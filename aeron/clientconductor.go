@@ -129,7 +129,7 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	interServiceTimeout time.Duration, driverTimeout time.Duration,
 	publicationConnectionTimeout time.Duration) *ClientConductor {
 
-	logger.Debugf("Initializing ClientConductor with: ", driverProxy, bcast, interServiceTimeout, driverTimeout,
+	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTimeout, driverTimeout,
 		publicationConnectionTimeout)
 
 	cc.driverProxy = driverProxy
@@ -341,16 +341,18 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 
 	for i, sub := range cc.subs {
 		if sub.registrationId == registrationId {
+			logger.Debugf("Removing subscription: %d; %v", registrationId, images)
 			cc.driverProxy.RemoveSubscription(registrationId)
 
 			cc.subs[i] = cc.subs[len(cc.subs)-1]
 			cc.subs[len(cc.subs)-1] = nil
 			cc.subs = cc.subs[:len(cc.subs)-1]
 
-			if cc.onUnavailableImageHandler != nil {
-				for _, image := range images {
+			for _, image := range images {
+				if cc.onUnavailableImageHandler != nil {
 					cc.onUnavailableImageHandler(image)
 				}
+				image.Close()
 			}
 
 			//lingerResources(m_epochClock(), images, imagesLength);

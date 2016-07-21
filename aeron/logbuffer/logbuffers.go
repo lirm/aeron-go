@@ -98,9 +98,9 @@ func (logBuffers *LogBuffers) Close() error {
 	logger.Info("Closing logBuffers")
 	// TODO accumulate errors
 	var err error
-	for i, mmap := range logBuffers.mmapFiles {
-		logger.Debugf("Closing [%i]: %v", i, mmap)
+	for _, mmap := range logBuffers.mmapFiles {
 		err = mmap.Close()
 	}
+	logBuffers.mmapFiles = nil
 	return err
 }

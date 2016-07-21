@@ -26,10 +26,11 @@ import (
 
 func TestAeronBasics(t *testing.T) {
 
-	logging.SetLevel(logging.INFO, "aeron")
-	logging.SetLevel(logging.INFO, "memmap")
-	logging.SetLevel(logging.INFO, "driver")
-	logging.SetLevel(logging.INFO, "counters")
+	//logging.SetLevel(logging.INFO, "aeron")
+	//logging.SetLevel(logging.INFO, "memmap")
+	//logging.SetLevel(logging.INFO, "driver")
+	//logging.SetLevel(logging.INFO, "counters")
+	//logging.SetLevel(logging.INFO, "logbuffers")
 
 	ctx := new(Context).AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
 	a := Connect(ctx)
@@ -63,6 +64,7 @@ func TestAeronBasics(t *testing.T) {
 		}
 		if time.Now().After(timeoutAt) {
 			t.Error("timed out waiting for message")
+			break
 		}
 	}
 	if fragmentsRead != 1 {

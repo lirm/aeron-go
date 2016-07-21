@@ -50,8 +50,10 @@ func (sub *Subscription) IsClosed() bool {
 }
 
 func (sub *Subscription) Close() error {
-	sub.isClosed.Store(true)
-	sub.conductor.ReleaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
+	if !sub.IsClosed() {
+		sub.isClosed.Store(true)
+		sub.conductor.ReleaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
+	}
 
 	return nil
 }

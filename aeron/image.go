@@ -21,6 +21,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
+	"sync/atomic"
 )
 
 type ControlledPollFragmentHandler func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header)
@@ -67,7 +68,8 @@ type Image struct {
 	logBuffers *logbuffer.LogBuffers
 
 	sourceIdentity   string
-	isClosed         bool // should be atomic
+	isClosed         atomic.Value
+
 	exceptionHandler func(error)
 
 	correlationId              int64
@@ -92,6 +94,7 @@ func NewImage(sessionId int32, correlationId int64, logBuffers *logbuffer.LogBuf
 	image.positionBitsToShift = util.NumberOfTrailingZeroes(capacity)
 	image.header.SetInitialTermId(logbuffer.InitialTermId(logBuffers.Buffer(logbuffer.Descriptor.LOG_META_DATA_SECTION_INDEX)))
 	image.header.SetPositionBitsToShift(int32(image.positionBitsToShift))
+	image.isClosed.Store(false)
 
 	return image
 }
@@ -100,7 +103,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	result := IMAGE_CLOSED
 
-	if !image.isClosed {
+	if !image.isClosed.Load().(bool) {
 		position := image.subscriberPosition.Get()
 		//logger.Debugf("Image position: %d, mask:%X", position, image.termLengthMask)
 		termOffset := int32(position) & image.termLengthMask
@@ -124,5 +127,12 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 }
 
 func (image *Image) Close() error {
-	return image.logBuffers.Close()
+	var err error = nil
+	// TODO this should likely be CAS
+	if !image.isClosed.Load().(bool) {
+		image.isClosed.Store(true)
+		logger.Debugf("Closing %v", image)
+		err = image.logBuffers.Close()
+	}
+	return err
 }
