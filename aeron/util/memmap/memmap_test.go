@@ -1,4 +1,4 @@
-package logbuffer
+package memmap
 
 import (
 	"fmt"
@@ -10,7 +10,8 @@ var MMAP string = "mmap.bin"
 
 func TestMmapBasics(t *testing.T) {
 	t.Logf("Beginning test")
-	mmap, err := CreateMemoryMappedFile(MMAP, 0, 8000)
+	mmap, err := New(MMAP, 0, 8000)
+	defer mmap.Close()
 	// t.Logf("mmap: %v, len:%d, err:%v", mmap.GetMemoryPtr(), mmap.GetMemorySize(), err)
 	fmt.Printf("mmap: %v, len:%d, err:%v\n", mmap.GetMemoryPtr(), mmap.GetMemorySize(), err)
 

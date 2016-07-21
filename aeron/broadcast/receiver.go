@@ -3,6 +3,7 @@ package broadcast
 import (
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/util"
+	"sync/atomic"
 )
 
 type Receiver struct {
@@ -17,23 +18,25 @@ type Receiver struct {
 	cursor       int64
 	nextRecord   int64
 
-	// std::atomic<long> lappedCount
 	lappedCount int64
 }
 
-func (recv *Receiver) Init(buffer *buffers.Atomic) {
+func NewReceiver(buffer *buffers.Atomic) *Receiver {
+	recv := new(Receiver)
 	recv.buffer = buffer
 	recv.capacity = buffer.Capacity() - BufferDescriptor.TRAILER_LENGTH
 	recv.mask = int64(recv.capacity) - 1
 	recv.tailIntentCounterIndex = recv.capacity + BufferDescriptor.TAIL_INTENT_COUNTER_OFFSET
 	recv.tailCounterIndex = recv.capacity + BufferDescriptor.TAIL_COUNTER_OFFSET
 	recv.latestCounterIndex = recv.capacity + BufferDescriptor.LATEST_COUNTER_OFFSET
+	recv.lappedCount = 0
+
+	CheckCapacity(recv.capacity)
+
+	return recv
 }
 
 func (recv *Receiver) Validate() bool {
-	// load fence = acquire()
-	// atomic::acquire();
-
 	return recv.validate(recv.cursor)
 }
 
@@ -42,8 +45,7 @@ func (recv *Receiver) validate(cursor int64) bool {
 }
 
 func (recv *Receiver) GetLappedCount() int64 {
-	// FIXME this needs to be atomic
-	return recv.lappedCount
+	return atomic.LoadInt64(&recv.lappedCount)
 }
 
 func (recv *Receiver) typeId() int32 {
@@ -68,18 +70,20 @@ func (recv *Receiver) receiveNext() bool {
 		recordOffset := int32(cursor & recv.mask)
 
 		if !recv.validate(cursor) {
-			recv.lappedCount += 1
+			atomic.AddInt64(&recv.lappedCount, 1)
 			cursor = recv.buffer.GetInt64(recv.latestCounterIndex)
 			recordOffset = int32(cursor & recv.mask)
 		}
 
 		recv.cursor = cursor
-		recv.nextRecord = cursor + int64(util.AlignInt32(recv.buffer.GetInt32(buffers.LengthOffset(recordOffset)), int32(buffers.RecordDescriptor.RECORD_ALIGNMENT)))
+		length := recv.buffer.GetInt32(buffers.LengthOffset(recordOffset))
+		alignedLength := int64(util.AlignInt32(length, buffers.RecordDescriptor.RECORD_ALIGNMENT))
+		recv.nextRecord = cursor + alignedLength
 
 		if buffers.RecordDescriptor.PADDING_MSG_TYPE_ID == recv.buffer.GetInt32(buffers.TypeOffset(recordOffset)) {
 			recordOffset = 0
 			recv.cursor = recv.nextRecord
-			recv.nextRecord += int64(util.AlignInt32(recv.buffer.GetInt32(buffers.LengthOffset(recordOffset)), int32(buffers.RecordDescriptor.RECORD_ALIGNMENT)))
+			recv.nextRecord += alignedLength
 		}
 
 		recv.recordOffset = recordOffset

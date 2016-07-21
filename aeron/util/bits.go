@@ -43,3 +43,7 @@ func FastMod3(value uint64) int32 {
 	value = (value >> 4) + (value & 0x000F)  // Max 0x3D.
 	return table[value]
 }
+
+func IsPowerOfTwo(value int32) bool {
+	return value > 0 && ((value & (^value + 1)) == value)
+}

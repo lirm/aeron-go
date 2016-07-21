@@ -16,7 +16,7 @@ func (m *StringFly) Length() int {
 
 func (m *StringFly) Wrap(buf *buffers.Atomic) *StringFly {
 	offset := 0
-	offset += m.s.wrap(buf, offset, &m.length)
+	offset += m.s.Wrap(buf, offset, &m.length)
 
 	m.length = offset
 	return m

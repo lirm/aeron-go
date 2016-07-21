@@ -10,12 +10,15 @@ type CopyReceiver struct {
 	scratchBuffer *buffers.Atomic
 }
 
-func (bcast *CopyReceiver) Init(receiver *Receiver) {
+func NewCopyReceiver(receiver *Receiver) *CopyReceiver {
+	bcast := new(CopyReceiver)
 	bcast.receiver = receiver
 	bcast.scratchBuffer = buffers.MakeAtomic(make([]byte, 4096))
 
+	// Scroll to the latest unprocessed
 	for bcast.receiver.receiveNext() {
 	}
+	return bcast
 }
 
 func (bcast *CopyReceiver) Receive(handler buffers.Handler) int {

@@ -2,6 +2,7 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
+	"sync/atomic"
 )
 
 type Subscription struct {
@@ -11,24 +12,39 @@ type Subscription struct {
 	registrationId  int64
 	streamId        int32
 
-	images []*Image
+	images atomic.Value
 
-	imagesLength int
+	isClosed atomic.Value
+}
 
-	isClosed bool
+func NewSubscription(conductor *ClientConductor, channel string, registrationId int64, streamId int32) *Subscription {
+	sub := new(Subscription)
+	sub.images.Store(make([]*Image, 0))
+	sub.conductor = conductor
+	sub.channel = channel
+	sub.registrationId = registrationId
+	sub.streamId = streamId
+	sub.isClosed.Store(false)
+
+	return sub
 }
 
 func (sub *Subscription) IsClosed() bool {
-	return sub.isClosed
+	return sub.isClosed.Load().(bool)
 }
 
-// int poll(const fragment_handler_t fragmentHandler, int fragmentLimit)
+func (sub *Subscription) Close() error {
+	sub.isClosed.Store(true)
+	sub.conductor.ReleaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
+
+	return nil
+}
+
 func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
-	// const int length = std::atomic_load(&m_imagesLength);
-	// Image *images = std::atomic_load(&m_images);
+	images := sub.images.Load().([]*Image)
+	length := len(images)
 	var fragmentsRead int = 0
-	var length int = sub.imagesLength
 
 	if length > 0 {
 		var startingIndex int = sub.roundRobinIndex
@@ -39,7 +55,7 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 
 		var i int = startingIndex
 		for fragmentsRead < fragmentLimit {
-			fragmentsRead += sub.images[i].Poll(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += images[i].Poll(handler, fragmentLimit-fragmentsRead)
 
 			i++
 			if i == length {
@@ -56,7 +72,8 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 }
 
 func (sub *Subscription) hasImage(sessionId int32) bool {
-	for _, image := range sub.images {
+	images := sub.images.Load().([]*Image)
+	for _, image := range images {
 		if image.sessionId == sessionId {
 			return true
 		}
@@ -64,13 +81,13 @@ func (sub *Subscription) hasImage(sessionId int32) bool {
 	return false
 }
 
-// FIXME make atomic
 func (sub *Subscription) addImage(image *Image) *[]*Image {
 
-	sub.images = append(sub.images, image)
-	sub.imagesLength = len(sub.images)
+	images := sub.images.Load().([]*Image)
 
-	return &sub.images
+	sub.images.Store(append(images, image))
+
+	return &images
 }
 
 func (sub *Subscription) removeImage(correlationId int64) (*Image, int) {
@@ -78,24 +95,20 @@ func (sub *Subscription) removeImage(correlationId int64) (*Image, int) {
 	var oldImage *Image
 	var oldIx int
 
-	for ix, image := range sub.images {
+	images := sub.images.Load().([]*Image)
+	for ix, image := range images {
 		if image.correlationId == correlationId {
+			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationId)
 			oldImage = image
 			oldIx = ix
-			/*
 
-			Image * newArray = new Image[length - 1]
+			images[ix] = images[len(images)-1]
+			images[len(images)-1] = nil
+			images = images[:len(images)-1]
 
-			for int i = 0, j = 0; i < length; i++ {
-				if i != index {
-					newArray[j++] = std::move(oldArray[i]);
-				}
-			}
+			sub.images.Store(images)
 
-			std::atomic_store(&m_imagesLength, length - 1);  // set length first. Don't go over end of new array on poll
-			std::atomic_store(&m_images, newArray);
-			*/
-
+			break
 		}
 	}
 

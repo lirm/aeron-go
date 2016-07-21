@@ -5,11 +5,13 @@ import (
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/lirm/aeron-go/aeron/driver"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
-	"github.com/lirm/aeron-go/aeron/driver"
 )
 
 var RegistrationStatus = struct {
@@ -23,8 +25,8 @@ var RegistrationStatus = struct {
 }
 
 const (
-	KEEPALIVE_TIMEOUT_MS int64 = 500
-	RESOURCE_TIMEOUT_MS  int64 = 1000
+	KEEPALIVE_TIMEOUT_NS int64 = 500 * int64(time.Millisecond)
+	RESOURCE_TIMEOUT_NS  int64 = 1000 * int64(time.Millisecond)
 )
 
 type PublicationStateDefn struct {
@@ -76,8 +78,8 @@ func (sub *SubscriptionStateDefn) Init(ch string, regId int64, sId int32, now in
 }
 
 type ClientConductor struct {
-	publications  []*PublicationStateDefn
-	subscriptions []*SubscriptionStateDefn
+	pubs []*PublicationStateDefn
+	subs []*SubscriptionStateDefn
 
 	driverProxy *driver.Proxy
 
@@ -96,69 +98,102 @@ type ClientConductor struct {
 	onUnavailableImageHandler UnavailableImageHandler
 	errorHandler              func(error)
 
-	running                         bool
-	driverActive                    bool // atomic
+	running      atomic.Value
+	driverActive atomic.Value
+
 	timeOfLastKeepalive             int64
 	timeOfLastCheckManagedResources int64
 	timeOfLastDoWork                int64
-	driverTimeoutMs                 int64
-	interServiceTimeoutMs           int64
-	publicationConnectionTimeoutMs  int64
+	driverTimeoutNs                 int64
+	interServiceTimeoutNs           int64
+	publicationConnectionTimeoutNs  int64
 }
 
-func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver, interServiceTimeoutNs int64, driverTimeoutNs int64) *ClientConductor {
+func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver,
+	interServiceTimeout time.Duration, driverTimeout time.Duration,
+	publicationConnectionTimeout time.Duration) *ClientConductor {
+
+	logger.Debugf("Initializing ClientConductor with: ", driverProxy, bcast, interServiceTimeout, driverTimeout,
+		publicationConnectionTimeout)
+
 	cc.driverProxy = driverProxy
-	cc.driverActive = true
+	cc.running.Store(true)
+	cc.driverActive.Store(true)
 	cc.driverListenerAdapter = driver.NewAdapter(cc, bcast)
-	cc.interServiceTimeoutMs = interServiceTimeoutNs / 1000000
-	cc.driverTimeoutMs = driverTimeoutNs / 1000000
+	cc.interServiceTimeoutNs = interServiceTimeout.Nanoseconds()
+	cc.driverTimeoutNs = driverTimeout.Nanoseconds()
+	cc.publicationConnectionTimeoutNs = publicationConnectionTimeout.Nanoseconds()
 
 	return cc
 }
 
-func (cc *ClientConductor) Run() {
+func (cc *ClientConductor) Close() error {
+	cc.running.Store(false)
 
-	cc.timeOfLastKeepalive = time.Now().UnixNano() / 1000000
-	cc.timeOfLastCheckManagedResources = time.Now().UnixNano() / 1000000
-	cc.timeOfLastDoWork = time.Now().UnixNano() / 1000000
+	// TODO accumulate errors
+	var err error
 
-	// FIXME needs a boolean flag for graceful shutdown
-	for {
+	for _, pub := range cc.pubs {
+		err = pub.publication.Close()
+		// In Go 1.7 should have the following line
+		// runtime.KeepAlice(pub.publication)
+	}
+	cc.pubs = nil
+
+	for _, sub := range cc.subs {
+		err = sub.subscription.Close()
+		// In Go 1.7 should have the following line
+		// runtime.KeepAlice(sub.subscription)
+	}
+	cc.subs = nil
+
+	return err
+}
+
+func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
+
+	cc.timeOfLastKeepalive = time.Now().UnixNano()
+	cc.timeOfLastCheckManagedResources = time.Now().UnixNano()
+	cc.timeOfLastDoWork = time.Now().UnixNano()
+
+	// In Go 1.7 should have the following line
+	// runtime.LockOSThread()
+
+	for cc.running.Load().(bool) {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
 		workCount += cc.onHeartbeatCheckTimeouts()
-		// FIXME this needs to happen!
-		// idleStrategy.idle(workCount)
-		time.Sleep(time.Microsecond)
+		idleStrategy.Idle(workCount)
 	}
 }
 
 func (cc *ClientConductor) verifyDriverIsActive() {
-	if !cc.driverActive {
+	if !cc.driverActive.Load().(bool) {
 		log.Fatal("Driver is not active")
 	}
 }
 
 func (cc *ClientConductor) AddPublication(channel string, streamId int32) int64 {
+	logger.Debugf("AddPublication: channel=%s, streamId=%d", channel, streamId)
 
 	cc.verifyDriverIsActive()
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, pub := range cc.publications {
+	for _, pub := range cc.pubs {
 		if pub.streamId == streamId && pub.channel == channel {
 			return pub.registrationId
 		}
 	}
 
-	now := time.Now().UnixNano() / 1000000
+	now := time.Now().UnixNano()
 
 	registrationId := cc.driverProxy.AddPublication(channel, streamId)
 
 	pubState := new(PublicationStateDefn)
 	pubState.Init(channel, registrationId, streamId, now)
 
-	cc.publications = append(cc.publications, pubState)
+	cc.pubs = append(cc.pubs, pubState)
 
 	return registrationId
 }
@@ -169,17 +204,19 @@ func (cc *ClientConductor) FindPublication(registrationId int64) *Publication {
 	defer cc.adminLock.Unlock()
 
 	var publication *Publication = nil
-	for _, pub := range cc.publications {
+	for _, pub := range cc.pubs {
 		if pub.registrationId == registrationId {
 			if pub.publication != nil {
 				publication = pub.publication
 			} else {
 				switch pub.status {
 				case RegistrationStatus.AWAITING_MEDIA_DRIVER:
-					now := time.Now().UnixNano() / 1000000
-					if now > (pub.timeOfRegistration + cc.driverTimeoutMs) {
-						log.Panic(fmt.Sprintf("No response on %v of %v", pub, cc.publications))
-						panic(fmt.Sprintf("No response from driver in %d ms", cc.driverTimeoutMs))
+					now := time.Now().UnixNano()
+					if now > (pub.timeOfRegistration + cc.driverTimeoutNs) {
+						logger.Errorf("No response from driver. started: %d, now: %d, to: %d",
+							pub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
+							cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
+						log.Panic(fmt.Sprintf("No response from driver on %v of %v", pub, cc.pubs))
 					}
 				case RegistrationStatus.REGISTERED_MEDIA_DRIVER:
 					publication = new(Publication)
@@ -206,29 +243,33 @@ func (cc *ClientConductor) FindPublication(registrationId int64) *Publication {
 }
 
 func (cc *ClientConductor) ReleasePublication(registrationId int64) {
+	logger.Debugf("ReleasePublication: registrationId=%d", registrationId)
 
 	cc.verifyDriverIsActive()
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, sub := range cc.subscriptions {
-		if sub.registrationId == registrationId {
+	for i, pub := range cc.pubs {
+		if pub.registrationId == registrationId {
 			cc.driverProxy.RemovePublication(registrationId)
 
-			// TODO remove from array
+			cc.pubs[i] = cc.pubs[len(cc.pubs)-1]
+			cc.pubs[len(cc.pubs)-1] = nil
+			cc.pubs = cc.pubs[:len(cc.pubs)-1]
 		}
 	}
 }
 
 func (cc *ClientConductor) AddSubscription(channel string, streamId int32) int64 {
+	logger.Debugf("AddSubscription: channel=%s, streamId=%d", channel, streamId)
 
 	cc.verifyDriverIsActive()
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	now := time.Now().UnixNano() / 1000000
+	now := time.Now().UnixNano()
 
 	registrationId := cc.driverProxy.AddSubscription(channel, streamId)
 
@@ -239,7 +280,7 @@ func (cc *ClientConductor) AddSubscription(channel string, streamId int32) int64
 	subState.streamId = streamId
 	subState.timeOfRegistration = now
 
-	cc.subscriptions = append(cc.subscriptions, subState)
+	cc.subs = append(cc.subs, subState)
 
 	return registrationId
 }
@@ -250,14 +291,17 @@ func (cc *ClientConductor) FindSubscription(registrationId int64) *Subscription 
 	defer cc.adminLock.Unlock()
 
 	var subscription *Subscription = nil
-	for _, sub := range cc.subscriptions {
+	for _, sub := range cc.subs {
 		if sub.registrationId == registrationId {
 
 			switch sub.status {
 			case RegistrationStatus.AWAITING_MEDIA_DRIVER:
-				now := time.Now().UnixNano() / 1000000
-				if now > (sub.timeOfRegistration + cc.driverTimeoutMs) {
-					log.Fatalf("No response on %v of %v", sub, cc.publications)
+				now := time.Now().UnixNano()
+				if now > (sub.timeOfRegistration + cc.driverTimeoutNs) {
+					logger.Errorf("No response from driver. started: %d, now: %d, to: %d",
+						sub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
+						cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
+					log.Fatalf("No response on %v of %v", sub, cc.subs)
 				}
 			case RegistrationStatus.ERRORED_MEDIA_DRIVER:
 				log.Fatalf("Error on %d: %d: %s", registrationId, sub.errorCode, sub.errorMessage)
@@ -271,19 +315,21 @@ func (cc *ClientConductor) FindSubscription(registrationId int64) *Subscription 
 	return subscription
 }
 
-func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*Image, imagesLength int) {
-	log.Printf("ReleaseSubscription: registrationId=%d", registrationId)
+func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*Image) {
+	logger.Debugf("ReleaseSubscription: registrationId=%d", registrationId)
 
 	cc.verifyDriverIsActive()
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, sub := range cc.subscriptions {
+	for i, sub := range cc.subs {
 		if sub.registrationId == registrationId {
 			cc.driverProxy.RemoveSubscription(registrationId)
 
-			// TODO remove from array
+			cc.subs[i] = cc.subs[len(cc.subs)-1]
+			cc.subs[len(cc.subs)-1] = nil
+			cc.subs = cc.subs[:len(cc.subs)-1]
 
 			if cc.onUnavailableImageHandler != nil {
 				for _, image := range images {
@@ -298,20 +344,20 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 
 func (cc *ClientConductor) OnNewPublication(streamId int32, sessionId int32, positionLimitCounterId int32,
 	logFileName string, registrationId int64) {
-	log.Printf("OnNewPublication: streamId=%d, sessionId=%d, positionLimitCounterId=%d, logFileName=%s, registrationId=%d",
+	logger.Debugf("OnNewPublication: streamId=%d, sessionId=%d, positionLimitCounterId=%d, logFileName=%s, registrationId=%d",
 		streamId, sessionId, positionLimitCounterId, logFileName, registrationId)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, pubDef := range cc.publications {
+	for _, pubDef := range cc.pubs {
 		if pubDef.registrationId == registrationId {
 			pubDef.status = RegistrationStatus.REGISTERED_MEDIA_DRIVER
 			pubDef.sessionId = sessionId
 			pubDef.positionLimitCounterId = positionLimitCounterId
 			pubDef.buffers = logbuffer.Wrap(logFileName)
 
-			log.Printf("Updated publication: %v", pubDef)
+			logger.Debugf("Updated publication: %v", pubDef)
 
 			if cc.onNewPublicationHandler != nil {
 				cc.onNewPublicationHandler(pubDef.channel, streamId, sessionId, registrationId)
@@ -321,15 +367,15 @@ func (cc *ClientConductor) OnNewPublication(streamId int32, sessionId int32, pos
 }
 
 func (cc *ClientConductor) OnAvailableImage(streamId int32, sessionId int32, logFilename string,
-	sourceIdentity string, subscriberPositionCount int32, subscriberPositions []driver.SubscriberPosition,
+	sourceIdentity string, subscriberPositionCount int, subscriberPositions []driver.SubscriberPosition,
 	correlationId int64) {
-	log.Printf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subscriberPositions=%v, correlationId=%d",
+	logger.Debugf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subscriberPositions=%v, correlationId=%d",
 		streamId, sessionId, logFilename, sourceIdentity, subscriberPositions, correlationId)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, sub := range cc.subscriptions {
+	for _, sub := range cc.subs {
 		if sub.streamId == streamId && sub.subscription != nil {
 			if !sub.subscription.hasImage(sessionId) {
 				for _, subPos := range subscriberPositions {
@@ -357,12 +403,12 @@ func (cc *ClientConductor) OnAvailableImage(streamId int32, sessionId int32, log
 }
 
 func (cc *ClientConductor) OnUnavailableImage(streamId int32, correlationId int64) {
-	log.Printf("OnUnavailableImage: streamId=%d, correlationId=%d", streamId, correlationId)
+	logger.Debugf("OnUnavailableImage: streamId=%d, correlationId=%d", streamId, correlationId)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, sub := range cc.subscriptions {
+	for _, sub := range cc.subs {
 		if sub.streamId == streamId {
 			sub.subscription.removeImage(correlationId)
 		}
@@ -370,30 +416,26 @@ func (cc *ClientConductor) OnUnavailableImage(streamId int32, correlationId int6
 }
 
 func (cc *ClientConductor) OnOperationSuccess(correlationId int64) {
-	log.Printf("OnOperationSuccess: correlationId=%d", correlationId)
+	logger.Debugf("OnOperationSuccess: correlationId=%d", correlationId)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, sub := range cc.subscriptions {
+	for _, sub := range cc.subs {
 		if sub.registrationId == correlationId && sub.status == RegistrationStatus.AWAITING_MEDIA_DRIVER {
 			sub.status = RegistrationStatus.REGISTERED_MEDIA_DRIVER
-			sub.subscription = new(Subscription)
-			sub.subscription.conductor = cc
-			sub.subscription.channel = sub.channel
-			sub.subscription.registrationId = correlationId
-			sub.subscription.streamId = sub.streamId
+			sub.subscription = NewSubscription(cc, sub.channel, correlationId, sub.streamId)
 		}
 	}
 }
 
 func (cc *ClientConductor) OnErrorResponse(correlationId int64, errorCode int32, errorMessage string) {
-	log.Printf("OnErrorResponse: correlationId=%d, errorCode=%d, errorMessage=%s", correlationId, errorCode, errorMessage)
+	logger.Debugf("OnErrorResponse: correlationId=%d, errorCode=%d, errorMessage=%s", correlationId, errorCode, errorMessage)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, pubDef := range cc.publications {
+	for _, pubDef := range cc.pubs {
 		if pubDef.registrationId == correlationId {
 			pubDef.status = RegistrationStatus.ERRORED_MEDIA_DRIVER
 			pubDef.errorCode = errorCode
@@ -402,7 +444,7 @@ func (cc *ClientConductor) OnErrorResponse(correlationId int64, errorCode int32,
 		}
 	}
 
-	for _, subDef := range cc.publications {
+	for _, subDef := range cc.pubs {
 		if subDef.registrationId == correlationId {
 			subDef.status = RegistrationStatus.ERRORED_MEDIA_DRIVER
 			subDef.errorCode = errorCode
@@ -416,70 +458,44 @@ func (cc *ClientConductor) onInterServiceTimeout(now int64) {
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
-	/*
-	   std::for_each(cc.publications.begin(), cc.publications.end(),
-	       [&](PublicationStateDefn& entry)
-	       {
-	           std::shared_ptr<Publication> pub = entry.m_publication.lock();
 
-	           if (nullptr != pub)
-	           {
-	               pub->close();
-	           }
-	       });
-
-	   cc.publications.clear();
-
-	   std::for_each(cc.subscriptions.begin(), cc.subscriptions.end(),
-	       [&](SubscriptionStateDefn& entry)
-	       {
-	           std::shared_ptr<Subscription> sub = entry.m_subscription.lock();
-
-	           if (nullptr != sub)
-	           {
-	               std::pair<Image *, int> removeResult = sub->removeAndCloseAllImages();
-	               Image* images = removeResult.first;
-	               const int imagesLength = removeResult.second;
-	           }
-	       });
-
-	   cc.subscriptions.clear();
-	*/
+	cc.Close()
 }
 
 func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 	var result int = 0
 
-	now := time.Now().UnixNano() / 1000000
+	now := time.Now().UnixNano()
 
-	if now > (cc.timeOfLastDoWork + cc.interServiceTimeoutMs) {
+	if now > (cc.timeOfLastDoWork + cc.interServiceTimeoutNs) {
 		cc.onInterServiceTimeout(now)
 
 		log.Fatalf("Timeout between service calls over %d ms (%d > %d + %d) (%d)",
-			cc.interServiceTimeoutMs,
-			now,
+			cc.interServiceTimeoutNs/time.Millisecond.Nanoseconds(),
+			now/time.Millisecond.Nanoseconds(),
 			cc.timeOfLastDoWork,
-			cc.interServiceTimeoutMs,
-			now-cc.timeOfLastDoWork)
+			cc.interServiceTimeoutNs/time.Millisecond.Nanoseconds(),
+			(now-cc.timeOfLastDoWork)/time.Millisecond.Nanoseconds())
 	}
 
 	cc.timeOfLastDoWork = now
 
-	if now > (cc.timeOfLastKeepalive + KEEPALIVE_TIMEOUT_MS) {
+	if now > (cc.timeOfLastKeepalive + KEEPALIVE_TIMEOUT_NS) {
 		cc.driverProxy.SendClientKeepalive()
 
-		hbTime := cc.driverProxy.TimeOfLastDriverKeepalive()
-		if now > (hbTime + cc.driverTimeoutMs) {
-			cc.driverActive = false
+		hbTime := cc.driverProxy.TimeOfLastDriverKeepalive() * time.Millisecond.Nanoseconds()
+		if now > (hbTime + cc.driverTimeoutNs) {
+			cc.driverActive.Store(false)
 
-			log.Fatalf("Driver has been inactive for over %d ms", cc.driverTimeoutMs)
+			log.Fatalf("Driver has been inactive for over %d ms",
+				cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
 		}
 
 		cc.timeOfLastKeepalive = now
 		result = 1
 	}
 
-	if now > (cc.timeOfLastCheckManagedResources + RESOURCE_TIMEOUT_MS) {
+	if now > (cc.timeOfLastCheckManagedResources + RESOURCE_TIMEOUT_NS) {
 		cc.timeOfLastCheckManagedResources = now
 		result = 1
 	}
@@ -488,6 +504,5 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 }
 
 func (cc *ClientConductor) isPublicationConnected(timeOfLastStatusMessage int64) bool {
-	now := time.Now().UnixNano() / 1000000
-	return now <= (timeOfLastStatusMessage + cc.publicationConnectionTimeoutMs)
+	return time.Now().UnixNano() <= (timeOfLastStatusMessage*int64(time.Millisecond) + cc.publicationConnectionTimeoutNs)
 }

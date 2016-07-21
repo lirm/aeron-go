@@ -1,41 +1,41 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/examples"
 	"log"
+	"time"
 )
 
 func main() {
-	ctx := new(aeron.Context).AeronDir("/tmp").MediaDriverTimeout(10000)
+	flag.Parse()
+
+	to := time.Duration(time.Millisecond.Nanoseconds() * examples.ExamplesConfig.DriverTo)
+	ctx := aeron.NewContext().AeronDir(examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
 
 	a := aeron.Connect(ctx)
 
-	subId := a.AddSubscription("aeron:udp?endpoint=localhost:40123", 10)
-	log.Printf("Subscription ID: %d, aeron: %v\n", subId, a)
-
-	subscription := a.FindSubscription(subId)
-	for subscription == nil {
-		subscription = a.FindSubscription(subId)
-	}
-
+	subscription := <-a.AddSubscription(examples.ExamplesConfig.Channel, examples.ExamplesConfig.StreamId)
+	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
-	// SleepingIdleStrategy idleStrategy(IDLE_SLEEP_MS);
 
 	counter := 1
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
-		// t.Logf("Gots me a fragment offset:%d length: %d\n", offset, length)
 		bytes := buffer.GetBytesArray(offset, length)
 		fmt.Printf("%8.d: Gots me a fragment offset:%d length: %d payload: %s\n", counter, offset, length, string(bytes))
 
 		counter++
 	}
 
-	// t.Logf("+++ Starting to receive +++\n")
+	idleStrategy := idlestrategy.Sleeping{time.Millisecond}
+
 	for {
-		_ = subscription.Poll(handler, 10)
-		// idleStrategy.idle(fragmentsRead);
+		fragmentsRead := subscription.Poll(handler, 10)
+		idleStrategy.Idle(fragmentsRead)
 	}
 }

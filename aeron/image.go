@@ -2,7 +2,6 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/buffers"
-	// "log"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
@@ -87,13 +86,14 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	if !image.isClosed {
 		position := image.subscriberPosition.Get()
-		// log.Printf("Image position: %d, mask:%X", position, image.termLengthMask)
+		//logger.Debugf("Image position: %d, mask:%X", position, image.termLengthMask)
 		termOffset := int32(position) & image.termLengthMask
-		termBuffer := image.termBuffers[logbuffer.IndexByPosition(position, image.positionBitsToShift)]
-		// log.Printf("Selected Term buffer: %v", termBuffer)
+		index := logbuffer.IndexByPosition(position, image.positionBitsToShift)
+		termBuffer := image.termBuffers[index]
+		//logger.Debugf("Selected Term buffer: %v", termBuffer)
 
 		var readOutcome term.ReadOutcome
-		term.Read(&readOutcome, termBuffer, termOffset, handler, fragmentLimit, &image.header, image.exceptionHandler)
+		term.Read(&readOutcome, termBuffer, termOffset, handler, fragmentLimit, &image.header)
 
 		newPosition := position + int64(readOutcome.Offset()-termOffset)
 		if newPosition > position {
@@ -105,4 +105,8 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	}
 
 	return result
+}
+
+func (image *Image) Close() error {
+	return image.logBuffers.Close()
 }

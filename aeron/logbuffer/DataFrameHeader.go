@@ -1,19 +1,5 @@
 package logbuffer
 
-/*
-struct DataFrameHeaderDefn {
-    std::int32_t frameLength;
-    std::int8_t version;
-    std::int8_t flags;
-    std::uint16_t type;
-    std::int32_t termOffset;
-    std::int32_t sessionId;
-    std::int32_t streamId;
-    std::int32_t termId;
-    std::int64_t reservedValue;
-},
-*/
-
 var DataFrameHeader = struct {
 	FRAME_LENGTH_FIELD_OFFSET   int32
 	VERSION_FIELD_OFFSET        int32

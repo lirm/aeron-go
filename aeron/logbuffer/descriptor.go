@@ -28,7 +28,7 @@ var Descriptor = struct {
 	LOG_DEFAULT_FRAME_HEADER_LENGTH_OFFSET int32
 	LOG_MTU_LENGTH_OFFSET                  int32
 
-	LOG_DEFAULT_FRAME_HEADER_OFFSET int32
+	LOG_DEFAULT_FRAME_HEADER_OFFSET uintptr
 	LOG_META_DATA_LENGTH            int32
 }{
 	64 * 1024,
@@ -46,23 +46,8 @@ var Descriptor = struct {
 	util.CACHE_LINE_LENGTH*4 + 12,
 	util.CACHE_LINE_LENGTH*4 + 16,
 
-	util.CACHE_LINE_LENGTH * 5,
+	uintptr(util.CACHE_LINE_LENGTH * 5),
 	util.CACHE_LINE_LENGTH * 7,
-}
-
-type LogMetaDataDefn struct {
-	/*
-	   std::int64_t termTailCounters[PARTITION_COUNT];
-	   std::int32_t activePartitionIndex;
-	   std::int8_t pad1[(2 * util::BitUtil::CACHE_LINE_LENGTH) - ((PARTITION_COUNT * sizeof(std::int64_t)) + sizeof(std::int32_t))];
-	   std::int64_t timeOfLastStatusMessage;
-	   std::int8_t pad2[(2 * util::BitUtil::CACHE_LINE_LENGTH) - sizeof(std::int64_t)];
-	   std::int64_t correlationId;
-	   std::int32_t initialTermId;
-	   std::int32_t defaultFrameHeaderLength;
-	   std::int32_t mtuLength;
-	   std::int8_t pad3[(util::BitUtil::CACHE_LINE_LENGTH) - (5 * sizeof(std::int32_t))];
-	*/
 }
 
 func checkTermLength(termLength int64) {
@@ -88,7 +73,8 @@ func computeTermLength(logLength int64) int64 {
 }
 
 func IndexByPosition(position int64, positionBitsToShift uint8) int32 {
-	return util.FastMod3(uint64(position) >> positionBitsToShift)
+	term := uint64(position) >> positionBitsToShift
+	return util.FastMod3(term)
 }
 
 func InitialTermId(logMetaDataBuffer *buffers.Atomic) int32 {

@@ -24,16 +24,6 @@ type Atomic struct {
 		MakeAtomicBuffer([]byte, len)
 */
 func MakeAtomic(args ...interface{}) *Atomic {
-	/*
-		for i,p := range args {
-			if p == nil {
-				fmt.Printf("nil parameter at %d\n", i)
-				continue
-			}
-
-			fmt.Printf("%d: %s of %v\n", i, reflect.TypeOf(p).String(), reflect.TypeOf(p).Kind())
-		}
-	*/
 	var bufPtr unsafe.Pointer = nil
 	var bufLen int32 = 0
 

@@ -2,24 +2,12 @@ package counters
 
 import (
 	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/lirm/aeron-go/aeron/util/memmap"
+	"github.com/op/go-logging"
+	"log"
 )
 
-/*
-   struct CounterValueDefn
-   {
-       std::int64_t counterValue;
-       std::int8_t pad1[(2 * util::BitUtil::CACHE_LINE_LENGTH) - sizeof(std::int64_t)];
-   };
-
-   struct CounterMetaDataDefn
-   {
-       std::int32_t state;
-       std::int32_t typeId;
-       std::int8_t key[(2 * util::BitUtil::CACHE_LINE_LENGTH) - (2 * sizeof(std::int32_t))];
-       std::int32_t labelLength;
-       std::int8_t label[(2 * util::BitUtil::CACHE_LINE_LENGTH) - sizeof(std::int32_t)];
-   };
-*/
+var logger = logging.MustGetLogger("counters")
 
 var ReaderConsts = struct {
 	RECORD_UNUSED    int32
@@ -49,4 +37,22 @@ var ReaderConsts = struct {
 
 func Offset(id int32) int32 {
 	return id * ReaderConsts.COUNTER_LENGTH
+}
+
+func MapCncFile(filename string) *memmap.File {
+
+	logger.Debugf("Trying to map file: %s", filename)
+	cncBuffer, err := memmap.MapExisting(filename, 0, 0)
+	if err != nil {
+		log.Fatalf("Failed to map the file %s with %s", filename, err.Error())
+	}
+
+	cncVer := CncVersion(cncBuffer)
+	logger.Debugf("Mapped %s for ver %d", filename, cncVer)
+
+	if Descriptor.CNC_VERSION != cncVer {
+		log.Fatalf("aeron cnc file version not understood: version=%d", cncVer)
+	}
+
+	return cncBuffer
 }

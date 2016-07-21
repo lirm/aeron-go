@@ -2,30 +2,34 @@ package logbuffer
 
 import (
 	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/util/memmap"
+	"github.com/op/go-logging"
 	"unsafe"
 )
 
+var logger = logging.MustGetLogger("logbuffers")
+
 type LogBuffers struct {
-	memoryMappedFiles []*MemoryMappedFile
-	buffers           [PARTITION_COUNT + 1]buffers.Atomic
+	mmapFiles []*memmap.File
+	buffers   [PARTITION_COUNT + 1]buffers.Atomic
 }
 
 func Wrap(fileName string) *LogBuffers {
 	buffers := new(LogBuffers)
 
-	logLength := GetFileSize(fileName)
+	logLength := memmap.GetFileSize(fileName)
 	termLength := computeTermLength(logLength)
 
 	checkTermLength(termLength)
 
 	if logLength < Descriptor.MAX_SINGLE_MAPPING_SIZE {
-		mmap, err := MapExistingMemoryMappedFile(fileName, 0, 0)
+		mmap, err := memmap.MapExisting(fileName, 0, 0)
 		if err != nil {
 			panic(err)
 		}
 
-		buffers.memoryMappedFiles = [](*MemoryMappedFile){mmap}
-		basePtr := uintptr(buffers.memoryMappedFiles[0].GetMemoryPtr())
+		buffers.mmapFiles = [](*memmap.File){mmap}
+		basePtr := uintptr(buffers.mmapFiles[0].GetMemoryPtr())
 		for i := 0; i < PARTITION_COUNT; i++ {
 			ptr := unsafe.Pointer(basePtr + uintptr(int64(i)*termLength))
 			buffers.buffers[i].Wrap(ptr, int32(termLength))
@@ -34,29 +38,29 @@ func Wrap(fileName string) *LogBuffers {
 		ptr := unsafe.Pointer(basePtr + uintptr(logLength-int64(Descriptor.LOG_META_DATA_LENGTH)))
 		buffers.buffers[PARTITION_COUNT].Wrap(ptr, Descriptor.LOG_META_DATA_LENGTH)
 	} else {
-		buffers.memoryMappedFiles = make([](*MemoryMappedFile), PARTITION_COUNT+1)
+		buffers.mmapFiles = make([](*memmap.File), PARTITION_COUNT+1)
 		metaDataSectionOffset := termLength * int64(PARTITION_COUNT)
 		metaDataSectionLength := int(logLength - metaDataSectionOffset)
 
-		mmap, err := MapExistingMemoryMappedFile(fileName, metaDataSectionOffset, metaDataSectionLength)
+		mmap, err := memmap.MapExisting(fileName, metaDataSectionOffset, metaDataSectionLength)
 		if err != nil {
 			panic("Failed to map the log buffer")
 		}
-		buffers.memoryMappedFiles = append(buffers.memoryMappedFiles, mmap)
+		buffers.mmapFiles = append(buffers.mmapFiles, mmap)
 
 		for i := 0; i < PARTITION_COUNT; i++ {
 			// one map for each term
-			mmap, err := MapExistingMemoryMappedFile(fileName, int64(i)*termLength, int(termLength))
+			mmap, err := memmap.MapExisting(fileName, int64(i)*termLength, int(termLength))
 			if err != nil {
 				panic("Failed to map the log buffer")
 			}
-			buffers.memoryMappedFiles = append(buffers.memoryMappedFiles, mmap)
+			buffers.mmapFiles = append(buffers.mmapFiles, mmap)
 
-			basePtr := buffers.memoryMappedFiles[i+1].GetMemoryPtr()
+			basePtr := buffers.mmapFiles[i+1].GetMemoryPtr()
 
 			buffers.buffers[i].Wrap(basePtr, int32(termLength))
 		}
-		metaDataBasePtr := buffers.memoryMappedFiles[0].GetMemoryPtr()
+		metaDataBasePtr := buffers.mmapFiles[0].GetMemoryPtr()
 		buffers.buffers[PARTITION_COUNT].Wrap(metaDataBasePtr, Descriptor.LOG_META_DATA_LENGTH)
 	}
 
@@ -72,4 +76,15 @@ func Wrap(fileName string) *LogBuffers {
 
 func (logBuffers *LogBuffers) Buffer(index int) *buffers.Atomic {
 	return &logBuffers.buffers[index]
+}
+
+func (logBuffers *LogBuffers) Close() error {
+	logger.Info("Closing logBuffers")
+	// TODO accumulate errors
+	var err error
+	for i, mmap := range logBuffers.mmapFiles {
+		logger.Debugf("Closing [%i]: %v", i, mmap)
+		err = mmap.Close()
+	}
+	return err
 }

@@ -28,7 +28,7 @@ func (driver *Proxy) AddSubscription(channel string, streamId int32) int64 {
 	filler := func(buffer *buffers.Atomic, length *int) int32 {
 
 		var message command.SubscriptionMessage
-		message.Wrap(buffer)
+		message.Wrap(buffer, 0)
 
 		message.ClientId.Set(driver.clientId)
 		message.CorrelationId.Set(correlationId)
@@ -53,7 +53,7 @@ func (driver *Proxy) RemoveSubscription(registrationId int64) int64 {
 	filler := func(buffer *buffers.Atomic, length *int) int32 {
 
 		var message command.RemoveMessage
-		message.Wrap(buffer)
+		message.Wrap(buffer, 0)
 
 		message.CorrelationId.Set(driver.clientId)
 		message.CorrelationId.Set(correlationId)
@@ -76,7 +76,7 @@ func (driver *Proxy) AddPublication(channel string, streamId int32) int64 {
 	filler := func(buffer *buffers.Atomic, length *int) int32 {
 
 		var message command.PublicationMessage
-		message.Wrap(buffer)
+		message.Wrap(buffer, 0)
 		message.ClientId.Set(driver.clientId)
 		message.CorrelationId.Set(correlationId)
 		message.StreamId.Set(streamId)
@@ -98,7 +98,7 @@ func (driver *Proxy) RemovePublication(registrationId int64) int64 {
 	filler := func(buffer *buffers.Atomic, length *int) int32 {
 
 		var message command.RemoveMessage
-		message.Wrap(buffer)
+		message.Wrap(buffer, 0)
 
 		message.CorrelationId.Set(driver.clientId)
 		message.CorrelationId.Set(correlationId)
@@ -119,7 +119,7 @@ func (driver *Proxy) SendClientKeepalive() {
 	filler := func(buffer *buffers.Atomic, length *int) int32 {
 
 		var message command.CorrelatedMessage
-		message.Wrap(buffer)
+		message.Wrap(buffer, 0)
 		message.ClientId.Set(driver.clientId)
 		message.CorrelationId.Set(0)
 

@@ -3,35 +3,26 @@ package aeron
 import (
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/aeron/term"
+	"github.com/op/go-logging"
 	"testing"
 	"time"
 )
 
-func TestAeron(t *testing.T) {
+func TestAeronBasics(t *testing.T) {
 
-	ctx := new(Context).AeronDir("/tmp").MediaDriverTimeout(10000)
+	logging.SetLevel(logging.INFO, "aeron")
+	logging.SetLevel(logging.INFO, "memmap")
+	logging.SetLevel(logging.INFO, "driver")
+	logging.SetLevel(logging.INFO, "counters")
+
+	ctx := new(Context).AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
 	a := Connect(ctx)
-	id := a.AddSubscription("aeron:udp?endpoint=localhost:40123", 10)
-	t.Logf("Subscription ID: %d, aeron: %v\n", id, a)
+	defer a.Close()
 
-	subscription := a.FindSubscription(id)
-	for subscription == nil {
-		subscription = a.FindSubscription(id)
-	}
+	subscription := <-a.AddSubscription("aeron:udp?endpoint=localhost:40123", 10)
+	publication := <-a.AddPublication("aeron:udp?endpoint=localhost:40123", 10)
 
-	t.Logf("Subscription found %v", subscription)
-
-	pubId := a.AddPublication("aeron:udp?endpoint=localhost:40123", 10)
-	t.Logf("Publication ID: %d, aeron: %v\n", pubId, a)
-
-	publication := a.FindPublication(pubId)
-	for publication == nil {
-		publication = a.FindPublication(pubId)
-	}
-	t.Logf("Publication found %v", publication)
-
-	counter := 1
+	counter := 0
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
 		t.Logf("%8.d: Gots me a fragment offset:%d length: %d\n", counter, offset, length)
 		counter++
@@ -39,25 +30,44 @@ func TestAeron(t *testing.T) {
 
 	message := "this is a message"
 	srcBuffer := buffers.MakeAtomic(([]byte)(message))
-	var ret int64 = -1
-	for ret < 0 {
-		ret = publication.Offer(srcBuffer, 0, int32(len(message)), term.DEFAULT_RESERVED_VALUE_SUPPLIER)
+	timeoutAt := time.Now().Add(time.Second * 10)
+	for publication.Offer(srcBuffer, 0, int32(len(message)), nil) <= 0 {
+		if time.Now().After(timeoutAt) {
+			t.Logf("Timed out at %v", time.Now())
+			break
+		}
 	}
-	t.Logf("Publication.Offer returned %d", ret)
 
-	now := time.Now().UnixNano()
 	fragmentsRead := 0
+	timeoutAt = time.Now().Add(time.Second * 10)
 	for {
 		fragmentsRead += subscription.Poll(handler, 10)
 		if fragmentsRead == 1 {
 			break
 		}
-		if time.Now().UnixNano()-now > 1000000000 {
+		if time.Now().After(timeoutAt) {
 			t.Error("timed out waiting for message")
 		}
 	}
 	if fragmentsRead != 1 {
 		t.Error("Expected 1 fragment. Got", fragmentsRead)
 	}
+	if counter != 1 {
+		t.Error("Expected 1 message. Got", counter)
+	}
 
+}
+
+func TestAeronClose(t *testing.T) {
+	logging.SetLevel(logging.INFO, "aeron")
+	logging.SetLevel(logging.INFO, "memmap")
+	logging.SetLevel(logging.INFO, "driver")
+	logging.SetLevel(logging.INFO, "counters")
+
+	ctx := new(Context).AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
+	ctx.unavailableImageHandler = func(img *Image) {
+		t.Logf("Image unavailable: %v", img)
+	}
+	a := Connect(ctx)
+	a.Close()
 }

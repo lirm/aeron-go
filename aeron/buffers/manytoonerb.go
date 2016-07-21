@@ -23,7 +23,7 @@ func (buf *ManyToOneRingBuffer) Init(buffer *Atomic) *ManyToOneRingBuffer {
 	buf.buffer = buffer
 	buf.capacity = buffer.Capacity() - RingBufferDescriptor.TRAILER_LENGTH
 
-	// FIXME Add power of 2 check on capacity
+	util.IsPowerOfTwo(buf.capacity)
 
 	buf.maxMsgLength = buf.capacity / 8
 	buf.tailPositionIndex = buf.capacity + RingBufferDescriptor.TAIL_POSITION_OFFSET
@@ -141,5 +141,6 @@ func (buf *ManyToOneRingBuffer) Write(msgTypeId int32, srcBuffer *Atomic, srcInd
 }
 
 func (buf *ManyToOneRingBuffer) Read(Handler, messageCountLimit int) int32 {
+	panic("Not implemented yet")
 	return -1
 }

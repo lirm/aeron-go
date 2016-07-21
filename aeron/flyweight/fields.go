@@ -8,6 +8,11 @@ import (
 	"unsafe"
 )
 
+type Field interface {
+	Wrap(buffer *buffers.Atomic, offset int)
+	Get() interface{}
+}
+
 type Int32Field struct {
 	offset unsafe.Pointer
 }

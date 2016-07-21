@@ -3,9 +3,14 @@ Implementation of [Aeron](https://github.com/real-logic/Aeron) messaging client 
 
 ## Outstanding items
 
-* Appending fragmented messages
+* Tests, tests, tests... 
 * Resource linger
-  Should, probably, use go routines with delay
-* Idle strategies
+    * Should, probably, use go routines with delay
 * Controlled poll
-* BufferClaims
+* Configuration reading
+* Command line args for pong/basic* examples
+* Error log buffer use
+* Error handling
+* Create Go-style benchmark test
+* Reduce type casting
+* Perf profiling

@@ -1,14 +1,14 @@
 package aeron
 
 import (
-	"fmt"
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/buffers"
-	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"log"
-	"os/user"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/lirm/aeron-go/aeron/util/memmap"
+	"github.com/op/go-logging"
+	"time"
 )
 
 type NewPublicationHandler func(string, int32, int32, int64)
@@ -18,39 +18,6 @@ type NewSubscriptionHandler func(string, int32, int64)
 type AvailableImageHandler func(*Image)
 
 type UnavailableImageHandler func(*Image)
-
-type Context struct {
-	aeronDir     string
-	errorHandler func(error)
-
-	newPublicationHandler        NewPublicationHandler
-	newSubscriptionHandler       NewSubscriptionHandler
-	availableImageHandler        AvailableImageHandler
-	unavailableImageHandler      UnavailableImageHandler
-	mediaDriverTimeoutMs         int64
-	resourceLingerTimeout        int64
-	publicationConnectionTimeout int64
-}
-
-func (ctx *Context) AeronDir(dir string) *Context {
-	ctx.aeronDir = dir
-	return ctx
-}
-
-func (ctx *Context) MediaDriverTimeout(to int64) *Context {
-	ctx.mediaDriverTimeoutMs = to
-	return ctx
-}
-
-func (ctx *Context) cncFileName() string {
-	user, err := user.Current()
-	var uName string = "unknown"
-	if err != nil {
-		log.Printf("Failed to get current user name: %v", err)
-	}
-	uName = user.Username
-	return ctx.aeronDir + "/aeron-" + uName + "/" + counters.Descriptor.CNC_FILE
-}
 
 type Aeron struct {
 	context            *Context
@@ -62,27 +29,22 @@ type Aeron struct {
 	toClientsAtomicBuffer *buffers.Atomic
 	counterValuesBuffer   *buffers.Atomic
 
-	cncBuffer *logbuffer.MemoryMappedFile
+	cncBuffer *memmap.File
 
 	toClientsBroadcastReceiver *broadcast.Receiver
 	toClientsCopyReceiver      *broadcast.CopyReceiver
 
-	/*
-			    std::random_device m_randomDevice;
-		    std::default_random_engine m_randomEngine;
-		    std::uniform_int_distribution<std::int32_t> m_sessionIdDistribution;
-
-
-
-		    SleepingIdleStrategy m_idleStrategy;
-	*/
+	idleStrategy idlestrategy.Idler
 }
+
+var logger = logging.MustGetLogger("aeron")
 
 func Connect(context *Context) *Aeron {
 	aeron := new(Aeron)
 	aeron.context = context
+	logger.Debugf("Connecting with context: %v", context)
 
-	aeron.cncBuffer = mapCncFile(context)
+	aeron.cncBuffer = counters.MapCncFile(context.cncFileName())
 
 	aeron.toDriverAtomicBuffer = counters.CreateToDriverBuffer(aeron.cncBuffer)
 	aeron.toClientsAtomicBuffer = counters.CreateToClientsBuffer(aeron.cncBuffer)
@@ -92,56 +54,59 @@ func Connect(context *Context) *Aeron {
 
 	aeron.driverProxy.Init(&aeron.toDriverRingBuffer)
 
-	aeron.toClientsBroadcastReceiver = new(broadcast.Receiver)
-	aeron.toClientsBroadcastReceiver.Init(aeron.toClientsAtomicBuffer)
-	//log.Printf("aeron.toClientsBroadcastReceiver: %v\n", aeron.toClientsBroadcastReceiver)
+	aeron.toClientsBroadcastReceiver = broadcast.NewReceiver(aeron.toClientsAtomicBuffer)
 
-	aeron.toClientsCopyReceiver = new(broadcast.CopyReceiver)
-	aeron.toClientsCopyReceiver.Init(aeron.toClientsBroadcastReceiver)
+	aeron.toClientsCopyReceiver = broadcast.NewCopyReceiver(aeron.toClientsBroadcastReceiver)
 
-	clientLivenessTimeout := counters.ClientLivenessTimeout(aeron.cncBuffer)
-	//log.Printf("clientLivenessTimeout=%d\n", clientLivenessTimeout)
+	clientLivenessTimeout := time.Duration(counters.ClientLivenessTimeout(aeron.cncBuffer))
 
-	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTimeout, context.mediaDriverTimeoutMs*1000000)
+	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTimeout,
+		context.mediaDriverTo, context.publicationConnectionTo)
 	aeron.conductor.counterValuesBuffer = aeron.counterValuesBuffer
-	//log.Printf("aeron.conductor: %v\n", aeron.conductor)
 
-	go aeron.conductor.Run()
+	aeron.idleStrategy = idlestrategy.Sleeping{time.Millisecond * 4}
+
+	go aeron.conductor.Run(aeron.idleStrategy)
 
 	return aeron
 }
 
-func mapCncFile(context *Context) *logbuffer.MemoryMappedFile {
+func (aeron *Aeron) Close() error {
+	err := aeron.conductor.Close()
 
-	//log.Printf("Trying to map file: %s", context.cncFileName())
-	cncBuffer, err := logbuffer.MapExistingMemoryMappedFile(context.cncFileName(), 0, 0)
-	if err != nil {
-		log.Fatal("Failed to map the file: " + context.cncFileName() + " with " + err.Error())
-	}
+	err = aeron.cncBuffer.Close()
 
-	cncVer := counters.CncVersion(cncBuffer)
-	//log.Printf("Mapped %s for ver %d", context.cncFileName(), cncVer)
-
-	if counters.Descriptor.CNC_VERSION != cncVer {
-		log.Fatal(
-			fmt.Sprintf("aeron cnc file version not understood: version=%d", cncVer))
-	}
-
-	return cncBuffer
+	return err
 }
 
-func (aeron *Aeron) AddPublication(channel string, streamId int32) int64 {
-	return aeron.conductor.AddPublication(channel, streamId)
+func (aeron *Aeron) AddSubscription(channel string, streamId int32) chan *Subscription {
+	ch := make(chan *Subscription, 1)
+
+	regId := aeron.conductor.AddSubscription(channel, streamId)
+	go func() {
+		subscription := aeron.conductor.FindSubscription(regId)
+		for subscription == nil {
+			subscription = aeron.conductor.FindSubscription(regId)
+		}
+		ch <- subscription
+		close(ch)
+	}()
+
+	return ch
 }
 
-func (aeron *Aeron) FindPublication(registrationId int64) *Publication {
-	return aeron.conductor.FindPublication(registrationId)
-}
+func (aeron *Aeron) AddPublication(channel string, streamId int32) chan *Publication {
+	ch := make(chan *Publication, 1)
 
-func (aeron *Aeron) AddSubscription(channel string, streamId int32) int64 {
-	return aeron.conductor.AddSubscription(channel, streamId)
-}
+	regId := aeron.conductor.AddPublication(channel, streamId)
+	go func() {
+		publication := aeron.conductor.FindPublication(regId)
+		for publication == nil {
+			publication = aeron.conductor.FindPublication(regId)
+		}
+		ch <- publication
+		close(ch)
+	}()
 
-func (aeron *Aeron) FindSubscription(registrationId int64) *Subscription {
-	return aeron.conductor.FindSubscription(registrationId)
+	return ch
 }

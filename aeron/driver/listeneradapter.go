@@ -3,8 +3,11 @@ package driver
 import (
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/buffers"
-	"log"
+	"github.com/lirm/aeron-go/aeron/command"
+	"github.com/op/go-logging"
 )
+
+var logger = logging.MustGetLogger("driver")
 
 var Events = struct {
 	/** Error Response */
@@ -44,7 +47,7 @@ type Listener interface {
 	OnNewPublication(streamId int32, sessionId int32, positionLimitCounterId int32,
 		logFileName string, registrationId int64)
 	OnAvailableImage(streamId int32, sessionId int32, logFilename string,
-		sourceIdentity string, subscriberPositionCount int32,
+		sourceIdentity string, subscriberPositionCount int,
 		subscriberPositions []SubscriberPosition,
 		correlationId int64)
 	OnUnavailableImage(streamId int32, correlationId int64)
@@ -57,7 +60,7 @@ type ListenerAdapter struct {
 	broadcastReceiver *broadcast.CopyReceiver
 }
 
-func NewAdapter(driverListener    Listener, broadcastReceiver *broadcast.CopyReceiver) *ListenerAdapter {
+func NewAdapter(driverListener Listener, broadcastReceiver *broadcast.CopyReceiver) *ListenerAdapter {
 	adapter := new(ListenerAdapter)
 	adapter.listener = driverListener
 	adapter.broadcastReceiver = broadcastReceiver
@@ -67,76 +70,86 @@ func NewAdapter(driverListener    Listener, broadcastReceiver *broadcast.CopyRec
 
 func (adapter *ListenerAdapter) ReceiveMessages() int {
 	handler := func(msgTypeId int32, buffer *buffers.Atomic, offset int32, length int32) {
-		// log.Printf("received %d", msgTypeId)
+		logger.Debugf("received %d", msgTypeId)
 		switch int32(msgTypeId) {
 		case Events.ON_PUBLICATION_READY:
-			// log.Printf("received ON_PUBLICATION_READY")
+			logger.Debugf("received ON_PUBLICATION_READY")
 
-			correlationId := buffer.GetInt64(offset)
-			sessionId := buffer.GetInt32(offset + 8)
-			streamId := buffer.GetInt32(offset + 12)
-			positionLimitCounterId := buffer.GetInt32(offset + 16)
-			logFileNameSize := buffer.GetInt32(offset + 20)
-			logFileNameBytes := buffer.GetBytesArray(offset+24, int32(logFileNameSize))
-			logFileName := string(logFileNameBytes)
+			var msg PublicationReady
+			msg.Wrap(buffer, int(offset))
+
+			correlationId := msg.correlationId.Get()
+			sessionId := msg.sessionId.Get()
+			streamId := msg.streamId.Get()
+			positionLimitCounterId := msg.publicationLimitOffset.Get()
+			logFileName := msg.logFile.Get()
 
 			adapter.listener.OnNewPublication(streamId, sessionId, positionLimitCounterId, logFileName, correlationId)
 		case Events.ON_AVAILABLE_IMAGE:
-			// log.Printf("received ON_AVAILABLE_IMAGE")
+			logger.Debugf("received ON_AVAILABLE_IMAGE")
 
-			correlationId := buffer.GetInt64(offset)
-			sessionId := buffer.GetInt32(offset + 8)
-			streamId := buffer.GetInt32(offset + 12)
-			subscriberPositionBlockLength := buffer.GetInt32(offset + 16)
-			subscriberPositionCount := buffer.GetInt32(offset + 20)
+			var header ImageReadyHeader
+			header.Wrap(buffer, int(offset))
 
-			subscriberPositions := make([]SubscriberPosition, subscriberPositionCount)
-			ix := 0
+			correlationId := header.correlationId.Get()
+			sessionId := header.sessionId.Get()
+			streamId := header.streamId.Get()
+			subsPosBlockLen := header.subsPosBlockLen.Get()
+			subsPosBlockCnt := int(header.subsPosBlockCnt.Get())
+			logger.Debugf("position count: %d block len: %d", subsPosBlockCnt, subsPosBlockLen)
+
+			subscriberPositions := make([]SubscriberPosition, subsPosBlockCnt)
 			pos := offset + int32(24)
-			logFileNameOffset := pos + int32(subscriberPositionBlockLength)
-			for ; pos < logFileNameOffset; ix++ {
-				subscriberPositions[ix].indicatorId = buffer.GetInt32(pos)
-				pos += 4
-				subscriberPositions[ix].registrationId = buffer.GetInt64(pos)
-				pos += 8
+			var posFly SubscriberPositionFly
+			for ix := 0; ix < subsPosBlockCnt; ix++ {
+				posFly.Wrap(buffer, int(pos))
+				pos += subsPosBlockLen
+
+				subscriberPositions[ix].indicatorId = posFly.indicatorId.Get()
+				subscriberPositions[ix].registrationId = posFly.registrationId.Get()
 			}
+			logger.Debugf("positions: %v", subscriberPositions)
 
-			logFileNameSize := buffer.GetInt32(logFileNameOffset)
-			logFileNameBytes := buffer.GetBytesArray(logFileNameOffset+4, int32(logFileNameSize))
-			logFileName := string(logFileNameBytes)
+			var trailer ImageReadyTrailer
+			trailer.Wrap(buffer, int(pos))
 
-			sourceIdentityOffset := logFileNameOffset + int32(4+logFileNameSize)
-			sourceIdentitySize := buffer.GetInt32(sourceIdentityOffset)
-			sourceIdentityBytes := buffer.GetBytesArray(sourceIdentityOffset+4, int32(sourceIdentitySize))
-			sourceIdentity := string(sourceIdentityBytes)
+			logFileName := trailer.logFile.Get()
+			logger.Debugf("logFileName: %v", logFileName)
 
-			adapter.listener.OnAvailableImage(streamId, sessionId, logFileName,
-				sourceIdentity, subscriberPositionCount, subscriberPositions, correlationId)
+			sourceIdentity := trailer.sourceIdentity.Get()
+			logger.Debugf("sourceIdentity: %v", sourceIdentity)
+
+			adapter.listener.OnAvailableImage(streamId, sessionId, logFileName, sourceIdentity,
+				subsPosBlockCnt, subscriberPositions, correlationId)
 		case Events.ON_OPERATION_SUCCESS:
-			// log.Printf("received ON_OPERATION_SUCCESS")
+			logger.Debugf("received ON_OPERATION_SUCCESS")
 
-			correlationId := buffer.GetInt64(offset + 8)
+			var msg command.CorrelatedMessage
+			msg.Wrap(buffer, int(offset))
+
+			correlationId := msg.CorrelationId.Get()
 
 			adapter.listener.OnOperationSuccess(correlationId)
 		case Events.ON_UNAVAILABLE_IMAGE:
-			// log.Printf("received ON_UNAVAILABLE_IMAGE")
+			logger.Debugf("received ON_UNAVAILABLE_IMAGE")
 
-			streamId := buffer.GetInt32(offset + 8)
-			correlationId := buffer.GetInt64(offset)
+			var msg command.ImageMessage
+			msg.Wrap(buffer, int(offset))
+
+			streamId := msg.StreamId.Get()
+			correlationId := msg.CorrelationId.Get()
 
 			adapter.listener.OnUnavailableImage(streamId, correlationId)
 		case Events.ON_ERROR:
-			// log.Printf("received ON_ERROR")
+			logger.Debugf("received ON_ERROR")
 
-			offendingCommandCorrelationId := buffer.GetInt64(offset)
-			errorCode := buffer.GetInt32(offset + 8)
-			errorSize := buffer.GetInt32(offset + 12)
-			errorBytes := buffer.GetBytesArray(offset+16, int32(errorSize))
-			errorMessage := string(errorBytes)
+			var msg ErrorMessage
+			msg.Wrap(buffer, int(offset))
 
-			adapter.listener.OnErrorResponse(offendingCommandCorrelationId, errorCode, errorMessage)
+			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationId.Get(),
+				msg.errorCode.Get(), msg.errorMessage.Get())
 		default:
-			log.Printf("received unhandled %d", msgTypeId)
+			logger.Debugf("received unhandled %d", msgTypeId)
 		}
 	}
 

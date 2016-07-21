@@ -1,48 +1,47 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/buffers"
-	"github.com/lirm/aeron-go/aeron/term"
+	"github.com/lirm/aeron-go/examples"
 	"log"
 	"time"
 )
 
 func main() {
-	ctx := new(aeron.Context).AeronDir("/tmp").MediaDriverTimeout(10000)
+	flag.Parse()
+
+	to := time.Duration(time.Millisecond.Nanoseconds() * examples.ExamplesConfig.DriverTo)
+	ctx := aeron.NewContext().AeronDir(examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
 
 	a := aeron.Connect(ctx)
 
-	pubId := a.AddPublication("aeron:udp?endpoint=localhost:40123", 10)
-	log.Printf("Publication ID: %d, aeron: %v\n", pubId, a)
-
-	//time.Sleep(time.Second)
-
-	publication := a.FindPublication(pubId)
-	for publication == nil {
-		publication = a.FindPublication(pubId)
-	}
-
+	publication := <-a.AddPublication(examples.ExamplesConfig.Channel, examples.ExamplesConfig.StreamId)
+	defer publication.Close()
 	log.Printf("Publication found %v", publication)
 
-	// t.Logf("+++ Starting to publish +++\n")
-	for {
-		message := "this is a message"
+	for counter := 0; counter < examples.ExamplesConfig.Messages; counter++ {
+		message := fmt.Sprintf("this is a message %d", counter)
 		srcBuffer := buffers.MakeAtomic(([]byte)(message))
-		ret := publication.Offer(srcBuffer, 0, int32(len(message)), term.DEFAULT_RESERVED_VALUE_SUPPLIER)
+		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
 		switch ret {
 		case aeron.NOT_CONNECTED:
-			log.Printf("not connected yet")
+			log.Printf("%d: not connected yet", counter)
 		case aeron.BACK_PRESSURED:
-			log.Printf("back pressured")
+			log.Printf("%d: back pressured", counter)
 		default:
 			if ret < 0 {
-				log.Printf("Unrecognized code: %d", ret)
+				log.Printf("%d: Unrecognized code: %d", counter, ret)
 			} else {
-				log.Printf("success!")
+				log.Printf("%d: success!", counter)
 			}
 		}
-		//log.Printf("Publication.Offer returned %d", ret)
+
+		if !publication.IsConnected() {
+			log.Printf("no subscribers detected")
+		}
 		time.Sleep(time.Second)
 	}
 }

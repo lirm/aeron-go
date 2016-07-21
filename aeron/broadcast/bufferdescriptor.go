@@ -2,6 +2,7 @@ package broadcast
 
 import (
 	"github.com/lirm/aeron-go/aeron/util"
+	"log"
 )
 
 var BufferDescriptor = struct {
@@ -17,9 +18,7 @@ var BufferDescriptor = struct {
 }
 
 func CheckCapacity(capacity int32) {
-
-	// if (!util::BitUtil::isPowerOfTwo(capacity)) {
-	// panic(
-	// fmt.Sprintf("Capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=%d", capacity))
-	// }
+	if !util.IsPowerOfTwo(capacity) {
+		log.Fatalf("Capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=%d", capacity)
+	}
 }
