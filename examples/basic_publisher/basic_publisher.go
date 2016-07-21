@@ -29,16 +29,16 @@ import (
 func main() {
 	flag.Parse()
 
-	to := time.Duration(time.Millisecond.Nanoseconds() * examples.ExamplesConfig.DriverTo)
-	ctx := aeron.NewContext().AeronDir(examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
+	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
+	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
 
 	a := aeron.Connect(ctx)
 
-	publication := <-a.AddPublication(examples.ExamplesConfig.Channel, examples.ExamplesConfig.StreamId)
+	publication := <-a.AddPublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamId))
 	defer publication.Close()
 	log.Printf("Publication found %v", publication)
 
-	for counter := 0; counter < examples.ExamplesConfig.Messages; counter++ {
+	for counter := 0; counter < *examples.ExamplesConfig.Messages; counter++ {
 		message := fmt.Sprintf("this is a message %d", counter)
 		srcBuffer := buffers.MakeAtomic(([]byte)(message))
 		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)

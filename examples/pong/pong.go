@@ -36,20 +36,22 @@ func main() {
 
 	flag.Parse()
 
-	to := time.Duration(time.Millisecond.Nanoseconds() * examples.ExamplesConfig.DriverTo)
-	ctx := aeron.NewContext().AeronDir(examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
+	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
+	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
 
 	a := aeron.Connect(ctx)
 
-	subscription := <-a.AddSubscription(examples.PingPongConfig.PingChannel, examples.PingPongConfig.PingStreamId)
+	subscription := <-a.AddSubscription(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamId))
 	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
 
-	publication := <-a.AddPublication(examples.PingPongConfig.PongChannel, examples.PingPongConfig.PongStreamId)
+	publication := <-a.AddPublication(*examples.PingPongConfig.PongChannel, int32(*examples.PingPongConfig.PongStreamId))
 	defer publication.Close()
 	log.Printf("Publication found %v", publication)
 
-	if examples.ExamplesConfig.ProfilerEnabled {
+	log.Printf("%v",  examples.ExamplesConfig)
+
+	if *examples.ExamplesConfig.ProfilerEnabled {
 		fname := fmt.Sprintf("pong-%d.pprof", time.Now().Unix())
 		log.Printf("Profiling enabled. Will use: %s", fname)
 		f, err := os.Create(fname)

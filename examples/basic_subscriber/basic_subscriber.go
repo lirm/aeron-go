@@ -31,12 +31,12 @@ import (
 func main() {
 	flag.Parse()
 
-	to := time.Duration(time.Millisecond.Nanoseconds() * examples.ExamplesConfig.DriverTo)
-	ctx := aeron.NewContext().AeronDir(examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
+	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
+	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
 
 	a := aeron.Connect(ctx)
 
-	subscription := <-a.AddSubscription(examples.ExamplesConfig.Channel, examples.ExamplesConfig.StreamId)
+	subscription := <-a.AddSubscription(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamId))
 	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
 
