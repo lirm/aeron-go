@@ -32,7 +32,7 @@ func TestAeronBasics(t *testing.T) {
 	logging.SetLevel(logging.INFO, "counters")
 	logging.SetLevel(logging.INFO, "logbuffers")
 
-	ctx := new(Context).AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
+	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
 	a := Connect(ctx)
 	defer a.Close()
 
@@ -83,7 +83,7 @@ func TestAeronClose(t *testing.T) {
 	logging.SetLevel(logging.INFO, "counters")
 	logging.SetLevel(logging.INFO, "logbuffers")
 
-	ctx := new(Context).AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
+	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
 	ctx.unavailableImageHandler = func(img *Image) {
 		t.Logf("Image unavailable: %v", img)
 	}

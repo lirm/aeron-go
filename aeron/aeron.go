@@ -21,7 +21,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
 	"time"
@@ -49,18 +48,16 @@ type Aeron struct {
 
 	toClientsBroadcastReceiver *broadcast.Receiver
 	toClientsCopyReceiver      *broadcast.CopyReceiver
-
-	idleStrategy idlestrategy.Idler
 }
 
 var logger = logging.MustGetLogger("aeron")
 
-func Connect(context *Context) *Aeron {
+func Connect(ctx *Context) *Aeron {
 	aeron := new(Aeron)
-	aeron.context = context
-	logger.Debugf("Connecting with context: %v", context)
+	aeron.context = ctx
+	logger.Debugf("Connecting with context: %v", ctx)
 
-	aeron.cncBuffer = counters.MapCncFile(context.cncFileName())
+	aeron.cncBuffer = counters.MapCncFile(ctx.cncFileName())
 
 	aeron.toDriverAtomicBuffer = counters.CreateToDriverBuffer(aeron.cncBuffer)
 	aeron.toClientsAtomicBuffer = counters.CreateToClientsBuffer(aeron.cncBuffer)
@@ -74,15 +71,13 @@ func Connect(context *Context) *Aeron {
 
 	aeron.toClientsCopyReceiver = broadcast.NewCopyReceiver(aeron.toClientsBroadcastReceiver)
 
-	clientLivenessTimeout := time.Duration(counters.ClientLivenessTimeout(aeron.cncBuffer))
+	clientLivenessTo := time.Duration(counters.ClientLivenessTimeout(aeron.cncBuffer))
 
-	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTimeout,
-		context.mediaDriverTo, context.publicationConnectionTo)
+	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTo, ctx.mediaDriverTo,
+		ctx.publicationConnectionTo)
 	aeron.conductor.counterValuesBuffer = aeron.counterValuesBuffer
 
-	aeron.idleStrategy = idlestrategy.Sleeping{time.Millisecond * 4}
-
-	go aeron.conductor.Run(aeron.idleStrategy)
+	go aeron.conductor.Run(ctx.idleStrategy)
 
 	return aeron
 }

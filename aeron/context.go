@@ -18,12 +18,16 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"os/user"
 	"time"
 )
 
+// https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
 type Context struct {
-	aeronDir     string
+	aeronDir      string // aeron.dir
+	mediaDriverTo time.Duration
+
 	errorHandler func(error)
 
 	newPublicationHandler   NewPublicationHandler
@@ -31,15 +35,18 @@ type Context struct {
 	availableImageHandler   AvailableImageHandler
 	unavailableImageHandler UnavailableImageHandler
 
-	mediaDriverTo           time.Duration
 	resourceLingerTo        time.Duration
 	publicationConnectionTo time.Duration
+	interServiceTo          time.Duration
+
+	idleStrategy idlestrategy.Idler
 }
 
 func NewContext() *Context {
 	ctx := new(Context)
 
 	ctx.aeronDir = "/tmp"
+
 	ctx.errorHandler = func(err error) { logger.Error(err) }
 
 	ctx.newPublicationHandler = func(string, int32, int32, int64) {}
@@ -50,6 +57,9 @@ func NewContext() *Context {
 	ctx.mediaDriverTo = time.Millisecond * 500
 	ctx.resourceLingerTo = time.Millisecond * 10
 	ctx.publicationConnectionTo = time.Second * 5
+	ctx.interServiceTo = time.Second * 10
+
+	ctx.idleStrategy = idlestrategy.Sleeping{time.Millisecond * 4}
 
 	return ctx
 }
