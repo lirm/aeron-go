@@ -24,6 +24,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"io"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -93,6 +94,11 @@ func (sub *SubscriptionStateDefn) Init(ch string, regId int64, sId int32, now in
 	return sub
 }
 
+type LingerResourse struct {
+	lastTime int64
+	resource io.Closer
+}
+
 type ClientConductor struct {
 	pubs []*PublicationStateDefn
 	subs []*SubscriptionStateDefn
@@ -105,9 +111,8 @@ type ClientConductor struct {
 
 	adminLock sync.Mutex
 
-	/*
-		epoch_clock_t m_epochClock;
-	*/
+	lingeringResources chan LingerResourse
+
 	onNewPublicationHandler   NewPublicationHandler
 	onNewSubscriptionHandler  NewSubscriptionHandler
 	onAvailableImageHandler   AvailableImageHandler
@@ -123,6 +128,7 @@ type ClientConductor struct {
 	driverTimeoutNs                 int64
 	interServiceTimeoutNs           int64
 	publicationConnectionTimeoutNs  int64
+	resourceLingerTimeoutNs         int64
 }
 
 func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver,
@@ -139,6 +145,10 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	cc.interServiceTimeoutNs = interServiceTimeout.Nanoseconds()
 	cc.driverTimeoutNs = driverTimeout.Nanoseconds()
 	cc.publicationConnectionTimeoutNs = publicationConnectionTimeout.Nanoseconds()
+	// TODO make configurable
+	cc.resourceLingerTimeoutNs = (time.Second * 3).Nanoseconds()
+
+	cc.lingeringResources = make(chan LingerResourse, 1024)
 
 	return cc
 }
@@ -339,6 +349,8 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
+	now := time.Now().UnixNano()
+
 	for i, sub := range cc.subs {
 		if sub.registrationId == registrationId {
 			logger.Debugf("Removing subscription: %d; %v", registrationId, images)
@@ -353,9 +365,8 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 					cc.onUnavailableImageHandler(image)
 				}
 				image.Close()
+				cc.lingeringResources <- LingerResourse{now, image}
 			}
-
-			//lingerResources(m_epochClock(), images, imagesLength);
 		}
 	}
 }
@@ -428,7 +439,8 @@ func (cc *ClientConductor) OnUnavailableImage(streamId int32, correlationId int6
 
 	for _, sub := range cc.subs {
 		if sub.streamId == streamId {
-			sub.subscription.removeImage(correlationId)
+			image := sub.subscription.removeImage(correlationId)
+			cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), image}
 		}
 	}
 }
@@ -514,11 +526,34 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 	}
 
 	if now > (cc.timeOfLastCheckManagedResources + RESOURCE_TIMEOUT_NS) {
+		cc.onCheckManagedResources(now)
 		cc.timeOfLastCheckManagedResources = now
 		result = 1
 	}
 
 	return result
+}
+
+func (cc *ClientConductor) onCheckManagedResources(now int64) {
+	moreToCheck := true
+	for moreToCheck {
+		select {
+		case r := <-cc.lingeringResources:
+			logger.Debugf("Resource to linger: %v", r)
+			if cc.resourceLingerTimeoutNs < now-r.lastTime {
+				logger.Debugf("lingering resource expired(%dms old): %v",
+					(now-r.lastTime)/time.Millisecond.Nanoseconds(), r.resource)
+				r.resource.Close()
+			} else {
+				// The assumption is that resources are queued in order
+				moreToCheck = false
+				// FIXME ..and we're breaking it here, but since there is no peek...
+				cc.lingeringResources <- r
+			}
+		default:
+			moreToCheck = false
+		}
+	}
 }
 
 func (cc *ClientConductor) isPublicationConnected(timeOfLastStatusMessage int64) bool {

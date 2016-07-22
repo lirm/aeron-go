@@ -23,13 +23,13 @@ import (
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/examples"
 	"log"
 	"os"
 	"os/signal"
 	"runtime/pprof"
 	"syscall"
 	"time"
-	"github.com/lirm/aeron-go/examples"
 )
 
 func main() {
@@ -49,7 +49,7 @@ func main() {
 	defer publication.Close()
 	log.Printf("Publication found %v", publication)
 
-	log.Printf("%v",  examples.ExamplesConfig)
+	log.Printf("%v", examples.ExamplesConfig)
 
 	if *examples.ExamplesConfig.ProfilerEnabled {
 		fname := fmt.Sprintf("pong-%d.pprof", time.Now().Unix())

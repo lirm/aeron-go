@@ -67,8 +67,8 @@ type Image struct {
 
 	logBuffers *logbuffer.LogBuffers
 
-	sourceIdentity   string
-	isClosed         atomic.Value
+	sourceIdentity string
+	isClosed       atomic.Value
 
 	exceptionHandler func(error)
 

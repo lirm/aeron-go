@@ -108,17 +108,12 @@ func (sub *Subscription) addImage(image *Image) *[]*Image {
 	return &images
 }
 
-func (sub *Subscription) removeImage(correlationId int64) (*Image, int) {
-
-	var oldImage *Image
-	var oldIx int
+func (sub *Subscription) removeImage(correlationId int64) *Image {
 
 	images := sub.images.Load().([]*Image)
 	for ix, image := range images {
 		if image.correlationId == correlationId {
 			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationId)
-			oldImage = image
-			oldIx = ix
 
 			images[ix] = images[len(images)-1]
 			images[len(images)-1] = nil
@@ -126,9 +121,8 @@ func (sub *Subscription) removeImage(correlationId int64) (*Image, int) {
 
 			sub.images.Store(images)
 
-			break
+			return image
 		}
 	}
-
-	return oldImage, oldIx
+	return nil
 }
