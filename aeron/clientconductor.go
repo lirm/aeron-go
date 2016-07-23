@@ -244,8 +244,7 @@ func (cc *ClientConductor) FindPublication(registrationId int64) *Publication {
 						log.Panic(fmt.Sprintf("No response from driver on %v of %v", pub, cc.pubs))
 					}
 				case RegistrationStatus.REGISTERED_MEDIA_DRIVER:
-					publication = new(Publication)
-					publication.Init(pub.buffers)
+					publication = NewPublication(pub.buffers)
 					publication.conductor = cc
 					publication.channel = pub.channel
 					publication.registrationId = registrationId
