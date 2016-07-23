@@ -118,7 +118,7 @@ func (pub *Publication) Offer(buffer *buffers.Atomic, offset int32, length int32
 		termOffset := rawTail & 0xFFFFFFFF
 		position := logbuffer.ComputeTermBeginPosition(logbuffer.TermId(rawTail), pub.positionBitsToShift, pub.initialTermId) + termOffset
 
-		//logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
+		logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
 		if position < limit {
 			var appendResult term.AppenderResult
 			var resValSupplier term.ReservedValueSupplier = term.DEFAULT_RESERVED_VALUE_SUPPLIER
@@ -133,6 +133,7 @@ func (pub *Publication) Offer(buffer *buffers.Atomic, offset int32, length int32
 			}
 
 			newPosition = pub.newPosition(partitionIndex, int32(termOffset), position, &appendResult)
+			logger.Debugf("publication new position: %d, term offset: %d", newPosition, termOffset)
 		} else if pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer)) {
 			newPosition = BACK_PRESSURED
 		} else {

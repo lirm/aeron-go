@@ -364,7 +364,7 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 					cc.onUnavailableImageHandler(image)
 				}
 				image.Close()
-				cc.lingeringResources <- LingerResourse{now, image}
+				cc.lingeringResources <- LingerResourse{now, *image}
 			}
 		}
 	}
@@ -439,7 +439,9 @@ func (cc *ClientConductor) OnUnavailableImage(streamId int32, correlationId int6
 	for _, sub := range cc.subs {
 		if sub.streamId == streamId {
 			image := sub.subscription.removeImage(correlationId)
-			cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), image}
+			if nil != image {
+				cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), image}
+			}
 		}
 	}
 }
@@ -540,9 +542,12 @@ func (cc *ClientConductor) onCheckManagedResources(now int64) {
 		case r := <-cc.lingeringResources:
 			logger.Debugf("Resource to linger: %v", r)
 			if cc.resourceLingerTimeoutNs < now-r.lastTime {
+				res := r.resource
 				logger.Debugf("lingering resource expired(%dms old): %v",
-					(now-r.lastTime)/time.Millisecond.Nanoseconds(), r.resource)
-				r.resource.Close()
+					(now-r.lastTime)/time.Millisecond.Nanoseconds(), res)
+				if res != nil {
+					res.Close()
+				}
 			} else {
 				// The assumption is that resources are queued in order
 				moreToCheck = false

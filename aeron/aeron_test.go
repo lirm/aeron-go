@@ -17,6 +17,7 @@ limitations under the License.
 package aeron
 
 import (
+	"fmt"
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
@@ -25,7 +26,7 @@ import (
 )
 
 const (
-	TEST_CHANNEL = "aeron:udp?endpoint=localhost:40123"
+	TEST_CHANNEL  = "aeron:udp?endpoint=localhost:40123"
 	TEST_STREAMID = 10
 )
 
@@ -88,8 +89,7 @@ func TestAeronBasics(t *testing.T) {
 
 	logtest(false)
 
-	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
-	a := Connect(ctx)
+	a := Connect(NewContext())
 	defer a.Close()
 
 	subscription := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
@@ -100,12 +100,15 @@ func TestAeronBasics(t *testing.T) {
 	receive1(subscription, t)
 }
 
-func TstAeronResubscribe(t *testing.T) {
+func TestAeronResubscribe(t *testing.T) {
 
 	logtest(false)
+	logging.SetLevel(logging.DEBUG, "aeron")
 
-	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
-	a := Connect(ctx)
+	a := Connect(NewContext().AvailableImageHandler(func(i *Image) {
+		fmt.Printf("++ IMAGE: pos=%v -> %d\n", i.subscriberPosition, i.subscriberPosition.Get())
+		t.Logf("++ IMAGE: pos=%v -> %d", i.subscriberPosition, i.subscriberPosition.Get())
+	}))
 	defer a.Close()
 
 	publication := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
@@ -115,7 +118,6 @@ func TstAeronResubscribe(t *testing.T) {
 	receive1(subscription, t)
 
 	subscription.Close()
-	subscription = nil
 
 	subscription = <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
 	send1(publication, t)
@@ -123,12 +125,9 @@ func TstAeronResubscribe(t *testing.T) {
 }
 
 func TestAeronClose(t *testing.T) {
+
 	logtest(false)
 
-	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
-	ctx.unavailableImageHandler = func(img *Image) {
-		t.Logf("Image unavailable: %v", img)
-	}
-	a := Connect(ctx)
+	a := Connect(NewContext())
 	a.Close()
 }
