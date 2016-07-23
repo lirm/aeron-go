@@ -132,11 +132,11 @@ type ClientConductor struct {
 }
 
 func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver,
-	interServiceTimeout time.Duration, driverTimeout time.Duration,
-	publicationConnectionTimeout time.Duration) *ClientConductor {
+	interServiceTimeout time.Duration, driverTimeout time.Duration, pubConnectionTimeout time.Duration,
+	lingerTo time.Duration) *ClientConductor {
 
 	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTimeout, driverTimeout,
-		publicationConnectionTimeout)
+		pubConnectionTimeout)
 
 	cc.driverProxy = driverProxy
 	cc.running.Store(true)
@@ -144,9 +144,8 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	cc.driverListenerAdapter = driver.NewAdapter(cc, bcast)
 	cc.interServiceTimeoutNs = interServiceTimeout.Nanoseconds()
 	cc.driverTimeoutNs = driverTimeout.Nanoseconds()
-	cc.publicationConnectionTimeoutNs = publicationConnectionTimeout.Nanoseconds()
-	// TODO make configurable
-	cc.resourceLingerTimeoutNs = (time.Second * 3).Nanoseconds()
+	cc.publicationConnectionTimeoutNs = pubConnectionTimeout.Nanoseconds()
+	cc.resourceLingerTimeoutNs = lingerTo.Nanoseconds()
 
 	cc.lingeringResources = make(chan LingerResourse, 1024)
 

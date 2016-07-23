@@ -54,13 +54,18 @@ func NewContext() *Context {
 	ctx.availableImageHandler = func(*Image) {}
 	ctx.unavailableImageHandler = func(*Image) {}
 
-	ctx.mediaDriverTo = time.Millisecond * 500
-	ctx.resourceLingerTo = time.Millisecond * 10
+	ctx.mediaDriverTo = time.Second
+	ctx.resourceLingerTo = time.Second * 3
 	ctx.publicationConnectionTo = time.Second * 5
 	ctx.interServiceTo = time.Second * 10
 
 	ctx.idleStrategy = idlestrategy.Sleeping{time.Millisecond * 4}
 
+	return ctx
+}
+
+func (ctx *Context) ErrorHandler(handler func(error)) *Context {
+	ctx.errorHandler = handler
 	return ctx
 }
 
@@ -71,6 +76,31 @@ func (ctx *Context) AeronDir(dir string) *Context {
 
 func (ctx *Context) MediaDriverTimeout(to time.Duration) *Context {
 	ctx.mediaDriverTo = to
+	return ctx
+}
+
+func (ctx *Context) ResourceLingerTimeout(to time.Duration) *Context {
+	ctx.resourceLingerTo = to
+	return ctx
+}
+
+func (ctx *Context) InterServiceTimeout(to time.Duration) *Context {
+	ctx.interServiceTo = to
+	return ctx
+}
+
+func (ctx *Context) PublicationConnectionTimeout(to time.Duration) *Context {
+	ctx.publicationConnectionTo = to
+	return ctx
+}
+
+func (ctx *Context) AvailableImageHandler(handler func(*Image)) *Context {
+	ctx.availableImageHandler = handler
+	return ctx
+}
+
+func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
+	ctx.unavailableImageHandler = handler
 	return ctx
 }
 
