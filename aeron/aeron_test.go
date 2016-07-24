@@ -48,7 +48,7 @@ func send1(pub *Publication, t *testing.T) bool {
 func receive1(sub *Subscription, t *testing.T) bool {
 	counter := 0
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
-		t.Logf("%8.d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
+		t.Logf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
 		counter++
 	}
 	fragmentsRead := 0
@@ -103,6 +103,7 @@ func TestAeronBasics(t *testing.T) {
 func TstAeronResubscribe(t *testing.T) {
 
 	logtest(false)
+	logging.SetLevel(logging.DEBUG, "aeron")
 
 	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
 	a := Connect(ctx)
@@ -113,11 +114,13 @@ func TstAeronResubscribe(t *testing.T) {
 	subscription := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
 	send1(publication, t)
 	receive1(subscription, t)
+	t.Log("Have one message. Closing subscription")
 
 	subscription.Close()
 	subscription = nil
 
 	subscription = <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	t.Log("Sending on new subscription")
 	send1(publication, t)
 	receive1(subscription, t)
 }

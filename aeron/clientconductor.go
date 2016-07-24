@@ -363,7 +363,7 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 					cc.onUnavailableImageHandler(image)
 				}
 				image.Close()
-				cc.lingeringResources <- LingerResourse{now, image}
+				cc.lingeringResources <- LingerResourse{now, *image}
 			}
 		}
 	}
@@ -438,7 +438,9 @@ func (cc *ClientConductor) OnUnavailableImage(streamId int32, correlationId int6
 	for _, sub := range cc.subs {
 		if sub.streamId == streamId {
 			image := sub.subscription.removeImage(correlationId)
-			cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), image}
+			if nil != image {
+				cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), *image}
+			}
 		}
 	}
 }
