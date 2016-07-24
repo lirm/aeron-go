@@ -52,7 +52,7 @@ func (driver *Proxy) AddSubscription(channel string, streamId int32) int64 {
 		message.StreamId.Set(streamId)
 		message.Channel.Set(channel)
 
-		*length = message.Length()
+		*length = message.Size()
 
 		return command.ADD_SUBSCRIPTION
 	}
@@ -75,7 +75,7 @@ func (driver *Proxy) RemoveSubscription(registrationId int64) int64 {
 		message.CorrelationId.Set(correlationId)
 		message.RegistrationId.Set(registrationId)
 
-		*length = message.Length()
+		*length = message.Size()
 
 		return command.REMOVE_SUBSCRIPTION
 	}
@@ -98,7 +98,7 @@ func (driver *Proxy) AddPublication(channel string, streamId int32) int64 {
 		message.StreamId.Set(streamId)
 		message.Channel.Set(channel)
 
-		*length = message.Length()
+		*length = message.Size()
 
 		return command.ADD_PUBLICATION
 	}
@@ -120,7 +120,7 @@ func (driver *Proxy) RemovePublication(registrationId int64) int64 {
 		message.CorrelationId.Set(correlationId)
 		message.RegistrationId.Set(registrationId)
 
-		*length = message.Length()
+		*length = message.Size()
 
 		return command.REMOVE_PUBLICATION
 	}
@@ -139,7 +139,7 @@ func (driver *Proxy) SendClientKeepalive() {
 		message.ClientId.Set(driver.clientId)
 		message.CorrelationId.Set(0)
 
-		*length = message.Length()
+		*length = message.Size()
 
 		return command.CLIENT_KEEPALIVE
 	}

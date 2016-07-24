@@ -12,10 +12,10 @@ type FWBase struct {
 	size int
 }
 
-func (m FWBase) Size() int {
+func (m *FWBase) Size() int {
 	return m.size
 }
 
-func (m FWBase) SetSize(size int) {
+func (m *FWBase) SetSize(size int) {
 	m.size = size
 }

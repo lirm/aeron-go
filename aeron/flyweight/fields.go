@@ -70,10 +70,10 @@ func (fld *Int64Field) Set(value int64) {
 type StringField struct {
 	lenOffset  unsafe.Pointer
 	dataOffset unsafe.Pointer
-	length     *int
+	fly Flyweight
 }
 
-func (fld *StringField) Wrap(buffer *buffers.Atomic, offset int, length *int) int {
+func (fld *StringField) Wrap(buffer *buffers.Atomic, offset int, fly Flyweight) int {
 	buffer.BoundsCheck(int32(offset), 4)
 
 	fld.lenOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
@@ -81,7 +81,7 @@ func (fld *StringField) Wrap(buffer *buffers.Atomic, offset int, length *int) in
 
 	buffer.BoundsCheck(int32(offset)+4, len)
 
-	fld.length = length
+	fld.fly = fly
 	fld.dataOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset+4))
 	return 4 + int(len)
 }
@@ -110,6 +110,8 @@ func (fld *StringField) Set(value string) {
 
 	C.memcpy(fld.dataOffset, unsafe.Pointer(srcUptr), C.size_t(length))
 
-	*fld.length -= int(prevLen)
-	*fld.length += int(length)
+	size := fld.fly.Size()
+	size -= int(prevLen)
+	size += int(length)
+	fld.fly.SetSize(size)
 }
