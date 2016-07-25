@@ -59,16 +59,16 @@ func receive1(sub *Subscription, t *testing.T) bool {
 			break
 		}
 		if time.Now().After(timeoutAt) {
-			t.Error("timed out waiting for message")
+			t.Fatal("timed out waiting for message")
 			break
 		}
 		time.Sleep(time.Millisecond * 1000)
 	}
 	if fragmentsRead != 1 {
-		t.Error("Expected 1 fragment. Got", fragmentsRead)
+		t.Fatal("Expected 1 fragment. Got", fragmentsRead)
 	}
 	if counter != 1 {
-		t.Error("Expected 1 message. Got", counter)
+		t.Fatal("Expected 1 message. Got", counter)
 	}
 
 	return counter == 1
@@ -88,7 +88,7 @@ func TestAeronBasics(t *testing.T) {
 
 	logtest(false)
 
-	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
+	ctx := NewContext().MediaDriverTimeout(time.Second * 10)
 	a := Connect(ctx)
 	defer a.Close()
 
@@ -100,13 +100,12 @@ func TestAeronBasics(t *testing.T) {
 	receive1(subscription, t)
 }
 
-func TstAeronResubscribe(t *testing.T) {
+func TestAeronResubscribe(t *testing.T) {
 
 	logtest(false)
 	logging.SetLevel(logging.DEBUG, "aeron")
 
-	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
-	a := Connect(ctx)
+	a := Connect(NewContext())
 	defer a.Close()
 
 	publication := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
@@ -128,7 +127,7 @@ func TstAeronResubscribe(t *testing.T) {
 func TestAeronClose(t *testing.T) {
 	logtest(false)
 
-	ctx := NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
+	ctx := NewContext().MediaDriverTimeout(time.Second * 10)
 	ctx.unavailableImageHandler = func(img *Image) {
 		t.Logf("Image unavailable: %v", img)
 	}
