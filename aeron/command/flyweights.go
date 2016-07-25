@@ -22,110 +22,95 @@ import (
 )
 
 type CorrelatedMessage struct {
+	flyweight.FWBase
+
 	ClientId      flyweight.Int64Field
 	CorrelationId flyweight.Int64Field
-	length        int
 }
 
-func (m *CorrelatedMessage) Length() int {
-	return m.length
-}
-
-func (m *CorrelatedMessage) Wrap(buf *buffers.Atomic, offset int) *CorrelatedMessage {
+func (m *CorrelatedMessage) Wrap(buf *buffers.Atomic, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)
 
-	m.length = pos
+	m.SetSize(pos - offset)
 	return m
 }
 
 type ImageMessage struct {
+	flyweight.FWBase
+
 	CorrelationId flyweight.Int64Field
 	StreamId      flyweight.Int32Field
 	Channel       flyweight.StringField
-	length        int
 }
 
-func (m *ImageMessage) Length() int {
-	return m.length
-}
-
-func (m *ImageMessage) Wrap(buf *buffers.Atomic, offset int) *ImageMessage {
+func (m *ImageMessage) Wrap(buf *buffers.Atomic, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.CorrelationId.Wrap(buf, pos)
 	pos += m.StreamId.Wrap(buf, pos)
-	pos += m.Channel.Wrap(buf, pos, &m.length)
+	pos += m.Channel.Wrap(buf, pos, m)
 
-	m.length = pos - offset
+	m.SetSize(pos - offset)
 	return m
 }
 
 type PublicationMessage struct {
+	flyweight.FWBase
+
 	ClientId      flyweight.Int64Field
 	CorrelationId flyweight.Int64Field
 	StreamId      flyweight.Int32Field
 	Channel       flyweight.StringField
-	length        int
 }
 
-func (m *PublicationMessage) Length() int {
-	return m.length
-}
-
-func (m *PublicationMessage) Wrap(buf *buffers.Atomic, offset int) *PublicationMessage {
+func (m *PublicationMessage) Wrap(buf *buffers.Atomic, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)
 	pos += m.StreamId.Wrap(buf, pos)
-	pos += m.Channel.Wrap(buf, pos, &m.length)
+	pos += m.Channel.Wrap(buf, pos, m)
 
-	m.length = pos - offset
+	m.SetSize(pos - offset)
 	return m
 }
 
 type SubscriptionMessage struct {
+	flyweight.FWBase
+
 	ClientId                  flyweight.Int64Field
 	CorrelationId             flyweight.Int64Field
 	RegistrationCorrelationId flyweight.Int64Field
 	StreamId                  flyweight.Int32Field
 	Channel                   flyweight.StringField
-	length                    int
 }
 
-func (m *SubscriptionMessage) Length() int {
-	return m.length
-}
-
-func (m *SubscriptionMessage) Wrap(buf *buffers.Atomic, offset int) *SubscriptionMessage {
+func (m *SubscriptionMessage) Wrap(buf *buffers.Atomic, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)
 	pos += m.RegistrationCorrelationId.Wrap(buf, pos)
 	pos += m.StreamId.Wrap(buf, pos)
-	pos += m.Channel.Wrap(buf, pos, &m.length)
+	pos += m.Channel.Wrap(buf, pos, m)
 
-	m.length = pos - offset
+	m.SetSize(pos - offset)
 	return m
 }
 
 type RemoveMessage struct {
+	flyweight.FWBase
+
 	ClientId       flyweight.Int64Field
 	CorrelationId  flyweight.Int64Field
 	RegistrationId flyweight.Int64Field
-	length         int
 }
 
-func (m *RemoveMessage) Length() int {
-	return m.length
-}
-
-func (m *RemoveMessage) Wrap(buf *buffers.Atomic, offset int) *RemoveMessage {
+func (m *RemoveMessage) Wrap(buf *buffers.Atomic, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)
 	pos += m.RegistrationId.Wrap(buf, pos)
 
-	m.length = pos - offset
+	m.SetSize(pos - offset)
 	return m
 }

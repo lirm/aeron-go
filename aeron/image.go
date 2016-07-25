@@ -99,7 +99,7 @@ func NewImage(sessionId int32, correlationId int64, logBuffers *logbuffer.LogBuf
 	return image
 }
 
-func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (image Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	result := IMAGE_CLOSED
 

@@ -22,19 +22,15 @@ import (
 )
 
 type StringFly struct {
-	s      StringField
-	length int
+	FWBase
+
+	s StringField
 }
 
-func (m *StringFly) Length() int {
-	return m.length
-}
-
-func (m *StringFly) Wrap(buf *buffers.Atomic) *StringFly {
-	offset := 0
-	offset += m.s.Wrap(buf, offset, &m.length)
-
-	m.length = offset
+func (m *StringFly) Wrap(buf *buffers.Atomic, offset int) Flyweight {
+	pos := offset
+	pos += m.s.Wrap(buf, pos, m)
+	m.SetSize(pos - offset)
 	return m
 }
 
@@ -43,14 +39,14 @@ func TestStringFlyweight(t *testing.T) {
 	buf := buffers.MakeAtomic(make([]byte, 128), 128)
 
 	var fw StringFly
-	fw.Wrap(buf)
+	fw.Wrap(buf, 0)
 
 	fw.s.Set(str)
 
 	t.Logf("%v", fw)
 
-	if 4+len(str) != fw.Length() {
-		t.Error("Expected length", 4+len(str), "have", fw.Length())
+	if 4+len(str) != fw.Size() {
+		t.Error("Expected length", 4+len(str), "have", fw.Size())
 	}
 
 	if str != fw.s.Get() {

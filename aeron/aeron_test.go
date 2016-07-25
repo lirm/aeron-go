@@ -49,7 +49,7 @@ func send1(pub *Publication, t *testing.T) bool {
 func receive1(sub *Subscription, t *testing.T) bool {
 	counter := 0
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
-		t.Logf("%8.d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
+		t.Logf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
 		counter++
 	}
 	fragmentsRead := 0
@@ -60,16 +60,16 @@ func receive1(sub *Subscription, t *testing.T) bool {
 			break
 		}
 		if time.Now().After(timeoutAt) {
-			t.Error("timed out waiting for message")
+			t.Fatal("timed out waiting for message")
 			break
 		}
 		time.Sleep(time.Millisecond * 1000)
 	}
 	if fragmentsRead != 1 {
-		t.Error("Expected 1 fragment. Got", fragmentsRead)
+		t.Fatal("Expected 1 fragment. Got", fragmentsRead)
 	}
 	if counter != 1 {
-		t.Error("Expected 1 message. Got", counter)
+		t.Fatal("Expected 1 message. Got", counter)
 	}
 
 	return counter == 1
@@ -116,10 +116,12 @@ func TestAeronResubscribe(t *testing.T) {
 	subscription := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
 	send1(publication, t)
 	receive1(subscription, t)
+	t.Log("Have one message. Closing subscription")
 
 	subscription.Close()
 
 	subscription = <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	t.Log("Sending on new subscription")
 	send1(publication, t)
 	receive1(subscription, t)
 }
@@ -128,6 +130,10 @@ func TestAeronClose(t *testing.T) {
 
 	logtest(false)
 
-	a := Connect(NewContext())
+	ctx := NewContext().MediaDriverTimeout(time.Second * 10)
+	ctx.unavailableImageHandler = func(img *Image) {
+		t.Logf("Image unavailable: %v", img)
+	}
+	a := Connect(ctx)
 	a.Close()
 }

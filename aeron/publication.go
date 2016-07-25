@@ -50,7 +50,8 @@ type Publication struct {
 	headerWriter term.HeaderWriter
 }
 
-func (pub *Publication) Init(logBuffers *logbuffer.LogBuffers) *Publication {
+func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
+	pub := new(Publication)
 	pub.logMetaDataBuffer = logBuffers.Buffer(logbuffer.Descriptor.LOG_META_DATA_SECTION_INDEX)
 	pub.initialTermId = logbuffer.InitialTermId(pub.logMetaDataBuffer)
 	pub.maxPayloadLength = logbuffer.MtuLength(pub.logMetaDataBuffer) - logbuffer.DataFrameHeader.LENGTH
