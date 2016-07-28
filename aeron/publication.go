@@ -76,7 +76,7 @@ func (pub *Publication) IsClosed() bool {
 func (pub *Publication) Close() error {
 	if pub != nil && !pub.IsClosed() {
 		pub.isClosed.Store(true)
-		<- pub.conductor.releasePublication(pub.registrationId)
+		<-pub.conductor.releasePublication(pub.registrationId)
 	}
 
 	return nil

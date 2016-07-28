@@ -136,3 +136,7 @@ func (image Image) Close() error {
 	}
 	return err
 }
+
+func (image Image) Position() int64 {
+	return image.subscriberPosition.Get()
+}

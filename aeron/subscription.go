@@ -40,6 +40,7 @@ func NewSubscription(conductor *ClientConductor, channel string, registrationId 
 	sub.channel = channel
 	sub.registrationId = registrationId
 	sub.streamId = streamId
+	sub.roundRobinIndex = 0
 	sub.isClosed.Store(false)
 
 	return sub
@@ -52,10 +53,14 @@ func (sub *Subscription) IsClosed() bool {
 func (sub *Subscription) Close() error {
 	if !sub.IsClosed() {
 		sub.isClosed.Store(true)
-		<- sub.conductor.releaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
+		<-sub.conductor.releaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
 	}
 
 	return nil
+}
+
+func (sub *Subscription) Images() []*Image {
+	return sub.images.Load().([]*Image)
 }
 
 func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) int {

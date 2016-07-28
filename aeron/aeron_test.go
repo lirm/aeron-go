@@ -35,40 +35,47 @@ func send(n int, pub *Publication, t *testing.T) {
 
 	for i := 0; i < n; i++ {
 		timeoutAt := time.Now().Add(time.Second * 5)
-		for pub.Offer(srcBuffer, 0, int32(len(message)), nil) <= 0 {
+		var v int64 = 0
+		for v <= 0 {
+			v = pub.Offer(srcBuffer, 0, int32(len(message)), nil)
 			if time.Now().After(timeoutAt) {
 				t.Fatalf("Timed out at %v", time.Now())
 			}
 			time.Sleep(time.Millisecond * 300)
 		}
-		//t.Logf("Sent message #%d", i)
+		t.Logf("%v: Sent message #%d at %d", time.Now(), i, v)
 	}
 }
 
-func receive1(sub *Subscription, t *testing.T) {
+func receive(n int, sub *Subscription, t *testing.T) {
 	counter := 0
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
 		//t.Logf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
 		counter++
 	}
 	fragmentsRead := 0
-	timeoutAt := time.Now().Add(time.Second * 5)
-	for {
-		fragmentsRead += sub.Poll(handler, 10)
-		if fragmentsRead == 1 {
-			break
+	for i := 0; i < n; i++ {
+		timeoutAt := time.Now().Add(time.Second * 5)
+		for {
+			fragmentsRead += sub.Poll(handler, 10)
+			if fragmentsRead == 1 {
+				for _, im := range sub.Images() {
+					t.Logf("%v: image: pos %d {%v}", time.Now(), im.Position(), im)
+				}
+				break
+			}
+			if time.Now().After(timeoutAt) {
+				t.Fatalf("%v: timed out waiting for message", time.Now())
+				break
+			}
+			time.Sleep(time.Millisecond * 10)
 		}
-		if time.Now().After(timeoutAt) {
-			t.Fatal("timed out waiting for message")
-			break
-		}
-		time.Sleep(time.Millisecond * 1000)
 	}
-	if fragmentsRead != 1 {
-		t.Fatal("Expected 1 fragment. Got", fragmentsRead)
+	if fragmentsRead != n {
+		t.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
 	}
-	if counter != 1 {
-		t.Fatal("Expected 1 message. Got", counter)
+	if counter != n {
+		t.Fatalf("Expected %d message. Got %d", n, counter)
 	}
 }
 
@@ -121,23 +128,27 @@ func subAndSendOne(a *Aeron, pub *Publication, t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 
+	for !pub.IsConnected() {
+		// FIXME this should be a configurable IdleStrategy
+		time.Sleep(time.Millisecond)
+	}
+
 	send(1, pub, t)
-	receive1(sub, t)
+	receive(1, sub, t)
 }
 
-
 func TestResubStress(t *testing.T) {
-	logtest(false)
+	logtest(true)
 	logger.Debug("Started TestAeronResubscribe")
 
 	a := Connect(NewContext())
 	defer a.Close()
 
 	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		subAndSendOne(a, pub, t)
+		t.Logf("bounce %d", i)
 	}
-
 }
 
 func TestAeronClose(t *testing.T) {
