@@ -66,23 +66,18 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 
 	if length > 0 {
 		var startingIndex int = sub.roundRobinIndex
+		sub.roundRobinIndex++
 		if startingIndex >= length {
 			sub.roundRobinIndex = 0
 			startingIndex = 0
 		}
 
-		var i int = startingIndex
-		for fragmentsRead < fragmentLimit {
+		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
 			fragmentsRead += images[i].Poll(handler, fragmentLimit-fragmentsRead)
+		}
 
-			i++
-			if i == length {
-				i = 0
-			}
-
-			if i == startingIndex {
-				break
-			}
+		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
+			fragmentsRead += images[i].Poll(handler, fragmentLimit-fragmentsRead)
 		}
 	}
 
