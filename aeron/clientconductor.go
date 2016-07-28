@@ -110,6 +110,7 @@ type ClientConductor struct {
 
 	adminLock sync.Mutex
 
+	pendingCloses      map[int64]chan bool
 	lingeringResources chan LingerResourse
 
 	onNewPublicationHandler   NewPublicationHandler
@@ -146,6 +147,7 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	cc.publicationConnectionTimeoutNs = pubConnectionTimeout.Nanoseconds()
 	cc.resourceLingerTimeoutNs = lingerTo.Nanoseconds()
 
+	cc.pendingCloses = make(map[int64]chan bool)
 	cc.lingeringResources = make(chan LingerResourse, 1024)
 
 	return cc
@@ -160,14 +162,14 @@ func (cc *ClientConductor) Close() error {
 	for _, pub := range cc.pubs {
 		err = pub.publication.Close()
 		// In Go 1.7 should have the following line
-		// runtime.KeepAlice(pub.publication)
+		// runtime.KeepAlive(pub.publication)
 	}
 	cc.pubs = nil
 
 	for _, sub := range cc.subs {
 		err = sub.subscription.Close()
 		// In Go 1.7 should have the following line
-		// runtime.KeepAlice(sub.subscription)
+		// runtime.KeepAlive(sub.subscription)
 	}
 	cc.subs = nil
 
@@ -263,7 +265,7 @@ func (cc *ClientConductor) FindPublication(registrationId int64) *Publication {
 	return publication
 }
 
-func (cc *ClientConductor) ReleasePublication(registrationId int64) {
+func (cc *ClientConductor) releasePublication(registrationId int64) chan bool {
 	logger.Debugf("ReleasePublication: registrationId=%d", registrationId)
 
 	cc.verifyDriverIsActive()
@@ -271,15 +273,21 @@ func (cc *ClientConductor) ReleasePublication(registrationId int64) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
+	var ch chan bool
+
 	for i, pub := range cc.pubs {
 		if pub.registrationId == registrationId {
-			cc.driverProxy.RemovePublication(registrationId)
+			corrId := cc.driverProxy.RemovePublication(registrationId)
 
 			cc.pubs[i] = cc.pubs[len(cc.pubs)-1]
 			cc.pubs[len(cc.pubs)-1] = nil
 			cc.pubs = cc.pubs[:len(cc.pubs)-1]
+
+			ch = make(chan bool, 1)
+			cc.pendingCloses[corrId] = ch
 		}
 	}
+	return ch
 }
 
 func (cc *ClientConductor) AddSubscription(channel string, streamId int32) int64 {
@@ -336,7 +344,7 @@ func (cc *ClientConductor) FindSubscription(registrationId int64) *Subscription 
 	return subscription
 }
 
-func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*Image) {
+func (cc *ClientConductor) releaseSubscription(registrationId int64, images []*Image) chan bool {
 	logger.Debugf("ReleaseSubscription: registrationId=%d", registrationId)
 
 	cc.verifyDriverIsActive()
@@ -346,10 +354,12 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 
 	now := time.Now().UnixNano()
 
+	var ch chan bool
+
 	for i, sub := range cc.subs {
 		if sub.registrationId == registrationId {
 			logger.Debugf("Removing subscription: %d; %v", registrationId, images)
-			cc.driverProxy.RemoveSubscription(registrationId)
+			corrId := cc.driverProxy.RemoveSubscription(registrationId)
 
 			cc.subs[i] = cc.subs[len(cc.subs)-1]
 			cc.subs[len(cc.subs)-1] = nil
@@ -362,8 +372,13 @@ func (cc *ClientConductor) ReleaseSubscription(registrationId int64, images []*I
 				image.Close()
 				cc.lingeringResources <- LingerResourse{now, *image}
 			}
+
+			ch = make(chan bool, 1)
+			cc.pendingCloses[corrId] = ch
 		}
 	}
+
+	return ch
 }
 
 func (cc *ClientConductor) OnNewPublication(streamId int32, sessionId int32, positionLimitCounterId int32,
@@ -434,25 +449,34 @@ func (cc *ClientConductor) OnUnavailableImage(streamId int32, correlationId int6
 
 	for _, sub := range cc.subs {
 		if sub.streamId == streamId {
-			image := sub.subscription.removeImage(correlationId)
-			if nil != image {
-				cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), *image}
+			if sub.subscription != nil {
+				image := sub.subscription.removeImage(correlationId)
+				// FIXME Howzzat?!
+				if nil != image {
+					cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), *image}
+				}
 			}
 		}
 	}
 }
 
-func (cc *ClientConductor) OnOperationSuccess(correlationId int64) {
-	logger.Debugf("OnOperationSuccess: correlationId=%d", correlationId)
+func (cc *ClientConductor) OnOperationSuccess(corrId int64) {
+	logger.Debugf("OnOperationSuccess: correlationId=%d", corrId)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	for _, sub := range cc.subs {
-		if sub.registrationId == correlationId && sub.status == RegistrationStatus.AWAITING_MEDIA_DRIVER {
+		if sub.registrationId == corrId && sub.status == RegistrationStatus.AWAITING_MEDIA_DRIVER {
 			sub.status = RegistrationStatus.REGISTERED_MEDIA_DRIVER
-			sub.subscription = NewSubscription(cc, sub.channel, correlationId, sub.streamId)
+			sub.subscription = NewSubscription(cc, sub.channel, corrId, sub.streamId)
 		}
+	}
+
+	if cc.pendingCloses[corrId] != nil {
+		cc.pendingCloses[corrId] <- true
+		close(cc.pendingCloses[corrId])
+		delete(cc.pendingCloses, corrId)
 	}
 }
 

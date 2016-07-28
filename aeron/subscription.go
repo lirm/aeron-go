@@ -52,7 +52,7 @@ func (sub *Subscription) IsClosed() bool {
 func (sub *Subscription) Close() error {
 	if !sub.IsClosed() {
 		sub.isClosed.Store(true)
-		sub.conductor.ReleaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
+		<- sub.conductor.releaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
 	}
 
 	return nil
