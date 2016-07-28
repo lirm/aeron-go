@@ -70,7 +70,7 @@ func (fld *Int64Field) Set(value int64) {
 type StringField struct {
 	lenOffset  unsafe.Pointer
 	dataOffset unsafe.Pointer
-	fly Flyweight
+	fly        Flyweight
 }
 
 func (fld *StringField) Wrap(buffer *buffers.Atomic, offset int, fly Flyweight) int {

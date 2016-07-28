@@ -16,16 +16,39 @@ limitations under the License.
 
 package buffers
 
+import (
+	"github.com/op/go-logging"
+	"github.com/lirm/aeron-go/aeron/util"
+)
+
+var logger = logging.MustGetLogger("buffers")
+
 type Position struct {
-	Buffer *Atomic
-	Id     int32
-	Offset int32
+	buffer *Atomic
+	id     int32
+	offset int32
+}
+
+func NewPosition(buffer *Atomic, id int32) Position {
+	pos := new(Position)
+
+	pos.buffer = buffer
+	pos.id = id
+	pos.offset = id * 2 * util.CACHE_LINE_LENGTH
+	//pos.offset = id * counters.ReaderConsts.COUNTER_LENGTH
+
+	logger.Debugf("<+ Counter[%d]: %d", id, pos.buffer.GetInt64(pos.offset))
+
+	return *pos
 }
 
 func (pos Position) Get() int64 {
-	return pos.Buffer.GetInt64(pos.Offset)
+	p := pos.buffer.GetInt64(pos.offset)
+	logger.Debugf("<- Counter[%d]: %d", pos.id, p)
+	return p
 }
 
 func (pos Position) Set(value int64) {
-	pos.Buffer.PutInt64(pos.Offset, value)
+	pos.buffer.PutInt64(pos.offset, value)
+	logger.Debugf("-> Counter[%d]: %d", pos.id, value)
 }

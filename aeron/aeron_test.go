@@ -33,7 +33,7 @@ const (
 func send1(pub *Publication, t *testing.T) bool {
 	message := "this is a message"
 	srcBuffer := buffers.MakeAtomic(([]byte)(message))
-	timeoutAt := time.Now().Add(time.Second * 10)
+	timeoutAt := time.Now().Add(time.Second * 5)
 	res := true
 	for pub.Offer(srcBuffer, 0, int32(len(message)), nil) <= 0 {
 		if time.Now().After(timeoutAt) {
@@ -41,7 +41,7 @@ func send1(pub *Publication, t *testing.T) bool {
 			res = false
 			break
 		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 300)
 	}
 	return res
 }
@@ -53,7 +53,7 @@ func receive1(sub *Subscription, t *testing.T) bool {
 		counter++
 	}
 	fragmentsRead := 0
-	timeoutAt := time.Now().Add(time.Second * 10)
+	timeoutAt := time.Now().Add(time.Second * 5)
 	for {
 		fragmentsRead += sub.Poll(handler, 10)
 		if fragmentsRead == 1 {
@@ -102,8 +102,8 @@ func TestAeronBasics(t *testing.T) {
 
 func TestAeronResubscribe(t *testing.T) {
 
-	logtest(false)
-	logging.SetLevel(logging.DEBUG, "aeron")
+	logtest(true)
+	//logging.SetLevel(logging.DEBUG, "aeron")
 
 	a := Connect(NewContext().AvailableImageHandler(func(i *Image) {
 		fmt.Printf("++ IMAGE: pos=%v -> %d\n", i.subscriberPosition, i.subscriberPosition.Get())
@@ -112,16 +112,20 @@ func TestAeronResubscribe(t *testing.T) {
 	defer a.Close()
 
 	publication := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
-
 	subscription := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+
 	send1(publication, t)
 	receive1(subscription, t)
+
 	t.Log("Have one message. Closing subscription")
 
 	subscription.Close()
-
 	subscription = <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+
 	t.Log("Sending on new subscription")
+
+	time.Sleep(100 * time.Millisecond)
+
 	send1(publication, t)
 	receive1(subscription, t)
 }
@@ -130,10 +134,7 @@ func TestAeronClose(t *testing.T) {
 
 	logtest(false)
 
-	ctx := NewContext().MediaDriverTimeout(time.Second * 10)
-	ctx.unavailableImageHandler = func(img *Image) {
-		t.Logf("Image unavailable: %v", img)
-	}
+	ctx := NewContext().MediaDriverTimeout(time.Second * 5)
 	a := Connect(ctx)
 	a.Close()
 }

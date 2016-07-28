@@ -51,11 +51,7 @@ var ReaderConsts = struct {
 	2*int32(util.CACHE_LINE_LENGTH) - 8,
 }
 
-func Offset(id int32) int32 {
-	return id * ReaderConsts.COUNTER_LENGTH
-}
-
-func MapCncFile(filename string) *memmap.File {
+func MapFile(filename string) *memmap.File {
 
 	logger.Debugf("Trying to map file: %s", filename)
 	cncBuffer, err := memmap.MapExisting(filename, 0, 0)

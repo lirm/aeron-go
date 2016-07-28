@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/buffers"
-	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -47,17 +46,17 @@ const (
 )
 
 type PublicationStateDefn struct {
-	channel                string
-	registrationId         int64
-	streamId               int32
-	sessionId              int32
-	positionLimitCounterId int32
-	timeOfRegistration     int64
-	status                 int
-	errorCode              int32
-	errorMessage           string
-	buffers                *logbuffer.LogBuffers
-	publication            *Publication
+	channel            string
+	registrationId     int64
+	streamId           int32
+	sessionId          int32
+	posLimitCounterId  int32
+	timeOfRegistration int64
+	status             int
+	errorCode          int32
+	errorMessage       string
+	buffers            *logbuffer.LogBuffers
+	publication        *Publication
 }
 
 func (pub *PublicationStateDefn) Init(channel string, registrationId int64, streamId int32, now int64) *PublicationStateDefn {
@@ -65,7 +64,7 @@ func (pub *PublicationStateDefn) Init(channel string, registrationId int64, stre
 	pub.registrationId = registrationId
 	pub.streamId = streamId
 	pub.sessionId = -1
-	pub.positionLimitCounterId = -1
+	pub.posLimitCounterId = -1
 	pub.timeOfRegistration = now
 	pub.status = RegistrationStatus.AWAITING_MEDIA_DRIVER
 
@@ -250,10 +249,8 @@ func (cc *ClientConductor) FindPublication(registrationId int64) *Publication {
 					publication.registrationId = registrationId
 					publication.streamId = pub.streamId
 					publication.sessionId = pub.sessionId
-					publication.publicationLimit = buffers.Position{
-						cc.counterValuesBuffer,
-						pub.positionLimitCounterId,
-						counters.Offset(pub.positionLimitCounterId)}
+					publication.publicationLimit = buffers.NewPosition(cc.counterValuesBuffer,
+						pub.posLimitCounterId)
 
 				case RegistrationStatus.ERRORED_MEDIA_DRIVER:
 					log.Fatalf("Error on %d: %d: %s", registrationId, pub.errorCode, pub.errorMessage)
@@ -381,7 +378,7 @@ func (cc *ClientConductor) OnNewPublication(streamId int32, sessionId int32, pos
 		if pubDef.registrationId == registrationId {
 			pubDef.status = RegistrationStatus.REGISTERED_MEDIA_DRIVER
 			pubDef.sessionId = sessionId
-			pubDef.positionLimitCounterId = positionLimitCounterId
+			pubDef.posLimitCounterId = positionLimitCounterId
 			pubDef.buffers = logbuffer.Wrap(logFileName)
 
 			logger.Debugf("Updated publication: %v", pubDef)
@@ -411,11 +408,11 @@ func (cc *ClientConductor) OnAvailableImage(streamId int32, sessionId int32, log
 						image := NewImage(sessionId, correlationId, logbuffer.Wrap(logFilename))
 						image.subscriptionRegistrationId = sub.registrationId
 						image.sourceIdentity = sourceIdentity
-						image.subscriberPosition = buffers.Position{
-							cc.counterValuesBuffer,
-							subPos.IndicatorId(),
-							counters.Offset(subPos.IndicatorId())}
+						image.subscriberPosition = buffers.NewPosition(cc.counterValuesBuffer,
+							subPos.IndicatorId())
 						image.exceptionHandler = cc.errorHandler
+						logger.Debugf("OnAvailableImage: new image position: %v -> %d",
+							image.subscriberPosition, image.subscriberPosition.Get())
 
 						sub.subscription.addImage(image)
 
