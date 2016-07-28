@@ -81,6 +81,7 @@ func logtest(flag bool) {
 		logging.SetLevel(logging.INFO, "driver")
 		logging.SetLevel(logging.INFO, "counters")
 		logging.SetLevel(logging.INFO, "logbuffers")
+		logging.SetLevel(logging.INFO, "buffers")
 	}
 }
 
@@ -116,10 +117,9 @@ func TestAeronResubscribe(t *testing.T) {
 
 	subscription.Close()
 	subscription = <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	logger.Debug("got second subscription")
 
 	t.Log("Sending on new subscription")
-
-	time.Sleep(100 * time.Millisecond)
 
 	send1(publication, t)
 	receive1(subscription, t)

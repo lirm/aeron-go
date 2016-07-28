@@ -126,3 +126,8 @@ func (sub *Subscription) removeImage(correlationId int64) *Image {
 	}
 	return nil
 }
+
+func (sub *Subscription) HasImages() bool {
+	images := sub.images.Load().([]*Image)
+	return len(images) > 0
+}

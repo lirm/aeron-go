@@ -66,6 +66,8 @@ func (driver *Proxy) AddSubscription(channel string, streamId int32) int64 {
 func (driver *Proxy) RemoveSubscription(registrationId int64) int64 {
 	correlationId := driver.toDriverCommandBuffer.NextCorrelationId()
 
+	logger.Debugf("driver.RemoveSubscription: correlationId=%d (subId=%d)", correlationId, registrationId)
+
 	filler := func(buffer *buffers.Atomic, length *int) int32 {
 
 		var message command.RemoveMessage
@@ -110,6 +112,8 @@ func (driver *Proxy) AddPublication(channel string, streamId int32) int64 {
 
 func (driver *Proxy) RemovePublication(registrationId int64) int64 {
 	correlationId := driver.toDriverCommandBuffer.NextCorrelationId()
+
+	logger.Debugf("driver.RemovePublication: correlationId=%d (pudId=%d)", correlationId, registrationId)
 
 	filler := func(buffer *buffers.Atomic, length *int) int32 {
 
