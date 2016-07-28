@@ -17,7 +17,6 @@ limitations under the License.
 package aeron
 
 import (
-	"fmt"
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
@@ -103,12 +102,8 @@ func TestAeronBasics(t *testing.T) {
 func TestAeronResubscribe(t *testing.T) {
 
 	logtest(true)
-	//logging.SetLevel(logging.DEBUG, "aeron")
 
-	a := Connect(NewContext().AvailableImageHandler(func(i *Image) {
-		fmt.Printf("++ IMAGE: pos=%v -> %d\n", i.subscriberPosition, i.subscriberPosition.Get())
-		t.Logf("++ IMAGE: pos=%v -> %d", i.subscriberPosition, i.subscriberPosition.Get())
-	}))
+	a := Connect(NewContext())
 	defer a.Close()
 
 	publication := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)

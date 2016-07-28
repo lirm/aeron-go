@@ -17,8 +17,8 @@ limitations under the License.
 package buffers
 
 import (
-	"github.com/op/go-logging"
 	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/op/go-logging"
 )
 
 var logger = logging.MustGetLogger("buffers")
