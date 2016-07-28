@@ -16,7 +16,10 @@ limitations under the License.
 
 package idlestrategy
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 type Idler interface {
 	Idle(fragmentsRead int)
@@ -36,5 +39,14 @@ type Sleeping struct {
 func (s Sleeping) Idle(fragmentsRead int) {
 	if fragmentsRead == 0 {
 		time.Sleep(s.SleepFor)
+	}
+}
+
+type Yielding struct {
+}
+
+func (s Yielding) Idle(fragmentsRead int) {
+	if fragmentsRead == 0 {
+		runtime.Gosched()
 	}
 }
