@@ -29,26 +29,26 @@ const (
 	TEST_STREAMID = 10
 )
 
-func send1(pub *Publication, t *testing.T) bool {
+func send(n int, pub *Publication, t *testing.T) {
 	message := "this is a message"
 	srcBuffer := buffers.MakeAtomic(([]byte)(message))
-	timeoutAt := time.Now().Add(time.Second * 5)
-	res := true
-	for pub.Offer(srcBuffer, 0, int32(len(message)), nil) <= 0 {
-		if time.Now().After(timeoutAt) {
-			t.Logf("Timed out at %v", time.Now())
-			res = false
-			break
+
+	for i := 0; i < n; i++ {
+		timeoutAt := time.Now().Add(time.Second * 5)
+		for pub.Offer(srcBuffer, 0, int32(len(message)), nil) <= 0 {
+			if time.Now().After(timeoutAt) {
+				t.Fatalf("Timed out at %v", time.Now())
+			}
+			time.Sleep(time.Millisecond * 300)
 		}
-		time.Sleep(time.Millisecond * 300)
+		//t.Logf("Sent message #%d", i)
 	}
-	return res
 }
 
-func receive1(sub *Subscription, t *testing.T) bool {
+func receive1(sub *Subscription, t *testing.T) {
 	counter := 0
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
-		t.Logf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
+		//t.Logf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
 		counter++
 	}
 	fragmentsRead := 0
@@ -70,8 +70,6 @@ func receive1(sub *Subscription, t *testing.T) bool {
 	if counter != 1 {
 		t.Fatal("Expected 1 message. Got", counter)
 	}
-
-	return counter == 1
 }
 
 func logtest(flag bool) {
@@ -88,46 +86,64 @@ func logtest(flag bool) {
 func TestAeronBasics(t *testing.T) {
 
 	logtest(false)
+	logger.Debug("Started TestAeronBasics")
 
 	a := Connect(NewContext())
 	defer a.Close()
 
-	subscription := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
-	publication := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	defer pub.Close()
 
-	send1(publication, t)
-
-	receive1(subscription, t)
+	subAndSendOne(a, pub, t)
 }
 
 func TestAeronResubscribe(t *testing.T) {
 
-	logtest(true)
+	logtest(false)
+	logger.Debug("Started TestAeronResubscribe")
 
 	a := Connect(NewContext())
 	defer a.Close()
 
-	publication := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
-	subscription := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
 
-	send1(publication, t)
-	receive1(subscription, t)
+	subAndSendOne(a, pub, t)
+	subAndSendOne(a, pub, t)
+}
 
-	t.Log("Have one message. Closing subscription")
+func subAndSendOne(a *Aeron, pub *Publication, t *testing.T) {
+	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	defer sub.Close()
 
-	subscription.Close()
-	subscription = <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
-	logger.Debug("got second subscription")
+	// This is basically a requirement since we need to wait
+	for !sub.HasImages() {
+		// FIXME this should be a configurable IdleStrategy
+		time.Sleep(time.Millisecond)
+	}
 
-	t.Log("Sending on new subscription")
+	send(1, pub, t)
+	receive1(sub, t)
+}
 
-	send1(publication, t)
-	receive1(subscription, t)
+
+func TestResubStress(t *testing.T) {
+	logtest(false)
+	logger.Debug("Started TestAeronResubscribe")
+
+	a := Connect(NewContext())
+	defer a.Close()
+
+	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	for i := 0; i < 10; i++ {
+		subAndSendOne(a, pub, t)
+	}
+
 }
 
 func TestAeronClose(t *testing.T) {
 
 	logtest(false)
+	logger.Debug("Started TestAeronClose")
 
 	ctx := NewContext().MediaDriverTimeout(time.Second * 5)
 	a := Connect(ctx)

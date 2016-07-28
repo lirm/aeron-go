@@ -103,11 +103,6 @@ func (aeron *Aeron) AddSubscription(channel string, streamId int32) chan *Subscr
 			subscription = aeron.conductor.FindSubscription(regId)
 			// FIXME here should be a configurable IdleStrategy
 		}
-
-		for !subscription.HasImages() {
-			// FIXME this should be a configurable IdleStrategy
-			time.Sleep(time.Millisecond)
-		}
 		ch <- subscription
 		close(ch)
 	}()
