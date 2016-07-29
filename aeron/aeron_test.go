@@ -41,7 +41,7 @@ func send(n int, pub *Publication, t *testing.T) {
 			if time.Now().After(timeoutAt) {
 				t.Fatalf("Timed out at %v", time.Now())
 			}
-			time.Sleep(time.Millisecond * 300)
+			time.Sleep(time.Millisecond * 50)
 		}
 		t.Logf("%v: Sent message #%d at %d", time.Now(), i, v)
 	}
@@ -50,13 +50,16 @@ func send(n int, pub *Publication, t *testing.T) {
 func receive(n int, sub *Subscription, t *testing.T) {
 	counter := 0
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
-		//t.Logf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
+		//fmt.Printf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
 		counter++
 	}
 	fragmentsRead := 0
 	for i := 0; i < n; i++ {
-		timeoutAt := time.Now().Add(time.Second * 5)
+		timeoutAt := time.Now().Add(time.Second)
 		for {
+			//for _, im := range sub.Images() {
+				//t.Logf("%v: PRE image: pos %d", time.Now(), im.Position())
+			//}
 			fragmentsRead += sub.Poll(handler, 10)
 			if fragmentsRead == 1 {
 				for _, im := range sub.Images() {
@@ -68,7 +71,7 @@ func receive(n int, sub *Subscription, t *testing.T) {
 				t.Fatalf("%v: timed out waiting for message", time.Now())
 				break
 			}
-			time.Sleep(time.Millisecond * 10)
+			time.Sleep(time.Millisecond)
 		}
 	}
 	if fragmentsRead != n {
@@ -128,10 +131,7 @@ func subAndSendOne(a *Aeron, pub *Publication, t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 
-	for !pub.IsConnected() {
-		// FIXME this should be a configurable IdleStrategy
-		time.Sleep(time.Millisecond)
-	}
+	time.Sleep(100 * time.Millisecond)
 
 	send(1, pub, t)
 	receive(1, sub, t)
