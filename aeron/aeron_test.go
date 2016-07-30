@@ -126,12 +126,9 @@ func subAndSendOne(a *Aeron, pub *Publication, t *testing.T) {
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
-	for !sub.HasImages() {
-		// FIXME this should be a configurable IdleStrategy
+	for !sub.IsConnectedTo(pub) {
 		time.Sleep(time.Millisecond)
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	send(1, pub, t)
 	receive(1, sub, t)

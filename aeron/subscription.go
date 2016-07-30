@@ -131,3 +131,14 @@ func (sub *Subscription) HasImages() bool {
 	images := sub.images.Load().([]*Image)
 	return len(images) > 0
 }
+
+func (sub *Subscription) IsConnectedTo(pub *Publication) bool {
+	images := sub.images.Load().([]*Image)
+	for _, image := range images {
+	     if image.sessionId == pub.sessionId {
+		     return true
+	     }
+	}
+
+	return false
+}
