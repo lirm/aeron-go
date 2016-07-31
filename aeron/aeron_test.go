@@ -58,7 +58,7 @@ func receive(n int, sub *Subscription, t *testing.T) {
 		timeoutAt := time.Now().Add(time.Second)
 		for {
 			//for _, im := range sub.Images() {
-				//t.Logf("%v: PRE image: pos %d", time.Now(), im.Position())
+			//t.Logf("%v: PRE image: pos %d", time.Now(), im.Position())
 			//}
 			fragmentsRead += sub.Poll(handler, 10)
 			if fragmentsRead == 1 {
