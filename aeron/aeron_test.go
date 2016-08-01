@@ -22,6 +22,7 @@ import (
 	"github.com/op/go-logging"
 	"testing"
 	"time"
+	"sync/atomic"
 )
 
 const (
@@ -43,28 +44,21 @@ func send(n int, pub *Publication, t *testing.T) {
 			}
 			time.Sleep(time.Millisecond * 50)
 		}
-		t.Logf("%v: Sent message #%d at %d", time.Now(), i, v)
 	}
 }
 
 func receive(n int, sub *Subscription, t *testing.T) {
 	counter := 0
 	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
-		//fmt.Printf("%.8d: Recvd fragment: offset:%d length: %d\n", counter, offset, length)
 		counter++
 	}
-	fragmentsRead := 0
+	var fragmentsRead int32 = 0
 	for i := 0; i < n; i++ {
 		timeoutAt := time.Now().Add(time.Second)
 		for {
-			//for _, im := range sub.Images() {
-			//t.Logf("%v: PRE image: pos %d", time.Now(), im.Position())
-			//}
-			fragmentsRead += sub.Poll(handler, 10)
-			if fragmentsRead == 1 {
-				for _, im := range sub.Images() {
-					t.Logf("%v: image: pos %d {%v}", time.Now(), im.Position(), im)
-				}
+			recvd := sub.Poll(handler, 10)
+			if recvd == 1 {
+				atomic.AddInt32(&fragmentsRead, int32(recvd))
 				break
 			}
 			if time.Now().After(timeoutAt) {
@@ -74,12 +68,25 @@ func receive(n int, sub *Subscription, t *testing.T) {
 			time.Sleep(time.Millisecond)
 		}
 	}
-	if fragmentsRead != n {
+	if int(fragmentsRead) != n {
 		t.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
 	}
 	if counter != n {
 		t.Fatalf("Expected %d message. Got %d", n, counter)
 	}
+}
+
+func subAndSend(n int, a *Aeron, pub *Publication, t *testing.T) {
+	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	defer sub.Close()
+
+	// This is basically a requirement since we need to wait
+	for !IsConnectedTo(sub, pub) {
+		time.Sleep(time.Millisecond)
+	}
+
+	send(n, pub, t)
+	receive(n, sub, t)
 }
 
 func logtest(flag bool) {
@@ -104,7 +111,61 @@ func TestAeronBasics(t *testing.T) {
 	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
 	defer pub.Close()
 
-	subAndSendOne(a, pub, t)
+	subAndSend(1, a, pub, t)
+}
+
+func TestAeronSendMultipleMessages(t *testing.T) {
+
+	logtest(false)
+	logger.Debug("Started TestAeronSendMultipleMessages")
+
+	a := Connect(NewContext())
+	defer a.Close()
+
+	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	defer pub.Close()
+
+	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	defer sub.Close()
+
+	// This is basically a requirement since we need to wait
+	for !IsConnectedTo(sub, pub) {
+		time.Sleep(time.Millisecond)
+	}
+
+	itCount := 100
+	go send(itCount, pub, t)
+	receive(itCount, sub, t)
+}
+
+func TstAeronSendMultiplePublications(t *testing.T) {
+
+	logtest(false)
+	logger.Debug("Started TestAeronSendMultiplePublications")
+
+	a := Connect(NewContext())
+	defer a.Close()
+
+
+	pubCount := 2
+	itCount := 10
+
+	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	defer sub.Close()
+
+	for i := 0; i < pubCount; i++ {
+		pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+		defer pub.Close()
+
+		// This is basically a requirement since we need to wait
+		for !IsConnectedTo(sub, pub) {
+			time.Sleep(time.Millisecond)
+		}
+
+		go send(itCount, pub, t)
+	}
+
+	receive(itCount * pubCount, sub, t)
 }
 
 func TestAeronResubscribe(t *testing.T) {
@@ -117,21 +178,8 @@ func TestAeronResubscribe(t *testing.T) {
 
 	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
 
-	subAndSendOne(a, pub, t)
-	subAndSendOne(a, pub, t)
-}
-
-func subAndSendOne(a *Aeron, pub *Publication, t *testing.T) {
-	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
-	defer sub.Close()
-
-	// This is basically a requirement since we need to wait
-	for !sub.IsConnectedTo(pub) {
-		time.Sleep(time.Millisecond)
-	}
-
-	send(1, pub, t)
-	receive(1, sub, t)
+	subAndSend(1, a, pub, t)
+	subAndSend(1, a, pub, t)
 }
 
 func TestResubStress(t *testing.T) {
@@ -143,7 +191,7 @@ func TestResubStress(t *testing.T) {
 
 	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
 	for i := 0; i < 100; i++ {
-		subAndSendOne(a, pub, t)
+		subAndSend(1, a, pub, t)
 		t.Logf("bounce %d", i)
 	}
 }
