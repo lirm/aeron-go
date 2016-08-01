@@ -66,10 +66,9 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 		return nil, errors.New("zero size for existing file?!")
 	}
 	if size < 0 {
-		// FIXME huh?
-		return nil, fmt.Errorf("mmap: file %q has negative size", filename)
+		return nil, fmt.Errorf("mmap: stat %q returned %d", filename, size)
 	}
-	if size != int64(int(size)) {
+	if size != int64(size) {
 		return nil, fmt.Errorf("mmap: file %q is too large", filename)
 	}
 
@@ -80,7 +79,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 		mapSize = int(size)
 	}
 
-	logger.Debugf("Mapping existing file: fd: %d, size: %d, offset: %d", int(f.Fd()), int(size), offset)
+	logger.Debugf("Mapping existing file: fd: %d, size: %d, offset: %d", f.Fd(), size, offset)
 	mmap := new(File)
 	mmap.data, err = syscall.Mmap(int(f.Fd()), offset, mapSize, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {

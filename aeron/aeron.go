@@ -101,7 +101,9 @@ func (aeron *Aeron) AddSubscription(channel string, streamId int32) chan *Subscr
 		subscription := aeron.conductor.FindSubscription(regId)
 		for subscription == nil {
 			subscription = aeron.conductor.FindSubscription(regId)
-			// FIXME here should be a configurable IdleStrategy
+			if subscription == nil {
+				aeron.context.idleStrategy.Idle(0)
+			}
 		}
 		ch <- subscription
 		close(ch)
@@ -118,6 +120,9 @@ func (aeron *Aeron) AddPublication(channel string, streamId int32) chan *Publica
 		publication := aeron.conductor.FindPublication(regId)
 		for publication == nil {
 			publication = aeron.conductor.FindPublication(regId)
+			if publication == nil {
+				aeron.context.idleStrategy.Idle(0)
+			}
 		}
 		ch <- publication
 		close(ch)

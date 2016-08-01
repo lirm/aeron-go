@@ -89,7 +89,7 @@ func NewImage(sessionId int32, correlationId int64, logBuffers *logbuffer.LogBuf
 	for i := 0; i < logbuffer.PARTITION_COUNT; i++ {
 		image.termBuffers[i] = logBuffers.Buffer(i)
 	}
-	capacity := int32(logBuffers.Buffer(0).Capacity())
+	capacity := logBuffers.Buffer(0).Capacity()
 	image.termLengthMask = capacity - 1
 	image.positionBitsToShift = util.NumberOfTrailingZeroes(capacity)
 	image.header.SetInitialTermId(logbuffer.InitialTermId(logBuffers.Buffer(logbuffer.Descriptor.LOG_META_DATA_SECTION_INDEX)))
