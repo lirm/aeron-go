@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package buffers
+package rb
 
-import "github.com/lirm/aeron-go/aeron/util"
+import (
+	"github.com/lirm/aeron-go/aeron/util"
+)
 
-type Handler func(int32, *Atomic, int32, int32)
-
-var RingBufferDescriptor = struct {
+var Descriptor = struct {
 	TAIL_POSITION_OFFSET       int32
 	HEAD_CACHE_POSITION_OFFSET int32
 	HEAD_POSITION_OFFSET       int32

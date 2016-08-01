@@ -17,16 +17,17 @@ limitations under the License.
 package driver
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/buffer/rb"
 	"github.com/lirm/aeron-go/aeron/command"
 )
 
 type Proxy struct {
-	toDriverCommandBuffer *buffers.ManyToOneRingBuffer
+	toDriverCommandBuffer *rb.ManyToOne
 	clientId              int64
 }
 
-func (driver *Proxy) Init(buffer *buffers.ManyToOneRingBuffer) *Proxy {
+func (driver *Proxy) Init(buffer *rb.ManyToOne) *Proxy {
 	driver.toDriverCommandBuffer = buffer
 	driver.clientId = driver.toDriverCommandBuffer.NextCorrelationId()
 
@@ -43,7 +44,7 @@ func (driver *Proxy) AddSubscription(channel string, streamId int32) int64 {
 
 	logger.Debugf("driver.AddSubscription: correlationId=%d", correlationId)
 
-	filler := func(buffer *buffers.Atomic, length *int) int32 {
+	filler := func(buffer *buffer.Atomic, length *int) int32 {
 
 		var message command.SubscriptionMessage
 		message.Wrap(buffer, 0)
@@ -70,7 +71,7 @@ func (driver *Proxy) RemoveSubscription(registrationId int64) int64 {
 
 	logger.Debugf("driver.RemoveSubscription: correlationId=%d (subId=%d)", correlationId, registrationId)
 
-	filler := func(buffer *buffers.Atomic, length *int) int32 {
+	filler := func(buffer *buffer.Atomic, length *int) int32 {
 
 		var message command.RemoveMessage
 		message.Wrap(buffer, 0)
@@ -95,7 +96,7 @@ func (driver *Proxy) AddPublication(channel string, streamId int32) int64 {
 
 	logger.Debugf("driver.AddPublication: correlationId=%d", correlationId)
 
-	filler := func(buffer *buffers.Atomic, length *int) int32 {
+	filler := func(buffer *buffer.Atomic, length *int) int32 {
 
 		var message command.PublicationMessage
 		message.Wrap(buffer, 0)
@@ -119,7 +120,7 @@ func (driver *Proxy) RemovePublication(registrationId int64) int64 {
 
 	logger.Debugf("driver.RemovePublication: correlationId=%d (pudId=%d)", correlationId, registrationId)
 
-	filler := func(buffer *buffers.Atomic, length *int) int32 {
+	filler := func(buffer *buffer.Atomic, length *int) int32 {
 
 		var message command.RemoveMessage
 		message.Wrap(buffer, 0)
@@ -140,7 +141,7 @@ func (driver *Proxy) RemovePublication(registrationId int64) int64 {
 
 func (driver *Proxy) SendClientKeepalive() {
 
-	filler := func(buffer *buffers.Atomic, length *int) int32 {
+	filler := func(buffer *buffer.Atomic, length *int) int32 {
 
 		var message command.CorrelatedMessage
 		message.Wrap(buffer, 0)
@@ -155,10 +156,10 @@ func (driver *Proxy) SendClientKeepalive() {
 	driver.writeCommandToDriver(filler)
 }
 
-func (driver *Proxy) writeCommandToDriver(filler func(*buffers.Atomic, *int) int32) {
+func (driver *Proxy) writeCommandToDriver(filler func(*buffer.Atomic, *int) int32) {
 	messageBuffer := make([]byte, 512)
 
-	buffer := buffers.MakeAtomic(messageBuffer)
+	buffer := buffer.MakeAtomic(messageBuffer)
 
 	length := len(messageBuffer)
 

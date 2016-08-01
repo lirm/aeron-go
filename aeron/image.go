@@ -17,14 +17,14 @@ limitations under the License.
 package aeron
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
 	"sync/atomic"
 )
 
-type ControlledPollFragmentHandler func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header)
+type ControlledPollFragmentHandler func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header)
 
 const (
 	IMAGE_CLOSED int = -1
@@ -60,10 +60,10 @@ var ControlledPollAction = struct {
 }
 
 type Image struct {
-	termBuffers [logbuffer.PARTITION_COUNT]*buffers.Atomic
+	termBuffers [logbuffer.PARTITION_COUNT]*buffer.Atomic
 	header      logbuffer.Header
 
-	subscriberPosition buffers.Position
+	subscriberPosition buffer.Position
 
 	logBuffers *logbuffer.LogBuffers
 

@@ -18,7 +18,7 @@ package driver
 
 import (
 	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/command"
 	"github.com/op/go-logging"
 )
@@ -85,7 +85,7 @@ func NewAdapter(driverListener Listener, broadcastReceiver *broadcast.CopyReceiv
 }
 
 func (adapter *ListenerAdapter) ReceiveMessages() int {
-	handler := func(msgTypeId int32, buffer *buffers.Atomic, offset int32, length int32) {
+	handler := func(msgTypeId int32, buffer *buffer.Atomic, offset int32, length int32) {
 		logger.Debugf("received %d", msgTypeId)
 		switch int32(msgTypeId) {
 		case Events.ON_PUBLICATION_READY:

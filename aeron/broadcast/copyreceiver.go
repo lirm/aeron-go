@@ -18,18 +18,20 @@ package broadcast
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 )
+
+type Handler func(int32, *buffer.Atomic, int32, int32)
 
 type CopyReceiver struct {
 	receiver      *Receiver
-	scratchBuffer *buffers.Atomic
+	scratchBuffer *buffer.Atomic
 }
 
 func NewCopyReceiver(receiver *Receiver) *CopyReceiver {
 	bcast := new(CopyReceiver)
 	bcast.receiver = receiver
-	bcast.scratchBuffer = buffers.MakeAtomic(make([]byte, 4096))
+	bcast.scratchBuffer = buffer.MakeAtomic(make([]byte, 4096))
 
 	// Scroll to the latest unprocessed
 	for bcast.receiver.receiveNext() {
@@ -37,7 +39,7 @@ func NewCopyReceiver(receiver *Receiver) *CopyReceiver {
 	return bcast
 }
 
-func (bcast *CopyReceiver) Receive(handler buffers.Handler) int {
+func (bcast *CopyReceiver) Receive(handler Handler) int {
 	messagesReceived := 0
 	lastSeenLappedCount := bcast.receiver.GetLappedCount()
 

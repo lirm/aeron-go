@@ -18,7 +18,8 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/buffer/rb"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
@@ -37,12 +38,12 @@ type UnavailableImageHandler func(*Image)
 type Aeron struct {
 	context            *Context
 	conductor          ClientConductor
-	toDriverRingBuffer buffers.ManyToOneRingBuffer
+	toDriverRingBuffer rb.ManyToOne
 	driverProxy        driver.Proxy
 
-	toDriverAtomicBuffer  *buffers.Atomic
-	toClientsAtomicBuffer *buffers.Atomic
-	counterValuesBuffer   *buffers.Atomic
+	toDriverAtomicBuffer  *buffer.Atomic
+	toClientsAtomicBuffer *buffer.Atomic
+	counterValuesBuffer   *buffer.Atomic
 
 	cncBuffer *memmap.File
 

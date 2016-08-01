@@ -18,7 +18,7 @@ package memmap
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"testing"
 )
 
@@ -31,7 +31,7 @@ func TestMmapBasics(t *testing.T) {
 	// t.Logf("mmap: %v, len:%d, err:%v", mmap.GetMemoryPtr(), mmap.GetMemorySize(), err)
 	fmt.Printf("mmap: %v, len:%d, err:%v\n", mmap.GetMemoryPtr(), mmap.GetMemorySize(), err)
 
-	buf := buffers.MakeAtomic(mmap.GetMemoryPtr(), mmap.GetMemorySize())
+	buf := buffer.MakeAtomic(mmap.GetMemoryPtr(), mmap.GetMemorySize())
 	// t.Logf("created atomic buffer: %v", buf)
 	fmt.Printf("created atomic buffer: %v\n", buf)
 

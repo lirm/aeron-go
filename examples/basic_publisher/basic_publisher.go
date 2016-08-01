@@ -20,7 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/examples"
 	"log"
 	"time"
@@ -40,7 +40,7 @@ func main() {
 
 	for counter := 0; counter < *examples.ExamplesConfig.Messages; counter++ {
 		message := fmt.Sprintf("this is a message %d", counter)
-		srcBuffer := buffers.MakeAtomic(([]byte)(message))
+		srcBuffer := buffer.MakeAtomic(([]byte)(message))
 		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
 		switch ret {
 		case aeron.NOT_CONNECTED:

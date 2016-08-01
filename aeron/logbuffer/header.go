@@ -17,12 +17,12 @@ limitations under the License.
 package logbuffer
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"unsafe"
 )
 
 type Header struct {
-	buffer              buffers.Atomic
+	buffer              buffer.Atomic
 	offset              int32
 	initialTermId       int32
 	positionBitsToShift int32

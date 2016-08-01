@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package buffers
+package buffer
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -49,11 +49,11 @@ func TestMakeAtomicBuffer(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	buffer = new(Atomic)
-	assert.Equal(t, 0, buffer.Capacity())
+	buffer = MakeAtomic()
+	assert.Equal(t, int32(0), buffer.Capacity())
 
 	bytes := make([]byte, 32)
-	bufLen := len(bytes)
+	bufLen := int32(len(bytes))
 
 	buffer.Wrap(unsafe.Pointer(&bytes), bufLen)
 	assert.Equal(t, bufLen, buffer.Capacity())

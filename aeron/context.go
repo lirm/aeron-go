@@ -59,7 +59,7 @@ func NewContext() *Context {
 	ctx.publicationConnectionTo = time.Second * 5
 	ctx.interServiceTo = time.Second * 10
 
-	ctx.idleStrategy = idlestrategy.Sleeping{time.Millisecond * 4}
+	ctx.idleStrategy = idlestrategy.Sleeping{SleepFor: time.Millisecond * 4}
 
 	return ctx
 }

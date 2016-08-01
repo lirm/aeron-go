@@ -1,9 +1,9 @@
 package flyweight
 
-import "github.com/lirm/aeron-go/aeron/buffers"
+import "github.com/lirm/aeron-go/aeron/buffer"
 
 type Flyweight interface {
-	Wrap(*buffers.Atomic, int) Flyweight
+	Wrap(*buffer.Atomic, int) Flyweight
 	Size() int
 	SetSize(int)
 }

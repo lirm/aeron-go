@@ -17,7 +17,7 @@ limitations under the License.
 package term
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 	"math"
@@ -29,25 +29,25 @@ const (
 	APPENDER_FAILED  int32 = -2
 )
 
-var DEFAULT_RESERVED_VALUE_SUPPLIER ReservedValueSupplier = func(termBuffer *buffers.Atomic, termOffset int32, length int32) int64 { return 0 }
+var DEFAULT_RESERVED_VALUE_SUPPLIER ReservedValueSupplier = func(termBuffer *buffer.Atomic, termOffset int32, length int32) int64 { return 0 }
 
-type ReservedValueSupplier func(termBuffer *buffers.Atomic, termOffset int32, length int32) int64
+type ReservedValueSupplier func(termBuffer *buffer.Atomic, termOffset int32, length int32) int64
 
 type HeaderWriter struct {
 	sessionId int32
 	streamId  int32
 }
 
-func (header *HeaderWriter) Fill(defaultHdr *buffers.Atomic) {
+func (header *HeaderWriter) Fill(defaultHdr *buffer.Atomic) {
 	header.sessionId = defaultHdr.GetInt32(logbuffer.DataFrameHeader.SESSION_ID_FIELD_OFFSET)
 	header.streamId = defaultHdr.GetInt32(logbuffer.DataFrameHeader.STREAM_ID_FIELD_OFFSET)
 }
 
-func (header *HeaderWriter) write(termBuffer *buffers.Atomic, offset, length, termId int32) {
+func (header *HeaderWriter) write(termBuffer *buffer.Atomic, offset, length, termId int32) {
 	termBuffer.PutInt32Ordered(offset, -length)
 
 	headerPtr := uintptr(termBuffer.Ptr()) + uintptr(offset)
-	headerBuffer := buffers.MakeAtomic(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.LENGTH)
+	headerBuffer := buffer.MakeAtomic(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.LENGTH)
 
 	headerBuffer.PutInt8(logbuffer.DataFrameHeader.VERSION_FIELD_OFFSET, logbuffer.DataFrameHeader.CURRENT_VERSION)
 	headerBuffer.PutUInt8(logbuffer.DataFrameHeader.FLAGS_FIELD_OFFSET, logbuffer.FrameDescriptor.BEGIN_FRAG|logbuffer.FrameDescriptor.END_FRAG)
@@ -59,8 +59,8 @@ func (header *HeaderWriter) write(termBuffer *buffers.Atomic, offset, length, te
 }
 
 type Appender struct {
-	termBuffer *buffers.Atomic
-	tailBuffer *buffers.Atomic
+	termBuffer *buffer.Atomic
+	tailBuffer *buffer.Atomic
 	tailOffset int32
 }
 
@@ -77,7 +77,7 @@ func (result *AppenderResult) TermId() int32 {
 	return result.termId
 }
 
-func MakeAppender(termBuffer *buffers.Atomic, metaDataBuffer *buffers.Atomic, partitionIndex int) *Appender {
+func MakeAppender(termBuffer *buffer.Atomic, metaDataBuffer *buffer.Atomic, partitionIndex int) *Appender {
 	appender := new(Appender)
 	appender.termBuffer = termBuffer
 	appender.tailBuffer = metaDataBuffer
@@ -94,7 +94,7 @@ func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
 	return appender.tailBuffer.GetAndAddInt64(appender.tailOffset, int64(alignedLength))
 }
 
-func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, length int32, claim *buffers.Claim) {
+func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, length int32, claim *buffer.Claim) {
 
 	frameLength := length + logbuffer.DataFrameHeader.LENGTH
 	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameDescriptor.FRAME_ALIGNMENT)
@@ -115,7 +115,7 @@ func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, le
 }
 
 func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, header *HeaderWriter,
-	srcBuffer *buffers.Atomic, srcOffset int32, length int32, reservedValueSupplier ReservedValueSupplier) {
+	srcBuffer *buffer.Atomic, srcOffset int32, length int32, reservedValueSupplier ReservedValueSupplier) {
 
 	frameLength := length + logbuffer.DataFrameHeader.LENGTH
 	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameDescriptor.FRAME_ALIGNMENT)
@@ -143,7 +143,7 @@ func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, head
 }
 
 func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header *HeaderWriter,
-	srcBuffer *buffers.Atomic, srcOffset int32, length int32, maxPayloadLength int32, reservedValueSupplier ReservedValueSupplier) {
+	srcBuffer *buffer.Atomic, srcOffset int32, length int32, maxPayloadLength int32, reservedValueSupplier ReservedValueSupplier) {
 
 	numMaxPayloads := length / maxPayloadLength
 	remainingPayload := length % maxPayloadLength
@@ -194,7 +194,7 @@ func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header
 }
 
 func (appender *Appender) handleEndOfLogCondition(result *AppenderResult,
-	termBuffer *buffers.Atomic, termOffset int32, header *HeaderWriter, termLength int32) {
+	termBuffer *buffer.Atomic, termOffset int32, header *HeaderWriter, termLength int32) {
 	result.termOffset = int64(APPENDER_FAILED)
 
 	if termOffset <= termLength {

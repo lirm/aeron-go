@@ -19,16 +19,16 @@ package aeron
 import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/util"
 	"io"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
-	"github.com/lirm/aeron-go/aeron/util"
 )
 
 var RegistrationStatus = struct {
@@ -105,7 +105,7 @@ type ClientConductor struct {
 
 	driverProxy *driver.Proxy
 
-	counterValuesBuffer *buffers.Atomic
+	counterValuesBuffer *buffer.Atomic
 
 	driverListenerAdapter *driver.ListenerAdapter
 
@@ -253,7 +253,7 @@ func (cc *ClientConductor) FindPublication(registrationId int64) *Publication {
 					publication.registrationId = registrationId
 					publication.streamId = pub.streamId
 					publication.sessionId = pub.sessionId
-					publication.publicationLimit = buffers.NewPosition(cc.counterValuesBuffer,
+					publication.publicationLimit = buffer.NewPosition(cc.counterValuesBuffer,
 						pub.posLimitCounterId)
 
 				case RegistrationStatus.ERRORED_MEDIA_DRIVER:
@@ -438,7 +438,7 @@ func (cc *ClientConductor) OnAvailableImage(streamId int32, sessionId int32, log
 						image := NewImage(sessionId, correlationId, logbuffer.Wrap(logFilename))
 						image.subscriptionRegistrationId = sub.registrationId
 						image.sourceIdentity = sourceIdentity
-						image.subscriberPosition = buffers.NewPosition(cc.counterValuesBuffer,
+						image.subscriberPosition = buffer.NewPosition(cc.counterValuesBuffer,
 							subPos.IndicatorId())
 						image.exceptionHandler = cc.errorHandler
 						logger.Debugf("OnAvailableImage: new image position: %v -> %d",

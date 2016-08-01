@@ -20,12 +20,12 @@ package flyweight
 import "C"
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"unsafe"
 )
 
 type Field interface {
-	Wrap(buffer *buffers.Atomic, offset int)
+	Wrap(buffer *buffer.Atomic, offset int)
 	Get() interface{}
 }
 
@@ -33,7 +33,7 @@ type Int32Field struct {
 	offset unsafe.Pointer
 }
 
-func (fld *Int32Field) Wrap(buffer *buffers.Atomic, offset int) int {
+func (fld *Int32Field) Wrap(buffer *buffer.Atomic, offset int) int {
 	buffer.BoundsCheck(int32(offset), 4)
 
 	fld.offset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
@@ -52,7 +52,7 @@ type Int64Field struct {
 	offset unsafe.Pointer
 }
 
-func (fld *Int64Field) Wrap(buffer *buffers.Atomic, offset int) int {
+func (fld *Int64Field) Wrap(buffer *buffer.Atomic, offset int) int {
 	buffer.BoundsCheck(int32(offset), 8)
 
 	fld.offset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
@@ -73,7 +73,7 @@ type StringField struct {
 	fly        Flyweight
 }
 
-func (fld *StringField) Wrap(buffer *buffers.Atomic, offset int, fly Flyweight) int {
+func (fld *StringField) Wrap(buffer *buffer.Atomic, offset int, fly Flyweight) int {
 	buffer.BoundsCheck(int32(offset), 4)
 
 	fld.lenOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))

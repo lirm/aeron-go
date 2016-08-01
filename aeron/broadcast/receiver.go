@@ -17,13 +17,14 @@ limitations under the License.
 package broadcast
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/buffer/rb"
 	"github.com/lirm/aeron-go/aeron/util"
 	"sync/atomic"
 )
 
 type Receiver struct {
-	buffer                 *buffers.Atomic
+	buffer                 *buffer.Atomic
 	capacity               int32
 	mask                   int64
 	tailIntentCounterIndex int32
@@ -37,7 +38,7 @@ type Receiver struct {
 	lappedCount int64
 }
 
-func NewReceiver(buffer *buffers.Atomic) *Receiver {
+func NewReceiver(buffer *buffer.Atomic) *Receiver {
 	recv := new(Receiver)
 	recv.buffer = buffer
 	recv.capacity = buffer.Capacity() - BufferDescriptor.TRAILER_LENGTH
@@ -65,15 +66,15 @@ func (recv *Receiver) GetLappedCount() int64 {
 }
 
 func (recv *Receiver) typeId() int32 {
-	return recv.buffer.GetInt32(buffers.TypeOffset(recv.recordOffset))
+	return recv.buffer.GetInt32(rb.TypeOffset(recv.recordOffset))
 }
 
 func (recv *Receiver) offset() int32 {
-	return buffers.EncodedMsgOffset(recv.recordOffset)
+	return rb.EncodedMsgOffset(recv.recordOffset)
 }
 
 func (recv *Receiver) length() int32 {
-	return int32(recv.buffer.GetInt32(buffers.LengthOffset(recv.recordOffset))) - buffers.RecordDescriptor.HEADER_LENGTH
+	return int32(recv.buffer.GetInt32(rb.LengthOffset(recv.recordOffset))) - rb.RecordDescriptor.HEADER_LENGTH
 }
 
 func (recv *Receiver) receiveNext() bool {
@@ -92,11 +93,11 @@ func (recv *Receiver) receiveNext() bool {
 		}
 
 		recv.cursor = cursor
-		length := recv.buffer.GetInt32(buffers.LengthOffset(recordOffset))
-		alignedLength := int64(util.AlignInt32(length, buffers.RecordDescriptor.RECORD_ALIGNMENT))
+		length := recv.buffer.GetInt32(rb.LengthOffset(recordOffset))
+		alignedLength := int64(util.AlignInt32(length, rb.RecordDescriptor.RECORD_ALIGNMENT))
 		recv.nextRecord = cursor + alignedLength
 
-		if buffers.RecordDescriptor.PADDING_MSG_TYPE_ID == recv.buffer.GetInt32(buffers.TypeOffset(recordOffset)) {
+		if rb.RecordDescriptor.PADDING_MSG_TYPE_ID == recv.buffer.GetInt32(rb.TypeOffset(recordOffset)) {
 			recordOffset = 0
 			recv.cursor = recv.nextRecord
 			recv.nextRecord += alignedLength

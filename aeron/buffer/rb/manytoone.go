@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package buffers
+package rb
 
 import (
 	"fmt"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
 const INSUFFICIENT_CAPACITY int32 = -2
 
-type ManyToOneRingBuffer struct {
-	buffer                    *Atomic
+type ManyToOne struct {
+	buffer                    *buffer.Atomic
 	capacity                  int32
 	maxMsgLength              int32
 	headPositionIndex         int32
@@ -34,48 +35,48 @@ type ManyToOneRingBuffer struct {
 	consumerHeartbeatIndex    int32
 }
 
-func (buf *ManyToOneRingBuffer) Init(buffer *Atomic) *ManyToOneRingBuffer {
+func (buf *ManyToOne) Init(buffer *buffer.Atomic) *ManyToOne {
 
 	buf.buffer = buffer
-	buf.capacity = buffer.Capacity() - RingBufferDescriptor.TRAILER_LENGTH
+	buf.capacity = buffer.Capacity() - Descriptor.TRAILER_LENGTH
 
 	util.IsPowerOfTwo(buf.capacity)
 
 	buf.maxMsgLength = buf.capacity / 8
-	buf.tailPositionIndex = buf.capacity + RingBufferDescriptor.TAIL_POSITION_OFFSET
-	buf.headCachePositionIndex = buf.capacity + RingBufferDescriptor.HEAD_CACHE_POSITION_OFFSET
-	buf.headPositionIndex = buf.capacity + RingBufferDescriptor.HEAD_POSITION_OFFSET
-	buf.correlationIdCounterIndex = buf.capacity + RingBufferDescriptor.CORRELATION_COUNTER_OFFSET
-	buf.consumerHeartbeatIndex = buf.capacity + RingBufferDescriptor.CONSUMER_HEARTBEAT_OFFSET
+	buf.tailPositionIndex = buf.capacity + Descriptor.TAIL_POSITION_OFFSET
+	buf.headCachePositionIndex = buf.capacity + Descriptor.HEAD_CACHE_POSITION_OFFSET
+	buf.headPositionIndex = buf.capacity + Descriptor.HEAD_POSITION_OFFSET
+	buf.correlationIdCounterIndex = buf.capacity + Descriptor.CORRELATION_COUNTER_OFFSET
+	buf.consumerHeartbeatIndex = buf.capacity + Descriptor.CONSUMER_HEARTBEAT_OFFSET
 
 	return buf
 }
 
-func (buf *ManyToOneRingBuffer) NextCorrelationId() int64 {
+func (buf *ManyToOne) NextCorrelationId() int64 {
 	return buf.buffer.GetAndAddInt64(buf.correlationIdCounterIndex, 1)
 }
 
-func (buf *ManyToOneRingBuffer) SetConsumerHeartbeatTime(time int64) {
+func (buf *ManyToOne) SetConsumerHeartbeatTime(time int64) {
 	buf.buffer.PutInt64Ordered(buf.consumerHeartbeatIndex, time)
 }
 
-func (buf *ManyToOneRingBuffer) ConsumerHeartbeatTime() int64 {
+func (buf *ManyToOne) ConsumerHeartbeatTime() int64 {
 	return buf.buffer.GetInt64Volatile(buf.consumerHeartbeatIndex)
 }
 
-func (buf *ManyToOneRingBuffer) ProducerPosition() int64 {
+func (buf *ManyToOne) ProducerPosition() int64 {
 	return buf.buffer.GetInt64Volatile(buf.tailPositionIndex)
 }
 
-func (buf *ManyToOneRingBuffer) ConsumerPosition() int64 {
+func (buf *ManyToOne) ConsumerPosition() int64 {
 	return buf.buffer.GetInt64Volatile(buf.headPositionIndex)
 }
 
-func (buf *ManyToOneRingBuffer) Capacity() int32 {
+func (buf *ManyToOne) Capacity() int32 {
 	return buf.capacity
 }
 
-func (buf *ManyToOneRingBuffer) claimCapacity(requiredCapacity int32) int32 {
+func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 
 	mask := buf.capacity - 1
 	head := buf.buffer.GetInt64Volatile(buf.headCachePositionIndex)
@@ -128,13 +129,13 @@ func (buf *ManyToOneRingBuffer) claimCapacity(requiredCapacity int32) int32 {
 	return tailIndex
 }
 
-func (buf *ManyToOneRingBuffer) checkMsgLength(length int32) {
+func (buf *ManyToOne) checkMsgLength(length int32) {
 	if length > buf.maxMsgLength {
 		panic(fmt.Sprintf("encoded message exceeds maxMsgLength of %d, length=%d", buf.maxMsgLength, length))
 	}
 }
 
-func (buf *ManyToOneRingBuffer) Write(msgTypeId int32, srcBuffer *Atomic, srcIndex int32, length int32) bool {
+func (buf *ManyToOne) Write(msgTypeId int32, srcBuffer *buffer.Atomic, srcIndex int32, length int32) bool {
 
 	var isSuccessful bool = false
 
@@ -156,7 +157,7 @@ func (buf *ManyToOneRingBuffer) Write(msgTypeId int32, srcBuffer *Atomic, srcInd
 	return isSuccessful
 }
 
-func (buf *ManyToOneRingBuffer) Read(Handler, messageCountLimit int) int32 {
+func (buf *ManyToOne) Read(Handler, messageCountLimit int) int32 {
 	panic("Not implemented yet")
 	return -1
 }

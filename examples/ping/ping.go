@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"github.com/codahale/hdrhistogram"
 	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
 	"log"
@@ -61,14 +61,14 @@ func main() {
 
 	hist := hdrhistogram.New(1, 1000000000, 3)
 
-	handler := func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header) {
+	handler := func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header) {
 		sent := buffer.GetInt64(offset)
 		now := time.Now().UnixNano()
 
 		hist.RecordValue(now - sent)
 	}
 
-	srcBuffer := buffers.MakeAtomic(make([]byte, 16))
+	srcBuffer := buffer.MakeAtomic(make([]byte, 16))
 	for i := 0; i < *examples.ExamplesConfig.Messages; i++ {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)

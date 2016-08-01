@@ -17,12 +17,12 @@ limitations under the License.
 package term
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffers"
+	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-type FragmentHandler func(buffer *buffers.Atomic, offset int32, length int32, header *logbuffer.Header)
+type FragmentHandler func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header)
 
 type ReadOutcome struct {
 	offset        int32
@@ -37,7 +37,7 @@ func (outcome *ReadOutcome) FragmentsRead() int {
 	return outcome.fragmentsRead
 }
 
-func Read(outcome *ReadOutcome, termBuffer *buffers.Atomic, termOffset int32,
+func Read(outcome *ReadOutcome, termBuffer *buffer.Atomic, termOffset int32,
 	handler FragmentHandler, fragmentsLimit int, header *logbuffer.Header) {
 
 	outcome.fragmentsRead = 0
