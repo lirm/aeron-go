@@ -68,7 +68,7 @@ type Image struct {
 	logBuffers *logbuffer.LogBuffers
 
 	sourceIdentity string
-	isClosed       atomic.Value
+	isClosed       int32
 
 	exceptionHandler func(error)
 
@@ -94,16 +94,20 @@ func NewImage(sessionId int32, correlationId int64, logBuffers *logbuffer.LogBuf
 	image.positionBitsToShift = util.NumberOfTrailingZeroes(capacity)
 	image.header.SetInitialTermId(logbuffer.InitialTermId(logBuffers.Buffer(logbuffer.Descriptor.LOG_META_DATA_SECTION_INDEX)))
 	image.header.SetPositionBitsToShift(int32(image.positionBitsToShift))
-	image.isClosed.Store(false)
+	image.isClosed = util.FALSE
 
 	return image
+}
+
+func (image Image) IsClosed() bool {
+	return atomic.LoadInt32(&image.isClosed) == util.TRUE
 }
 
 func (image Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	result := IMAGE_CLOSED
 
-	if !image.isClosed.Load().(bool) {
+	if !image.IsClosed() {
 		position := image.subscriberPosition.Get()
 		logger.Debugf("Image position: %d, mask:%X", position, image.termLengthMask)
 		termOffset := int32(position) & image.termLengthMask
@@ -128,9 +132,7 @@ func (image Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 func (image Image) Close() error {
 	var err error = nil
-	// TODO this should likely be CAS
-	if !image.isClosed.Load().(bool) {
-		image.isClosed.Store(true)
+	if atomic.CompareAndSwapInt32(&image.isClosed, util.FALSE, util.TRUE) {
 		logger.Debugf("Closing %v", image)
 		err = image.logBuffers.Close()
 	}

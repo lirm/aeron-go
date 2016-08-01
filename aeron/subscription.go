@@ -18,6 +18,7 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
+	"github.com/lirm/aeron-go/aeron/util"
 	"sync/atomic"
 )
 
@@ -30,7 +31,7 @@ type Subscription struct {
 
 	images atomic.Value
 
-	isClosed atomic.Value
+	isClosed int32
 }
 
 func NewSubscription(conductor *ClientConductor, channel string, registrationId int64, streamId int32) *Subscription {
@@ -41,18 +42,17 @@ func NewSubscription(conductor *ClientConductor, channel string, registrationId 
 	sub.registrationId = registrationId
 	sub.streamId = streamId
 	sub.roundRobinIndex = 0
-	sub.isClosed.Store(false)
+	sub.isClosed = util.FALSE
 
 	return sub
 }
 
 func (sub *Subscription) IsClosed() bool {
-	return sub.isClosed.Load().(bool)
+	return atomic.LoadInt32(&sub.isClosed) == util.TRUE
 }
 
 func (sub *Subscription) Close() error {
-	if !sub.IsClosed() {
-		sub.isClosed.Store(true)
+	if atomic.CompareAndSwapInt32(&sub.isClosed, util.FALSE, util.TRUE) {
 		<-sub.conductor.releaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
 	}
 

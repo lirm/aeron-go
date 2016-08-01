@@ -25,6 +25,8 @@ const (
 	CACHE_LINE_LENGTH int32 = 64
 	SIZEOF_INT32      int32 = int32(unsafe.Sizeof(i32))
 	SIZEOF_INT64      int32 = int32(unsafe.Sizeof(i64))
+	TRUE              int32 = 1
+	FALSE             int32 = 0
 )
 
 func AlignInt32(value, alignment int32) int32 {

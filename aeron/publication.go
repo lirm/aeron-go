@@ -44,7 +44,7 @@ type Publication struct {
 	positionBitsToShift int32
 	publicationLimit    buffers.Position
 
-	isClosed atomic.Value
+	isClosed int32
 
 	appenders    [logbuffer.PARTITION_COUNT]*term.Appender
 	headerWriter term.HeaderWriter
@@ -58,7 +58,7 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(logBuffers.Buffer(0).Capacity()))
 	header := logbuffer.DefaultFrameHeader(pub.logMetaDataBuffer)
 	pub.headerWriter.Fill(header)
-	pub.isClosed.Store(false)
+	pub.isClosed = util.FALSE
 
 	for i := 0; i < logbuffer.PARTITION_COUNT; i++ {
 		appender := term.MakeAppender(logBuffers.Buffer(i), pub.logMetaDataBuffer, i)
@@ -70,12 +70,11 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 }
 
 func (pub *Publication) IsClosed() bool {
-	return pub.isClosed.Load().(bool)
+	return atomic.LoadInt32(&pub.isClosed) == util.TRUE
 }
 
 func (pub *Publication) Close() error {
-	if pub != nil && !pub.IsClosed() {
-		pub.isClosed.Store(true)
+	if pub != nil && atomic.CompareAndSwapInt32(&pub.isClosed, util.FALSE, util.TRUE) {
 		<-pub.conductor.releasePublication(pub.registrationId)
 	}
 

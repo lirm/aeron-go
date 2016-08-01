@@ -28,6 +28,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 var RegistrationStatus = struct {
@@ -119,7 +120,7 @@ type ClientConductor struct {
 	onUnavailableImageHandler UnavailableImageHandler
 	errorHandler              func(error)
 
-	running      atomic.Value
+	running      int32
 	driverActive atomic.Value
 
 	timeOfLastKeepalive             int64
@@ -139,7 +140,7 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 		pubConnectionTimeout)
 
 	cc.driverProxy = driverProxy
-	cc.running.Store(true)
+	cc.running = util.TRUE
 	cc.driverActive.Store(true)
 	cc.driverListenerAdapter = driver.NewAdapter(cc, bcast)
 	cc.interServiceTimeoutNs = interServiceTimeout.Nanoseconds()
@@ -154,24 +155,25 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 }
 
 func (cc *ClientConductor) Close() error {
-	cc.running.Store(false)
 
-	// TODO accumulate errors
 	var err error
+	if atomic.CompareAndSwapInt32(&cc.running, util.TRUE, util.FALSE) {
+		// TODO accumulate errors
 
-	for _, pub := range cc.pubs {
-		err = pub.publication.Close()
-		// In Go 1.7 should have the following line
-		// runtime.KeepAlive(pub.publication)
-	}
-	cc.pubs = nil
+		for _, pub := range cc.pubs {
+			err = pub.publication.Close()
+			// In Go 1.7 should have the following line
+			// runtime.KeepAlive(pub.publication)
+		}
+		cc.pubs = nil
 
-	for _, sub := range cc.subs {
-		err = sub.subscription.Close()
-		// In Go 1.7 should have the following line
-		// runtime.KeepAlive(sub.subscription)
+		for _, sub := range cc.subs {
+			err = sub.subscription.Close()
+			// In Go 1.7 should have the following line
+			// runtime.KeepAlive(sub.subscription)
+		}
+		cc.subs = nil
 	}
-	cc.subs = nil
 
 	return err
 }
@@ -185,7 +187,7 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 	// In Go 1.7 should have the following line
 	// runtime.LockOSThread()
 
-	for cc.running.Load().(bool) {
+	for atomic.LoadInt32(&cc.running) == util.TRUE {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
 		workCount += cc.onHeartbeatCheckTimeouts()
 		idleStrategy.Idle(workCount)
@@ -273,7 +275,8 @@ func (cc *ClientConductor) releasePublication(registrationId int64) chan bool {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	var ch chan bool
+	ch := make(chan bool, 1)
+	found := false
 
 	for i, pub := range cc.pubs {
 		if pub.registrationId == registrationId {
@@ -283,10 +286,16 @@ func (cc *ClientConductor) releasePublication(registrationId int64) chan bool {
 			cc.pubs[len(cc.pubs)-1] = nil
 			cc.pubs = cc.pubs[:len(cc.pubs)-1]
 
-			ch = make(chan bool, 1)
 			cc.pendingCloses[corrId] = ch
+			found = true
 		}
 	}
+
+	// Need to report if it's already been closed
+	if !found {
+		ch <- false
+	}
+
 	return ch
 }
 
@@ -354,7 +363,8 @@ func (cc *ClientConductor) releaseSubscription(registrationId int64, images []*I
 
 	now := time.Now().UnixNano()
 
-	var ch chan bool
+	ch := make(chan bool, 1)
+	found := false
 
 	for i, sub := range cc.subs {
 		if sub.registrationId == registrationId {
@@ -373,9 +383,14 @@ func (cc *ClientConductor) releaseSubscription(registrationId int64, images []*I
 				cc.lingeringResources <- LingerResourse{now, *image}
 			}
 
-			ch = make(chan bool, 1)
 			cc.pendingCloses[corrId] = ch
+			found = true
 		}
+	}
+
+	// Need to report if it's already been closed
+	if !found {
+		ch <- false
 	}
 
 	return ch
