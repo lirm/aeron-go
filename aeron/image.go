@@ -109,11 +109,11 @@ func (image Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	if !image.IsClosed() {
 		position := image.subscriberPosition.Get()
-		logger.Debugf("Image position: %d, mask:%X", position, image.termLengthMask)
+		//logger.Debugf("Image position: %d, mask:%X", position, image.termLengthMask)
 		termOffset := int32(position) & image.termLengthMask
 		index := logbuffer.IndexByPosition(position, image.positionBitsToShift)
 		termBuffer := image.termBuffers[index]
-		logger.Debugf("Selected Term buffer: %v", termBuffer)
+		//logger.Debugf("Selected Term buffer: %v", termBuffer)
 
 		var readOutcome term.ReadOutcome
 		term.Read(&readOutcome, termBuffer, termOffset, handler, fragmentLimit, &image.header)
@@ -121,7 +121,7 @@ func (image Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 		newPosition := position + int64(readOutcome.Offset()-termOffset)
 		if newPosition > position {
 			image.subscriberPosition.Set(newPosition)
-			logger.Debugf("New position: %d, term offset: %d", newPosition, termOffset)
+			//logger.Debugf("New position: %d, term offset: %d", newPosition, termOffset)
 		}
 
 		result = readOutcome.FragmentsRead()
