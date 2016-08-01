@@ -97,7 +97,7 @@ func logtest(flag bool) {
 		logging.SetLevel(logging.INFO, "driver")
 		logging.SetLevel(logging.INFO, "counters")
 		logging.SetLevel(logging.INFO, "logbuffers")
-		logging.SetLevel(logging.INFO, "buffers")
+		logging.SetLevel(logging.INFO, "buffer")
 	}
 }
 
@@ -141,7 +141,7 @@ func TestAeronSendMultipleMessages(t *testing.T) {
 
 func TestAeronSendMultiplePublications(t *testing.T) {
 
-	logtest(true)
+	logtest(false)
 	logger.Debug("Started TestAeronSendMultiplePublications")
 
 	//go func() {
@@ -173,9 +173,9 @@ func TestAeronSendMultiplePublications(t *testing.T) {
 		pubs[i] = pub
 
 		// This is basically a requirement since we need to wait
-		//for !IsConnectedTo(sub, pub) {
-		//	time.Sleep(time.Millisecond)
-		//}
+		for !IsConnectedTo(sub, pub) {
+			time.Sleep(time.Millisecond)
+		}
 	}
 
 	logger.Debugf(" ==> Got pubs %v", pubs)

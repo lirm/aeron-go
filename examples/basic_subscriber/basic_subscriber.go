@@ -37,7 +37,7 @@ func main() {
 	logging.SetLevel(logging.INFO, "driver")
 	logging.SetLevel(logging.INFO, "counters")
 	logging.SetLevel(logging.INFO, "logbuffers")
-	logging.SetLevel(logging.INFO, "buffers")
+	logging.SetLevel(logging.INFO, "buffer")
 
 	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
 	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)

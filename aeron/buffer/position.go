@@ -21,7 +21,7 @@ import (
 	"github.com/op/go-logging"
 )
 
-var logger = logging.MustGetLogger("buffers")
+var logger = logging.MustGetLogger("buffer")
 
 type Position struct {
 	buffer *Atomic
@@ -35,7 +35,6 @@ func NewPosition(buffer *Atomic, id int32) Position {
 	pos.buffer = buffer
 	pos.id = id
 	pos.offset = id * 2 * util.CACHE_LINE_LENGTH
-	//pos.offset = id * counters.ReaderConsts.COUNTER_LENGTH
 
 	logger.Debugf("<+ Counter[%d]: %d", id, pos.buffer.GetInt64(pos.offset))
 
@@ -44,11 +43,11 @@ func NewPosition(buffer *Atomic, id int32) Position {
 
 func (pos Position) Get() int64 {
 	p := pos.buffer.GetInt64(pos.offset)
-	logger.Debugf("<- Counter[%d]: %d", pos.id, p)
+	//logger.Debugf("<- Counter[%d]: %d", pos.id, p)
 	return p
 }
 
 func (pos Position) Set(value int64) {
 	pos.buffer.PutInt64(pos.offset, value)
-	logger.Debugf("-> Counter[%d]: %d", pos.id, value)
+	//logger.Debugf("-> Counter[%d]: %d", pos.id, value)
 }
