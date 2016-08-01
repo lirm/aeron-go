@@ -20,9 +20,9 @@ import (
 	"github.com/lirm/aeron-go/aeron/buffers"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
+	"sync/atomic"
 	"testing"
 	"time"
-	"sync/atomic"
 )
 
 const (
@@ -146,7 +146,6 @@ func TstAeronSendMultiplePublications(t *testing.T) {
 	a := Connect(NewContext())
 	defer a.Close()
 
-
 	pubCount := 2
 	itCount := 10
 
@@ -165,7 +164,7 @@ func TstAeronSendMultiplePublications(t *testing.T) {
 		go send(itCount, pub, t)
 	}
 
-	receive(itCount * pubCount, sub, t)
+	receive(itCount*pubCount, sub, t)
 }
 
 func TestAeronResubscribe(t *testing.T) {

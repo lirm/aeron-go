@@ -134,9 +134,11 @@ func (sub *Subscription) HasImages() bool {
 
 func IsConnectedTo(sub *Subscription, pub *Publication) bool {
 	images := sub.images.Load().([]*Image)
-	for _, image := range images {
-		if image.sessionId == pub.sessionId {
-			return true
+	if sub.channel == pub.channel && sub.streamId == pub.streamId {
+		for _, image := range images {
+			if image.sessionId == pub.sessionId {
+				return true
+			}
 		}
 	}
 
