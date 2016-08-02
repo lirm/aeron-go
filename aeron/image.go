@@ -17,11 +17,11 @@ limitations under the License.
 package aeron
 
 import (
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
-	"sync/atomic"
 )
 
 type ControlledPollFragmentHandler func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header)
@@ -68,7 +68,7 @@ type Image struct {
 	logBuffers *logbuffer.LogBuffers
 
 	sourceIdentity string
-	isClosed       int32
+	isClosed       atomic.Bool
 
 	exceptionHandler func(error)
 
@@ -94,13 +94,13 @@ func NewImage(sessionId int32, correlationId int64, logBuffers *logbuffer.LogBuf
 	image.positionBitsToShift = util.NumberOfTrailingZeroes(capacity)
 	image.header.SetInitialTermId(logbuffer.InitialTermId(logBuffers.Buffer(logbuffer.Descriptor.LOG_META_DATA_SECTION_INDEX)))
 	image.header.SetPositionBitsToShift(int32(image.positionBitsToShift))
-	image.isClosed = util.FALSE
+	image.isClosed.Set(false)
 
 	return image
 }
 
 func (image *Image) IsClosed() bool {
-	return atomic.LoadInt32(&image.isClosed) == util.TRUE
+	return image.isClosed.Get()
 }
 
 func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
@@ -132,7 +132,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 func (image Image) Close() error {
 	var err error = nil
-	if atomic.CompareAndSwapInt32(&image.isClosed, util.FALSE, util.TRUE) {
+	if image.isClosed.CompareAndSet(false, true) {
 		logger.Debugf("Closing %v", image)
 		err = image.logBuffers.Close()
 	}

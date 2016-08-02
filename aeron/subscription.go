@@ -17,10 +17,8 @@ limitations under the License.
 package aeron
 
 import (
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
-	"github.com/lirm/aeron-go/aeron/util"
-	"sync/atomic"
-	"unsafe"
 )
 
 type Subscription struct {
@@ -30,49 +28,40 @@ type Subscription struct {
 	registrationId  int64
 	streamId        int32
 
-	img unsafe.Pointer
+	images *ImageList
 
-	isClosed int32
+	isClosed atomic.Bool
 }
 
 func NewSubscription(conductor *ClientConductor, channel string, registrationId int64, streamId int32) *Subscription {
 	sub := new(Subscription)
-	images := make([]*Image, 0)
-	sub.img = unsafe.Pointer(&images)
+	sub.images = NewImageList()
 	sub.conductor = conductor
 	sub.channel = channel
 	sub.registrationId = registrationId
 	sub.streamId = streamId
 	sub.roundRobinIndex = 0
-	sub.isClosed = util.FALSE
+	sub.isClosed.Set(false)
 
 	return sub
 }
 
 func (sub *Subscription) IsClosed() bool {
-	return atomic.LoadInt32(&sub.isClosed) == util.TRUE
+	return sub.isClosed.Get()
 }
 
 func (sub *Subscription) Close() error {
-	if atomic.CompareAndSwapInt32(&sub.isClosed, util.FALSE, util.TRUE) {
-		<-sub.conductor.releaseSubscription(sub.registrationId, sub.images())
+	if sub.isClosed.CompareAndSet(false, true) {
+		<-sub.conductor.releaseSubscription(sub.registrationId, sub.images.Get())
 	}
 
 	return nil
 }
 
-func (sub *Subscription) images() []*Image {
-	return *(*[]*Image)(atomic.LoadPointer(&sub.img))
-}
-
-func  (sub *Subscription) setImages(imgs []*Image) {
-	atomic.StorePointer(&sub.img, unsafe.Pointer(&imgs))
-}
-
 func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
-	images := sub.images()
-	length := len(images)
+	img := sub.images.Get()
+	length := len(img)
 	var fragmentsRead int = 0
 
 	if length > 0 {
@@ -84,11 +73,11 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 		}
 
 		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += images[i].Poll(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].Poll(handler, fragmentLimit-fragmentsRead)
 		}
 
 		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += images[i].Poll(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].Poll(handler, fragmentLimit-fragmentsRead)
 		}
 	}
 
@@ -96,8 +85,8 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 }
 
 func (sub *Subscription) hasImage(sessionId int32) bool {
-	images := sub.images()
-	for _, image := range images {
+	img := sub.images.Get()
+	for _, image := range img {
 		if image.sessionId == sessionId {
 			return true
 		}
@@ -107,26 +96,26 @@ func (sub *Subscription) hasImage(sessionId int32) bool {
 
 func (sub *Subscription) addImage(image *Image) *[]*Image {
 
-	images := sub.images()
+	images := sub.images.Get()
 
-	sub.setImages(append(images, image))
+	sub.images.Set(append(images, image))
 
 	return &images
 }
 
 func (sub *Subscription) removeImage(correlationId int64) *Image {
 
-	images := sub.images()
-	for ix, image := range images {
+	img := sub.images.Get()
+	for ix, image := range img {
 		if image.correlationId == correlationId {
 			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationId)
 
-			images[ix] = images[len(images)-1]
-			images[len(images)-1] = nil
-			images = images[:len(images)-1]
+			img[ix] = img[len(img)-1]
+			img[len(img)-1] = nil
+			img = img[:len(img)-1]
 
 			// FIXME CAS to make sure it's the same list
-			sub.setImages(images)
+			sub.images.Set(img)
 
 			return image
 		}
@@ -135,14 +124,14 @@ func (sub *Subscription) removeImage(correlationId int64) *Image {
 }
 
 func (sub *Subscription) HasImages() bool {
-	images := sub.images()
+	images := sub.images.Get()
 	return len(images) > 0
 }
 
 func IsConnectedTo(sub *Subscription, pub *Publication) bool {
-	images := sub.images()
+	img := sub.images.Get()
 	if sub.channel == pub.channel && sub.streamId == pub.streamId {
-		for _, image := range images {
+		for _, image := range img {
 			if image.sessionId == pub.sessionId {
 				return true
 			}

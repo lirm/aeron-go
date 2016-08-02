@@ -18,11 +18,11 @@ package aeron
 
 import (
 	"fmt"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
-	"sync/atomic"
 )
 
 const (
@@ -44,7 +44,7 @@ type Publication struct {
 	positionBitsToShift int32
 	publicationLimit    buffer.Position
 
-	isClosed int32
+	isClosed atomic.Bool
 
 	appenders    [logbuffer.PARTITION_COUNT]*term.Appender
 	headerWriter term.HeaderWriter
@@ -58,7 +58,7 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(logBuffers.Buffer(0).Capacity()))
 	header := logbuffer.DefaultFrameHeader(pub.logMetaDataBuffer)
 	pub.headerWriter.Fill(header)
-	pub.isClosed = util.FALSE
+	pub.isClosed.Set(false)
 
 	for i := 0; i < logbuffer.PARTITION_COUNT; i++ {
 		appender := term.MakeAppender(logBuffers.Buffer(i), pub.logMetaDataBuffer, i)
@@ -70,11 +70,11 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 }
 
 func (pub *Publication) IsClosed() bool {
-	return atomic.LoadInt32(&pub.isClosed) == util.TRUE
+	return pub.isClosed.Get()
 }
 
 func (pub *Publication) Close() error {
-	if pub != nil && atomic.CompareAndSwapInt32(&pub.isClosed, util.FALSE, util.TRUE) {
+	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
 		<-pub.conductor.releasePublication(pub.registrationId)
 	}
 

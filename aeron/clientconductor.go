@@ -18,16 +18,15 @@ package aeron
 
 import (
 	"fmt"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/aeron/util"
 	"io"
 	"log"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -120,8 +119,8 @@ type ClientConductor struct {
 	onUnavailableImageHandler UnavailableImageHandler
 	errorHandler              func(error)
 
-	running      int32
-	driverActive atomic.Value
+	running      atomic.Bool
+	driverActive atomic.Bool
 
 	timeOfLastKeepalive             int64
 	timeOfLastCheckManagedResources int64
@@ -140,8 +139,8 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 		pubConnectionTimeout)
 
 	cc.driverProxy = driverProxy
-	cc.running = util.TRUE
-	cc.driverActive.Store(true)
+	cc.running.Set(true)
+	cc.driverActive.Set(true)
 	cc.driverListenerAdapter = driver.NewAdapter(cc, bcast)
 	cc.interServiceTimeoutNs = interServiceTimeout.Nanoseconds()
 	cc.driverTimeoutNs = driverTimeout.Nanoseconds()
@@ -157,7 +156,7 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 func (cc *ClientConductor) Close() error {
 
 	var err error
-	if atomic.CompareAndSwapInt32(&cc.running, util.TRUE, util.FALSE) {
+	if cc.running.CompareAndSet(true, false) {
 		// TODO accumulate errors
 
 		for _, pub := range cc.pubs {
@@ -187,7 +186,7 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 	// In Go 1.7 should have the following line
 	// runtime.LockOSThread()
 
-	for atomic.LoadInt32(&cc.running) == util.TRUE {
+	for cc.running.Get() {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
 		workCount += cc.onHeartbeatCheckTimeouts()
 		idleStrategy.Idle(workCount)
@@ -195,7 +194,7 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 }
 
 func (cc *ClientConductor) verifyDriverIsActive() {
-	if !cc.driverActive.Load().(bool) {
+	if !cc.driverActive.Get() {
 		log.Fatal("Driver is not active")
 	}
 }
@@ -551,7 +550,7 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 
 		hbTime := cc.driverProxy.TimeOfLastDriverKeepalive() * time.Millisecond.Nanoseconds()
 		if now > (hbTime + cc.driverTimeoutNs) {
-			cc.driverActive.Store(false)
+			cc.driverActive.Set(false)
 
 			log.Fatalf("Driver has been inactive for over %d ms",
 				cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
