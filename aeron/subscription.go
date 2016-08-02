@@ -20,6 +20,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
 	"sync/atomic"
+	"unsafe"
 )
 
 type Subscription struct {
@@ -29,14 +30,15 @@ type Subscription struct {
 	registrationId  int64
 	streamId        int32
 
-	images atomic.Value
+	img unsafe.Pointer
 
 	isClosed int32
 }
 
 func NewSubscription(conductor *ClientConductor, channel string, registrationId int64, streamId int32) *Subscription {
 	sub := new(Subscription)
-	sub.images.Store(make([]*Image, 0))
+	images := make([]*Image, 0)
+	sub.img = unsafe.Pointer(&images)
 	sub.conductor = conductor
 	sub.channel = channel
 	sub.registrationId = registrationId
@@ -53,19 +55,23 @@ func (sub *Subscription) IsClosed() bool {
 
 func (sub *Subscription) Close() error {
 	if atomic.CompareAndSwapInt32(&sub.isClosed, util.FALSE, util.TRUE) {
-		<-sub.conductor.releaseSubscription(sub.registrationId, sub.images.Load().([]*Image))
+		<-sub.conductor.releaseSubscription(sub.registrationId, sub.images())
 	}
 
 	return nil
 }
 
-func (sub *Subscription) Images() []*Image {
-	return sub.images.Load().([]*Image)
+func (sub *Subscription) images() []*Image {
+	return *(*[]*Image)(atomic.LoadPointer(&sub.img))
+}
+
+func  (sub *Subscription) setImages(imgs []*Image) {
+	atomic.StorePointer(&sub.img, unsafe.Pointer(&imgs))
 }
 
 func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
-	images := sub.images.Load().([]*Image)
+	images := sub.images()
 	length := len(images)
 	var fragmentsRead int = 0
 
@@ -90,7 +96,7 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 }
 
 func (sub *Subscription) hasImage(sessionId int32) bool {
-	images := sub.images.Load().([]*Image)
+	images := sub.images()
 	for _, image := range images {
 		if image.sessionId == sessionId {
 			return true
@@ -101,16 +107,16 @@ func (sub *Subscription) hasImage(sessionId int32) bool {
 
 func (sub *Subscription) addImage(image *Image) *[]*Image {
 
-	images := sub.images.Load().([]*Image)
+	images := sub.images()
 
-	sub.images.Store(append(images, image))
+	sub.setImages(append(images, image))
 
 	return &images
 }
 
 func (sub *Subscription) removeImage(correlationId int64) *Image {
 
-	images := sub.images.Load().([]*Image)
+	images := sub.images()
 	for ix, image := range images {
 		if image.correlationId == correlationId {
 			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationId)
@@ -119,7 +125,8 @@ func (sub *Subscription) removeImage(correlationId int64) *Image {
 			images[len(images)-1] = nil
 			images = images[:len(images)-1]
 
-			sub.images.Store(images)
+			// FIXME CAS to make sure it's the same list
+			sub.setImages(images)
 
 			return image
 		}
@@ -128,12 +135,12 @@ func (sub *Subscription) removeImage(correlationId int64) *Image {
 }
 
 func (sub *Subscription) HasImages() bool {
-	images := sub.images.Load().([]*Image)
+	images := sub.images()
 	return len(images) > 0
 }
 
 func IsConnectedTo(sub *Subscription, pub *Publication) bool {
-	images := sub.images.Load().([]*Image)
+	images := sub.images()
 	if sub.channel == pub.channel && sub.streamId == pub.streamId {
 		for _, image := range images {
 			if image.sessionId == pub.sessionId {
