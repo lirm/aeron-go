@@ -41,11 +41,11 @@ func NewPosition(buffer *Atomic, id int32) Position {
 	return *pos
 }
 
-func (pos Position) Get() int64 {
+func (pos *Position) Get() int64 {
 	p := pos.buffer.GetInt64(pos.offset)
 	return p
 }
 
-func (pos Position) Set(value int64) {
+func (pos *Position) Set(value int64) {
 	pos.buffer.PutInt64(pos.offset, value)
 }
