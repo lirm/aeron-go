@@ -99,11 +99,11 @@ func NewImage(sessionId int32, correlationId int64, logBuffers *logbuffer.LogBuf
 	return image
 }
 
-func (image Image) IsClosed() bool {
+func (image *Image) IsClosed() bool {
 	return atomic.LoadInt32(&image.isClosed) == util.TRUE
 }
 
-func (image Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	result := IMAGE_CLOSED
 
@@ -137,8 +137,4 @@ func (image Image) Close() error {
 		err = image.logBuffers.Close()
 	}
 	return err
-}
-
-func (image Image) Position() int64 {
-	return image.subscriberPosition.Get()
 }
