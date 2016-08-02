@@ -76,12 +76,12 @@ func main() {
 		hist.RecordValue(now - sent)
 	}
 
-	srcBuffer := buffer.MakeAtomic(make([]byte, 16))
+	srcBuffer := buffer.MakeAtomic(make([]byte, 256))
 	for i := 0; i < *examples.ExamplesConfig.Messages; i++ {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-		for publication.Offer(srcBuffer, 0, 16, nil) < 0 {
+		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
 		}
 
 		for subscription.Poll(handler, 10) <= 0 {
