@@ -16,11 +16,9 @@ limitations under the License.
 
 package flyweight
 
-//#include <string.h>
-import "C"
-
 import (
 	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/util"
 	"unsafe"
 )
 
@@ -106,9 +104,7 @@ func (fld *StringField) Set(value string) {
 	bArr := []byte(value)
 	srcUptr := unsafe.Pointer(&bArr[0])
 
-	//log.Printf("length: %d, srcUptr: %v, destPtr: %v", length, srcUptr, fld.dataOffset)
-
-	C.memcpy(fld.dataOffset, unsafe.Pointer(srcUptr), C.size_t(length))
+	util.Memcpy(uintptr(fld.dataOffset), uintptr(srcUptr), length)
 
 	size := fld.fly.Size()
 	size -= int(prevLen)

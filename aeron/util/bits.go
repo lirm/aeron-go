@@ -65,3 +65,13 @@ func FastMod3(value uint64) int32 {
 func IsPowerOfTwo(value int32) bool {
 	return value > 0 && ((value & (^value + 1)) == value)
 }
+
+func Memcpy(dest uintptr, src uintptr, length int32) {
+	var i int32
+	for i = 0; i < length; i++ {
+		destPtr := unsafe.Pointer(dest + uintptr(i))
+		srcPtr := unsafe.Pointer(src + uintptr(i))
+
+		*(*int8)(destPtr) = *(*int8)(srcPtr)
+	}
+}

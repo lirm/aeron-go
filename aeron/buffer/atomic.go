@@ -16,11 +16,9 @@ limitations under the License.
 
 package buffer
 
-//#include <string.h>
-import "C"
-
 import (
 	"fmt"
+	"github.com/lirm/aeron-go/aeron/util"
 	"log"
 	"reflect"
 	"sync/atomic"
@@ -240,10 +238,7 @@ func (buf *Atomic) PutBytes(index int32, srcBuffer *Atomic, srcint32 int32, leng
 	buf.BoundsCheck(index, length)
 	srcBuffer.BoundsCheck(srcint32, length)
 
-	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(index))
-	srcUptr := unsafe.Pointer(uintptr(srcBuffer.bufferPtr) + uintptr(srcint32))
-
-	C.memcpy(unsafe.Pointer(uptr), unsafe.Pointer(srcUptr), C.size_t(length))
+	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(srcBuffer.bufferPtr)+uintptr(srcint32), length)
 }
 
 func (buf *Atomic) GetBytesArray(offset int32, length int32) []byte {
@@ -264,10 +259,7 @@ func (buf *Atomic) PutBytesArray(index int32, arr *[]byte, srcint32 int32, lengt
 
 	bArr := *arr
 
-	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(index))
-	srcUptr := unsafe.Pointer(uintptr(unsafe.Pointer(&bArr[0])) + uintptr(srcint32))
-
-	C.memcpy(unsafe.Pointer(uptr), unsafe.Pointer(srcUptr), C.size_t(length))
+	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(unsafe.Pointer(&bArr[0]))+uintptr(srcint32), length)
 }
 
 func (buf *Atomic) BoundsCheck(index int32, length int32) {
