@@ -43,11 +43,9 @@ func NewPosition(buffer *Atomic, id int32) Position {
 
 func (pos Position) Get() int64 {
 	p := pos.buffer.GetInt64(pos.offset)
-	//logger.Debugf("<- Counter[%d]: %d", pos.id, p)
 	return p
 }
 
 func (pos Position) Set(value int64) {
 	pos.buffer.PutInt64(pos.offset, value)
-	//logger.Debugf("-> Counter[%d]: %d", pos.id, value)
 }

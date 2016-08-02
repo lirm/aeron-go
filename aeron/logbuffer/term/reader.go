@@ -57,8 +57,8 @@ func Read(outcome *ReadOutcome, termBuffer *buffer.Atomic, termOffset int32,
 		if !logbuffer.IsPaddingFrame(termBuffer, fragmentOffset) {
 			header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
 			header.SetOffset(fragmentOffset)
-			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.LENGTH, frameLength-logbuffer.DataFrameHeader.LENGTH,
-				header)
+			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.LENGTH,
+				frameLength-logbuffer.DataFrameHeader.LENGTH, header)
 
 			outcome.fragmentsRead++
 		}
