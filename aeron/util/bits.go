@@ -67,8 +67,28 @@ func IsPowerOfTwo(value int32) bool {
 }
 
 func Memcpy(dest uintptr, src uintptr, length int32) {
-	var i int32
-	for i = 0; i < length; i++ {
+	var i int32 = 0
+
+	// batches of 8
+	i8 := length >> 3
+	for ; i < i8; i += 8 {
+		destPtr := unsafe.Pointer(dest + uintptr(i))
+		srcPtr := unsafe.Pointer(src + uintptr(i))
+
+		*(*uint64)(destPtr) = *(*uint64)(srcPtr)
+	}
+
+	// batches of 4
+	i4 := (length - i) >> 2
+	for ; i < i4; i += 4 {
+		destPtr := unsafe.Pointer(dest + uintptr(i))
+		srcPtr := unsafe.Pointer(src + uintptr(i))
+
+		*(*uint32)(destPtr) = *(*uint32)(srcPtr)
+	}
+
+	// remainder
+	for ; i < length; i++ {
 		destPtr := unsafe.Pointer(dest + uintptr(i))
 		srcPtr := unsafe.Pointer(src + uintptr(i))
 
