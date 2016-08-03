@@ -18,14 +18,14 @@ package logbuffer
 
 import (
 	"unsafe"
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 type Claim struct {
-	buffer buffer.Atomic
+	buffer atomic.Buffer
 }
 
-func (c *Claim) Wrap(buf *buffer.Atomic, offset, length int32) {
+func (c *Claim) Wrap(buf *atomic.Buffer, offset, length int32) {
 	buf.BoundsCheck(offset, length)
 	ptr := unsafe.Pointer(uintptr(buf.Ptr()) + uintptr(offset))
 	c.buffer.Wrap(ptr, length)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package buffer
+package atomic
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -22,34 +22,34 @@ import (
 	"unsafe"
 )
 
-var buffer *Atomic
+var buffer *Buffer
 
 func TestMakeAtomicBuffer(t *testing.T) {
-	var b *Atomic
+	var b *Buffer
 
-	b = MakeAtomic()
+	b = MakeBuffer()
 	t.Logf("buf: %v", b)
 
-	b = MakeAtomic(nil)
+	b = MakeBuffer(nil)
 	t.Logf("buf: %v", b)
 
 	arr := make([]byte, 64)
 
-	b = MakeAtomic(arr)
+	b = MakeBuffer(arr)
 	t.Logf("buf: %v", b)
 
-	b = MakeAtomic(arr, 64)
+	b = MakeBuffer(arr, 64)
 	t.Logf("buf: %v", b)
 
-	b = MakeAtomic(unsafe.Pointer(&arr[0]))
+	b = MakeBuffer(unsafe.Pointer(&arr[0]))
 	t.Logf("buf: %v", b)
 
-	b = MakeAtomic(unsafe.Pointer(&arr[0]), 64)
+	b = MakeBuffer(unsafe.Pointer(&arr[0]), 64)
 	t.Logf("buf: %v", b)
 }
 
 func TestInit(t *testing.T) {
-	buffer = MakeAtomic()
+	buffer = MakeBuffer()
 	assert.Equal(t, int32(0), buffer.Capacity())
 
 	bytes := make([]byte, 32)
@@ -60,7 +60,7 @@ func TestInit(t *testing.T) {
 }
 
 func TestGetAndAddInt64(t *testing.T) {
-	buffer = MakeAtomic(make([]byte, 32), 32)
+	buffer = MakeBuffer(make([]byte, 32), 32)
 	buffer.Fill(0)
 
 	assert.Equal(t, int64(0), buffer.GetAndAddInt64(0, 7))
@@ -80,7 +80,7 @@ func TestGetAndAddInt64(t *testing.T) {
 }
 
 func TestPutInt64Ordered(t *testing.T) {
-	buffer = MakeAtomic(make([]byte, 32), 32)
+	buffer = MakeBuffer(make([]byte, 32), 32)
 	buffer.Fill(0)
 
 	buffer.PutInt64Ordered(1, 31415)
@@ -92,7 +92,7 @@ func TestPutInt64Ordered(t *testing.T) {
 func TestWrap(t *testing.T) {
 	bytes := make([]byte, 32)
 	ptr := unsafe.Pointer(&bytes[0])
-	buffer = MakeAtomic(bytes, 32)
+	buffer = MakeBuffer(bytes, 32)
 	buffer.Fill(0)
 	t.Logf("buf: %v", buffer)
 

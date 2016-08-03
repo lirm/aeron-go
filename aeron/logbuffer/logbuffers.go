@@ -17,7 +17,7 @@ limitations under the License.
 package logbuffer
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
 	"unsafe"
@@ -27,7 +27,7 @@ var logger = logging.MustGetLogger("logbuffers")
 
 type LogBuffers struct {
 	mmapFiles []*memmap.File
-	buffers   [PARTITION_COUNT + 1]buffer.Atomic
+	buffers   [PARTITION_COUNT + 1]atomic.Buffer
 }
 
 func Wrap(fileName string) *LogBuffers {
@@ -90,7 +90,7 @@ func Wrap(fileName string) *LogBuffers {
 	return buffers
 }
 
-func (logBuffers *LogBuffers) Buffer(index int) *buffer.Atomic {
+func (logBuffers *LogBuffers) Buffer(index int) *atomic.Buffer {
 	return &logBuffers.buffers[index]
 }
 

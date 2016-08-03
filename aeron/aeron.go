@@ -18,13 +18,13 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/buffer"
-	"github.com/lirm/aeron-go/aeron/buffer/rb"
+	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
 	"time"
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 type NewPublicationHandler func(string, int32, int32, int64)
@@ -41,9 +41,9 @@ type Aeron struct {
 	toDriverRingBuffer rb.ManyToOne
 	driverProxy        driver.Proxy
 
-	toDriverAtomicBuffer  *buffer.Atomic
-	toClientsAtomicBuffer *buffer.Atomic
-	counterValuesBuffer   *buffer.Atomic
+	toDriverAtomicBuffer  *atomic.Buffer
+	toClientsAtomicBuffer *atomic.Buffer
+	counterValuesBuffer   *atomic.Buffer
 
 	cncBuffer *memmap.File
 

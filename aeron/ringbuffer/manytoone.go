@@ -18,14 +18,14 @@ package rb
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 const INSUFFICIENT_CAPACITY int32 = -2
 
 type ManyToOne struct {
-	buffer                    *buffer.Atomic
+	buffer                    *atomic.Buffer
 	capacity                  int32
 	maxMsgLength              int32
 	headPositionIndex         int32
@@ -35,7 +35,7 @@ type ManyToOne struct {
 	consumerHeartbeatIndex    int32
 }
 
-func (buf *ManyToOne) Init(buffer *buffer.Atomic) *ManyToOne {
+func (buf *ManyToOne) Init(buffer *atomic.Buffer) *ManyToOne {
 
 	buf.buffer = buffer
 	buf.capacity = buffer.Capacity() - Descriptor.TRAILER_LENGTH
@@ -135,7 +135,7 @@ func (buf *ManyToOne) checkMsgLength(length int32) {
 	}
 }
 
-func (buf *ManyToOne) Write(msgTypeId int32, srcBuffer *buffer.Atomic, srcIndex int32, length int32) bool {
+func (buf *ManyToOne) Write(msgTypeId int32, srcBuffer *atomic.Buffer, srcIndex int32, length int32) bool {
 
 	var isSuccessful bool = false
 

@@ -17,11 +17,11 @@ limitations under the License.
 package term
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 	"math"
 	"unsafe"
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 const (
@@ -29,25 +29,25 @@ const (
 	APPENDER_FAILED  int32 = -2
 )
 
-var DEFAULT_RESERVED_VALUE_SUPPLIER ReservedValueSupplier = func(termBuffer *buffer.Atomic, termOffset int32, length int32) int64 { return 0 }
+var DEFAULT_RESERVED_VALUE_SUPPLIER ReservedValueSupplier = func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64 { return 0 }
 
-type ReservedValueSupplier func(termBuffer *buffer.Atomic, termOffset int32, length int32) int64
+type ReservedValueSupplier func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64
 
 type HeaderWriter struct {
 	sessionId int32
 	streamId  int32
 }
 
-func (header *HeaderWriter) Fill(defaultHdr *buffer.Atomic) {
+func (header *HeaderWriter) Fill(defaultHdr *atomic.Buffer) {
 	header.sessionId = defaultHdr.GetInt32(logbuffer.DataFrameHeader.SESSION_ID_FIELD_OFFSET)
 	header.streamId = defaultHdr.GetInt32(logbuffer.DataFrameHeader.STREAM_ID_FIELD_OFFSET)
 }
 
-func (header *HeaderWriter) write(termBuffer *buffer.Atomic, offset, length, termId int32) {
+func (header *HeaderWriter) write(termBuffer *atomic.Buffer, offset, length, termId int32) {
 	termBuffer.PutInt32Ordered(offset, -length)
 
 	headerPtr := uintptr(termBuffer.Ptr()) + uintptr(offset)
-	headerBuffer := buffer.MakeAtomic(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.LENGTH)
+	headerBuffer := atomic.MakeBuffer(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.LENGTH)
 
 	headerBuffer.PutInt8(logbuffer.DataFrameHeader.VERSION_FIELD_OFFSET, logbuffer.DataFrameHeader.CURRENT_VERSION)
 	headerBuffer.PutUInt8(logbuffer.DataFrameHeader.FLAGS_FIELD_OFFSET, logbuffer.FrameDescriptor.BEGIN_FRAG|logbuffer.FrameDescriptor.END_FRAG)
@@ -59,8 +59,8 @@ func (header *HeaderWriter) write(termBuffer *buffer.Atomic, offset, length, ter
 }
 
 type Appender struct {
-	termBuffer *buffer.Atomic
-	tailBuffer *buffer.Atomic
+	termBuffer *atomic.Buffer
+	tailBuffer *atomic.Buffer
 	tailOffset int32
 }
 
@@ -77,7 +77,7 @@ func (result *AppenderResult) TermId() int32 {
 	return result.termId
 }
 
-func MakeAppender(termBuffer *buffer.Atomic, metaDataBuffer *buffer.Atomic, partitionIndex int) *Appender {
+func MakeAppender(termBuffer *atomic.Buffer, metaDataBuffer *atomic.Buffer, partitionIndex int) *Appender {
 	appender := new(Appender)
 	appender.termBuffer = termBuffer
 	appender.tailBuffer = metaDataBuffer
@@ -115,7 +115,7 @@ func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, le
 }
 
 func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, header *HeaderWriter,
-	srcBuffer *buffer.Atomic, srcOffset int32, length int32, reservedValueSupplier ReservedValueSupplier) {
+	srcBuffer *atomic.Buffer, srcOffset int32, length int32, reservedValueSupplier ReservedValueSupplier) {
 
 	frameLength := length + logbuffer.DataFrameHeader.LENGTH
 	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameDescriptor.FRAME_ALIGNMENT)
@@ -143,7 +143,7 @@ func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, head
 }
 
 func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header *HeaderWriter,
-	srcBuffer *buffer.Atomic, srcOffset int32, length int32, maxPayloadLength int32, reservedValueSupplier ReservedValueSupplier) {
+	srcBuffer *atomic.Buffer, srcOffset int32, length int32, maxPayloadLength int32, reservedValueSupplier ReservedValueSupplier) {
 
 	numMaxPayloads := length / maxPayloadLength
 	remainingPayload := length % maxPayloadLength
@@ -194,7 +194,7 @@ func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header
 }
 
 func (appender *Appender) handleEndOfLogCondition(result *AppenderResult,
-	termBuffer *buffer.Atomic, termOffset int32, header *HeaderWriter, termLength int32) {
+	termBuffer *atomic.Buffer, termOffset int32, header *HeaderWriter, termLength int32) {
 	result.termOffset = int64(APPENDER_FAILED)
 
 	if termOffset <= termLength {

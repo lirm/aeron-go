@@ -17,7 +17,7 @@ limitations under the License.
 package driver
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/flyweight"
 )
 
@@ -28,7 +28,7 @@ type SubscriberPositionFly struct {
 	registrationId flyweight.Int64Field
 }
 
-func (m *SubscriberPositionFly) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *SubscriberPositionFly) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.indicatorId.Wrap(buf, pos)
 	pos += m.registrationId.Wrap(buf, pos)
@@ -44,7 +44,7 @@ type ImageReadyTrailer struct {
 	sourceIdentity flyweight.StringField
 }
 
-func (m *ImageReadyTrailer) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *ImageReadyTrailer) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.logFile.Wrap(buf, pos, m)
 	pos += m.sourceIdentity.Wrap(buf, pos, m)
@@ -61,7 +61,7 @@ type ErrorMessage struct {
 	errorMessage                  flyweight.StringField
 }
 
-func (m *ErrorMessage) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *ErrorMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.offendingCommandCorrelationId.Wrap(buf, pos)
 	pos += m.errorCode.Wrap(buf, pos)
@@ -81,7 +81,7 @@ type PublicationReady struct {
 	logFile                flyweight.StringField
 }
 
-func (m *PublicationReady) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *PublicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.correlationId.Wrap(buf, pos)
 	pos += m.sessionId.Wrap(buf, pos)
@@ -103,7 +103,7 @@ type ImageReadyHeader struct {
 	subsPosBlockCnt flyweight.Int32Field
 }
 
-func (m *ImageReadyHeader) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *ImageReadyHeader) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.correlationId.Wrap(buf, pos)
 	pos += m.sessionId.Wrap(buf, pos)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package buffer
+package atomic
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ import (
 	"unsafe"
 )
 
-type Atomic struct {
+type Buffer struct {
 	bufferPtr unsafe.Pointer
 	length    int32
 }
@@ -37,7 +37,7 @@ type Atomic struct {
 		MakeAtomicBuffer(Pointer, len)
 		MakeAtomicBuffer([]byte, len)
 */
-func MakeAtomic(args ...interface{}) *Atomic {
+func MakeBuffer(args ...interface{}) *Buffer {
 	var bufPtr unsafe.Pointer = nil
 	var bufLen int32 = 0
 
@@ -72,25 +72,25 @@ func MakeAtomic(args ...interface{}) *Atomic {
 		// wrap with offset and length
 	}
 
-	buf := new(Atomic)
+	buf := new(Buffer)
 	return buf.Wrap(bufPtr, bufLen)
 }
 
-func (buf *Atomic) Wrap(buffer unsafe.Pointer, length int32) *Atomic {
+func (buf *Buffer) Wrap(buffer unsafe.Pointer, length int32) *Buffer {
 	buf.bufferPtr = buffer
 	buf.length = length
 	return buf
 }
 
-func (buf *Atomic) Ptr() unsafe.Pointer {
+func (buf *Buffer) Ptr() unsafe.Pointer {
 	return buf.bufferPtr
 }
 
-func (buf *Atomic) Capacity() int32 {
+func (buf *Buffer) Capacity() int32 {
 	return buf.length
 }
 
-func (buf *Atomic) Fill(b uint8) {
+func (buf *Buffer) Fill(b uint8) {
 	if buf.length == 0 {
 		return
 	}
@@ -100,7 +100,7 @@ func (buf *Atomic) Fill(b uint8) {
 	}
 }
 
-func (buf *Atomic) GetUInt8(offset int32) uint8 {
+func (buf *Buffer) GetUInt8(offset int32) uint8 {
 	buf.BoundsCheck(offset, 1)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -108,7 +108,7 @@ func (buf *Atomic) GetUInt8(offset int32) uint8 {
 	return *(*uint8)(uptr)
 }
 
-func (buf *Atomic) GetUInt16(offset int32) uint16 {
+func (buf *Buffer) GetUInt16(offset int32) uint16 {
 	buf.BoundsCheck(offset, 2)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -116,7 +116,7 @@ func (buf *Atomic) GetUInt16(offset int32) uint16 {
 	return *(*uint16)(uptr)
 }
 
-func (buf *Atomic) GetInt32(offset int32) int32 {
+func (buf *Buffer) GetInt32(offset int32) int32 {
 	buf.BoundsCheck(offset, 4)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -124,7 +124,7 @@ func (buf *Atomic) GetInt32(offset int32) int32 {
 	return *(*int32)(uptr)
 }
 
-func (buf *Atomic) GetInt64(offset int32) int64 {
+func (buf *Buffer) GetInt64(offset int32) int64 {
 	buf.BoundsCheck(offset, 8)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -132,7 +132,7 @@ func (buf *Atomic) GetInt64(offset int32) int64 {
 	return *(*int64)(uptr)
 }
 
-func (buf *Atomic) PutUInt8(offset int32, value uint8) {
+func (buf *Buffer) PutUInt8(offset int32, value uint8) {
 	buf.BoundsCheck(offset, 1)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -140,7 +140,7 @@ func (buf *Atomic) PutUInt8(offset int32, value uint8) {
 	*(*uint8)(uptr) = value
 }
 
-func (buf *Atomic) PutInt8(offset int32, value int8) {
+func (buf *Buffer) PutInt8(offset int32, value int8) {
 	buf.BoundsCheck(offset, 1)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -148,7 +148,7 @@ func (buf *Atomic) PutInt8(offset int32, value int8) {
 	*(*int8)(uptr) = value
 }
 
-func (buf *Atomic) PutUInt16(offset int32, value uint16) {
+func (buf *Buffer) PutUInt16(offset int32, value uint16) {
 	buf.BoundsCheck(offset, 2)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -156,7 +156,7 @@ func (buf *Atomic) PutUInt16(offset int32, value uint16) {
 	*(*uint16)(uptr) = value
 }
 
-func (buf *Atomic) PutInt32(offset int32, value int32) {
+func (buf *Buffer) PutInt32(offset int32, value int32) {
 	buf.BoundsCheck(offset, 4)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -164,7 +164,7 @@ func (buf *Atomic) PutInt32(offset int32, value int32) {
 	*(*int32)(uptr) = value
 }
 
-func (buf *Atomic) PutInt64(offset int32, value int64) {
+func (buf *Buffer) PutInt64(offset int32, value int64) {
 	buf.BoundsCheck(offset, 8)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -172,7 +172,7 @@ func (buf *Atomic) PutInt64(offset int32, value int64) {
 	*(*int64)(uptr) = value
 }
 
-func (buf *Atomic) GetAndAddInt64(offset int32, delta int64) int64 {
+func (buf *Buffer) GetAndAddInt64(offset int32, delta int64) int64 {
 	buf.BoundsCheck(offset, 8)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -181,7 +181,7 @@ func (buf *Atomic) GetAndAddInt64(offset int32, delta int64) int64 {
 	return int64(newVal) - delta
 }
 
-func (buf *Atomic) GetInt32Volatile(offset int32) int32 {
+func (buf *Buffer) GetInt32Volatile(offset int32) int32 {
 	buf.BoundsCheck(offset, 4)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -190,7 +190,7 @@ func (buf *Atomic) GetInt32Volatile(offset int32) int32 {
 	return int32(cur)
 }
 
-func (buf *Atomic) GetInt64Volatile(offset int32) int64 {
+func (buf *Buffer) GetInt64Volatile(offset int32) int64 {
 	buf.BoundsCheck(offset, 8)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
@@ -199,49 +199,49 @@ func (buf *Atomic) GetInt64Volatile(offset int32) int64 {
 	return int64(cur)
 }
 
-func (buf *Atomic) PutInt64Ordered(offset int32, value int64) {
+func (buf *Buffer) PutInt64Ordered(offset int32, value int64) {
 	buf.BoundsCheck(offset, 8)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	atomic.StoreInt64((*int64)(uptr), value)
 }
 
-func (buf *Atomic) PutInt32Ordered(offset int32, value int32) {
+func (buf *Buffer) PutInt32Ordered(offset int32, value int32) {
 	buf.BoundsCheck(offset, 4)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	atomic.StoreInt32((*int32)(uptr), value)
 }
 
-func (buf *Atomic) PutIntOrdered(offset int32, value int) {
+func (buf *Buffer) PutIntOrdered(offset int32, value int) {
 	buf.BoundsCheck(offset, 4)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	atomic.StoreInt32((*int32)(uptr), int32(value))
 }
 
-func (buf *Atomic) CompareAndSetInt64(offset int32, expectedValue, updateValue int64) bool {
+func (buf *Buffer) CompareAndSetInt64(offset int32, expectedValue, updateValue int64) bool {
 	buf.BoundsCheck(offset, 8)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	return atomic.CompareAndSwapInt64((*int64)(uptr), expectedValue, updateValue)
 }
 
-func (buf *Atomic) CompareAndSetInt32(offset int32, expectedValue, updateValue int32) bool {
+func (buf *Buffer) CompareAndSetInt32(offset int32, expectedValue, updateValue int32) bool {
 	buf.BoundsCheck(offset, 4)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	return atomic.CompareAndSwapInt32((*int32)(uptr), expectedValue, updateValue)
 }
 
-func (buf *Atomic) PutBytes(index int32, srcBuffer *Atomic, srcint32 int32, length int32) {
+func (buf *Buffer) PutBytes(index int32, srcBuffer *Buffer, srcint32 int32, length int32) {
 	buf.BoundsCheck(index, length)
 	srcBuffer.BoundsCheck(srcint32, length)
 
 	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(srcBuffer.bufferPtr)+uintptr(srcint32), length)
 }
 
-func (buf *Atomic) GetBytesArray(offset int32, length int32) []byte {
+func (buf *Buffer) GetBytesArray(offset int32, length int32) []byte {
 	buf.BoundsCheck(offset, length)
 
 	bArr := make([]byte, length)
@@ -253,7 +253,7 @@ func (buf *Atomic) GetBytesArray(offset int32, length int32) []byte {
 	return bArr
 }
 
-func (buf *Atomic) PutBytesArray(index int32, arr *[]byte, srcint32 int32, length int32) {
+func (buf *Buffer) PutBytesArray(index int32, arr *[]byte, srcint32 int32, length int32) {
 	buf.BoundsCheck(index, length)
 	boundsCheck(srcint32, length, int32(len(*arr)))
 
@@ -262,7 +262,7 @@ func (buf *Atomic) PutBytesArray(index int32, arr *[]byte, srcint32 int32, lengt
 	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(unsafe.Pointer(&bArr[0]))+uintptr(srcint32), length)
 }
 
-func (buf *Atomic) BoundsCheck(index int32, length int32) {
+func (buf *Buffer) BoundsCheck(index int32, length int32) {
 	if (index + length) > buf.length {
 		log.Fatal(fmt.Sprintf("int32 Out of Bounds[%p]. int32: %d + %d Capacity: %d", buf, index, length, buf.length))
 	}

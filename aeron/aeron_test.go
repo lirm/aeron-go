@@ -18,7 +18,6 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
 	"testing"
@@ -32,7 +31,7 @@ const (
 
 func send(n int, pub *Publication, t *testing.T) {
 	message := "this is a message"
-	srcBuffer := buffer.MakeAtomic(([]byte)(message))
+	srcBuffer := atomic.MakeBuffer(([]byte)(message))
 
 	for i := 0; i < n; i++ {
 		timeoutAt := time.Now().Add(time.Second * 5)
@@ -49,7 +48,7 @@ func send(n int, pub *Publication, t *testing.T) {
 
 func receive(n int, sub *Subscription, t *testing.T) {
 	counter := 0
-	handler := func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header) {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		counter++
 	}
 	var fragmentsRead atomic.Int
@@ -183,7 +182,7 @@ func TestAeronSendMultiplePublications(t *testing.T) {
 	go func() {
 		n := itCount * pubCount
 		counter := 0
-		handler := func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header) {
+		handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 			counter++
 		}
 		var fragmentsRead atomic.Int

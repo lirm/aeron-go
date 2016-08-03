@@ -17,7 +17,7 @@ limitations under the License.
 package counters
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"unsafe"
@@ -53,35 +53,35 @@ type MetaDataDefn struct {
 	errorLogBufferLength        int32
 }
 
-func CreateToDriverBuffer(cncFile *memmap.File) *buffer.Atomic {
+func CreateToDriverBuffer(cncFile *memmap.File) *atomic.Buffer {
 
 	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_DRIVERBUFLEN)
 
 	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH)
 
-	return buffer.MakeAtomic(unsafe.Pointer(ptr), toDriverBufferLength)
+	return atomic.MakeBuffer(unsafe.Pointer(ptr), toDriverBufferLength)
 }
 
-func CreateToClientsBuffer(cncFile *memmap.File) *buffer.Atomic {
+func CreateToClientsBuffer(cncFile *memmap.File) *atomic.Buffer {
 	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
 	// log.Printf("createToClientsBuffer: MetaData: %v\n", metaData)
 
 	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_DRIVERBUFLEN)
 	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH) + uintptr(toDriverBufferLength)
 
-	return buffer.MakeAtomic(unsafe.Pointer(ptr), metaData.toClientsBufferLength)
+	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.toClientsBufferLength)
 }
 
-func CreateCounterMetadataBuffer(cncFile *memmap.File) *buffer.Atomic {
+func CreateCounterMetadataBuffer(cncFile *memmap.File) *atomic.Buffer {
 	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
 	// log.Printf("createCounterMetadataBuffer: MetaData: %v\n", metaData)
 
 	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH) + uintptr(metaData.toDriverBufferLength) + uintptr(metaData.toClientsBufferLength)
 
-	return buffer.MakeAtomic(unsafe.Pointer(ptr), metaData.counterMetadataBufferLength)
+	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.counterMetadataBufferLength)
 }
 
-func CreateCounterValuesBuffer(cncFile *memmap.File) *buffer.Atomic {
+func CreateCounterValuesBuffer(cncFile *memmap.File) *atomic.Buffer {
 	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
 	// log.Printf("createCounterValuesBuffer: MetaData: %v\n", metaData)
 
@@ -91,10 +91,10 @@ func CreateCounterValuesBuffer(cncFile *memmap.File) *buffer.Atomic {
 		uintptr(metaData.toClientsBufferLength) +
 		uintptr(metaData.counterMetadataBufferLength)
 
-	return buffer.MakeAtomic(unsafe.Pointer(ptr), metaData.counterValuesBufferLength)
+	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.counterValuesBufferLength)
 }
 
-func CreateErrorLogBuffer(cncFile *memmap.File) *buffer.Atomic {
+func CreateErrorLogBuffer(cncFile *memmap.File) *atomic.Buffer {
 	// metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
 	// log.Printf("createErrorLogBuffer: MetaData: %v\n", metaData)
 
@@ -111,7 +111,7 @@ func CreateErrorLogBuffer(cncFile *memmap.File) *buffer.Atomic {
 		uintptr(counterMetadataBufferLength) +
 		uintptr(counterValuesBufferLength)
 
-	return buffer.MakeAtomic(unsafe.Pointer(ptr), errorLogBufferLength)
+	return atomic.MakeBuffer(unsafe.Pointer(ptr), errorLogBufferLength)
 }
 
 func CncVersion(cncFile *memmap.File) int32 {

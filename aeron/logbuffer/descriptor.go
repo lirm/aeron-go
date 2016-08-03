@@ -18,7 +18,7 @@ package logbuffer
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
@@ -93,23 +93,23 @@ func IndexByPosition(position int64, positionBitsToShift uint8) int32 {
 	return util.FastMod3(term)
 }
 
-func InitialTermId(logMetaDataBuffer *buffer.Atomic) int32 {
+func InitialTermId(logMetaDataBuffer *atomic.Buffer) int32 {
 	return logMetaDataBuffer.GetInt32(Descriptor.LOG_INITIAL_TERM_ID_OFFSET)
 }
 
-func MtuLength(logMetaDataBuffer *buffer.Atomic) int32 {
+func MtuLength(logMetaDataBuffer *atomic.Buffer) int32 {
 	return logMetaDataBuffer.GetInt32(Descriptor.LOG_MTU_LENGTH_OFFSET)
 }
 
-func ActivePartitionIndex(logMetaDataBuffer *buffer.Atomic) int32 {
+func ActivePartitionIndex(logMetaDataBuffer *atomic.Buffer) int32 {
 	return logMetaDataBuffer.GetInt32Volatile(Descriptor.LOG_ACTIVE_PARTITION_INDEX_OFFSET)
 }
 
-func SetActivePartitionIndex(logMetaDataBuffer *buffer.Atomic, index int32) {
+func SetActivePartitionIndex(logMetaDataBuffer *atomic.Buffer, index int32) {
 	logMetaDataBuffer.PutInt32Ordered(Descriptor.LOG_ACTIVE_PARTITION_INDEX_OFFSET, index)
 }
 
-func TimeOfLastStatusMessage(logMetaDataBuffer *buffer.Atomic) int64 {
+func TimeOfLastStatusMessage(logMetaDataBuffer *atomic.Buffer) int64 {
 	return logMetaDataBuffer.GetInt64Volatile(Descriptor.LOG_TIME_OF_LAST_STATUS_MESSAGE_OFFSET)
 }
 

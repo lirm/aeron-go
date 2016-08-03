@@ -20,7 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
@@ -79,7 +79,7 @@ func main() {
 		done <- true
 	}()
 
-	handler := func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header) {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		for publication.Offer(buffer, offset, length, nil) < 0 {
 		}
 	}

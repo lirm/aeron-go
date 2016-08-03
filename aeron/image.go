@@ -18,13 +18,12 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-type ControlledPollFragmentHandler func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header)
+type ControlledPollFragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
 
 const (
 	IMAGE_CLOSED int = -1
@@ -60,7 +59,7 @@ var ControlledPollAction = struct {
 }
 
 type Image struct {
-	termBuffers [logbuffer.PARTITION_COUNT]*buffer.Atomic
+	termBuffers [logbuffer.PARTITION_COUNT]*atomic.Buffer
 	header      logbuffer.Header
 
 	subscriberPosition Position

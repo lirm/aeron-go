@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -104,7 +103,7 @@ type ClientConductor struct {
 
 	driverProxy *driver.Proxy
 
-	counterValuesBuffer *buffer.Atomic
+	counterValuesBuffer *atomic.Buffer
 
 	driverListenerAdapter *driver.ListenerAdapter
 

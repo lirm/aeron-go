@@ -17,7 +17,7 @@ limitations under the License.
 package logbuffer
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"unsafe"
 )
 
@@ -60,29 +60,29 @@ func typeOffset(frameOffset int32) int32 {
 	return frameOffset + DataFrameHeader.TYPE_FIELD_OFFSET
 }
 
-func FrameLengthVolatile(logBuffer *buffer.Atomic, frameOffset int32) int32 {
+func FrameLengthVolatile(logBuffer *atomic.Buffer, frameOffset int32) int32 {
 	offset := lengthOffset(frameOffset)
 	return logBuffer.GetInt32Volatile(offset)
 }
 
-func FrameLengthOrdered(logBuffer *buffer.Atomic, frameOffset int32, frameLength int32) {
+func FrameLengthOrdered(logBuffer *atomic.Buffer, frameOffset int32, frameLength int32) {
 	logBuffer.PutInt32Ordered(lengthOffset(frameOffset), frameLength)
 }
 
-func IsPaddingFrame(logBuffer *buffer.Atomic, frameOffset int32) bool {
+func IsPaddingFrame(logBuffer *atomic.Buffer, frameOffset int32) bool {
 	return logBuffer.GetUInt16(typeOffset(frameOffset)) == DataFrameHeader.HDR_TYPE_PAD
 }
 
-func SetFrameType(logBuffer *buffer.Atomic, frameOffset int32, typ uint16) {
+func SetFrameType(logBuffer *atomic.Buffer, frameOffset int32, typ uint16) {
 	logBuffer.PutUInt16(typeOffset(frameOffset), typ)
 }
 
-func FrameFlags(logBuffer *buffer.Atomic, frameOffset int32, flags uint8) {
+func FrameFlags(logBuffer *atomic.Buffer, frameOffset int32, flags uint8) {
 	logBuffer.PutUInt8(flagsOffset(frameOffset), flags)
 }
 
-func DefaultFrameHeader(logMetaDataBuffer *buffer.Atomic) *buffer.Atomic {
+func DefaultFrameHeader(logMetaDataBuffer *atomic.Buffer) *atomic.Buffer {
 	headerPtr := unsafe.Pointer(uintptr(logMetaDataBuffer.Ptr()) + Descriptor.LOG_DEFAULT_FRAME_HEADER_OFFSET)
 
-	return buffer.MakeAtomic(headerPtr, DataFrameHeader.LENGTH)
+	return atomic.MakeBuffer(headerPtr, DataFrameHeader.LENGTH)
 }

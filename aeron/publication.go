@@ -19,7 +19,6 @@ package aeron
 import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
@@ -34,7 +33,7 @@ const (
 
 type Publication struct {
 	conductor           *ClientConductor
-	logMetaDataBuffer   *buffer.Atomic
+	logMetaDataBuffer   *atomic.Buffer
 	channel             string
 	registrationId      int64
 	streamId            int32
@@ -106,7 +105,7 @@ func (pub *Publication) newPosition(index int32, currentTail int32, position int
 	return newPosition
 }
 
-func (pub *Publication) Offer(buffer *buffer.Atomic, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
+func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
 
 	newPosition := PUBLICATION_CLOSED
 

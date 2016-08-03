@@ -18,16 +18,16 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/util"
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 type Position struct {
-	buffer *buffer.Atomic
+	buffer *atomic.Buffer
 	id     int32
 	offset int32
 }
 
-func NewPosition(buffer *buffer.Atomic, id int32) Position {
+func NewPosition(buffer *atomic.Buffer, id int32) Position {
 	pos := new(Position)
 
 	pos.buffer = buffer

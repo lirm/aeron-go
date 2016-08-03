@@ -18,13 +18,12 @@ package broadcast
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/buffer"
-	"github.com/lirm/aeron-go/aeron/buffer/rb"
+	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
 type Receiver struct {
-	buffer                 *buffer.Atomic
+	buffer                 *atomic.Buffer
 	capacity               int32
 	mask                   int64
 	tailIntentCounterIndex int32
@@ -38,7 +37,7 @@ type Receiver struct {
 	lappedCount atomic.Long
 }
 
-func NewReceiver(buffer *buffer.Atomic) *Receiver {
+func NewReceiver(buffer *atomic.Buffer) *Receiver {
 	recv := new(Receiver)
 	recv.buffer = buffer
 	recv.capacity = buffer.Capacity() - BufferDescriptor.TRAILER_LENGTH

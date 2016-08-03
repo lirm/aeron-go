@@ -17,7 +17,7 @@ limitations under the License.
 package command
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/flyweight"
 )
 
@@ -28,7 +28,7 @@ type CorrelatedMessage struct {
 	CorrelationId flyweight.Int64Field
 }
 
-func (m *CorrelatedMessage) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *CorrelatedMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)
@@ -45,7 +45,7 @@ type ImageMessage struct {
 	Channel       flyweight.StringField
 }
 
-func (m *ImageMessage) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *ImageMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.CorrelationId.Wrap(buf, pos)
 	pos += m.StreamId.Wrap(buf, pos)
@@ -64,7 +64,7 @@ type PublicationMessage struct {
 	Channel       flyweight.StringField
 }
 
-func (m *PublicationMessage) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *PublicationMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)
@@ -85,7 +85,7 @@ type SubscriptionMessage struct {
 	Channel                   flyweight.StringField
 }
 
-func (m *SubscriptionMessage) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *SubscriptionMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)
@@ -105,7 +105,7 @@ type RemoveMessage struct {
 	RegistrationId flyweight.Int64Field
 }
 
-func (m *RemoveMessage) Wrap(buf *buffer.Atomic, offset int) flyweight.Flyweight {
+func (m *RemoveMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.ClientId.Wrap(buf, pos)
 	pos += m.CorrelationId.Wrap(buf, pos)

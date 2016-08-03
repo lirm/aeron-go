@@ -17,7 +17,7 @@ limitations under the License.
 package flyweight
 
 import (
-	"github.com/lirm/aeron-go/aeron/buffer"
+	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"testing"
 )
 
@@ -27,7 +27,7 @@ type StringFly struct {
 	s StringField
 }
 
-func (m *StringFly) Wrap(buf *buffer.Atomic, offset int) Flyweight {
+func (m *StringFly) Wrap(buf *atomic.Buffer, offset int) Flyweight {
 	pos := offset
 	pos += m.s.Wrap(buf, pos, m)
 	m.SetSize(pos - offset)
@@ -36,7 +36,7 @@ func (m *StringFly) Wrap(buf *buffer.Atomic, offset int) Flyweight {
 
 func TestStringFlyweight(t *testing.T) {
 	str := "Hello worlds!"
-	buf := buffer.MakeAtomic(make([]byte, 128), 128)
+	buf := atomic.MakeBuffer(make([]byte, 128), 128)
 
 	var fw StringFly
 	fw.Wrap(buf, 0)
