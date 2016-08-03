@@ -41,3 +41,9 @@ func (l *ImageList) Get() []*Image {
 func (l *ImageList) Set(imgs []*Image) {
 	atomic.StorePointer(&l.img, unsafe.Pointer(&imgs))
 }
+
+func (l *ImageList) Empty() (oldList []*Image) {
+	oldList = l.Get()
+	l.Set(make([]*Image, 0))
+	return
+}
