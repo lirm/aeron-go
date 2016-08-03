@@ -26,10 +26,10 @@ const (
 	CacheLineLength int32 = 64
 
 	// SizeOfInt32 is a constant for the size of int32. Ha. Just for Clarity
-	SizeOfInt32     int32 = int32(unsafe.Sizeof(i32))
+	SizeOfInt32 int32 = int32(unsafe.Sizeof(i32))
 
 	// SizeOfInt64 is a constant for the size of int64
-	SizeOfInt64     int32 = int32(unsafe.Sizeof(i64))
+	SizeOfInt64 int32 = int32(unsafe.Sizeof(i64))
 )
 
 // AlignInt32 will return a number rounded up to the alignment boundary

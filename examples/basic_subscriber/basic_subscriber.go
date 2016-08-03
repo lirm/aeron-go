@@ -24,9 +24,9 @@ import (
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
+	"github.com/op/go-logging"
 	"log"
 	"time"
-	"github.com/op/go-logging"
 )
 
 func main() {

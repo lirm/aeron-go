@@ -175,5 +175,4 @@ func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex 
 
 func (buf *ManyToOne) Read(Handler, messageCountLimit int) int32 {
 	panic("Not implemented yet")
-	return -1
 }

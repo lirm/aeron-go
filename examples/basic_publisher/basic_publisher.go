@@ -22,9 +22,9 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/examples"
+	"github.com/op/go-logging"
 	"log"
 	"time"
-	"github.com/op/go-logging"
 )
 
 func main() {

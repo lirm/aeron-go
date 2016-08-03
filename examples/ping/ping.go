@@ -24,11 +24,11 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
+	"github.com/op/go-logging"
 	"log"
 	"os"
 	"runtime/pprof"
 	"time"
-	"github.com/op/go-logging"
 )
 
 func main() {
