@@ -1,6 +1,8 @@
 # aeron-go
 Implementation of [Aeron](https://github.com/real-logic/Aeron) messaging client in Go.
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/lirm/aeron-go)](https://goreportcard.com/report/github.com/lirm/aeron-go)
+
 Architecture, design, and protocol of Aeron can be found [here](https://github.com/real-logic/Aeron/wiki)
 
 # Usage
