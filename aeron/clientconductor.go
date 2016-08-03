@@ -252,7 +252,7 @@ func (cc *ClientConductor) FindPublication(registrationId int64) *Publication {
 					publication.registrationId = registrationId
 					publication.streamId = pub.streamId
 					publication.sessionId = pub.sessionId
-					publication.publicationLimit = buffer.NewPosition(cc.counterValuesBuffer,
+					publication.publicationLimit = NewPosition(cc.counterValuesBuffer,
 						pub.posLimitCounterId)
 
 				case RegistrationStatus.ERRORED_MEDIA_DRIVER:
@@ -437,11 +437,11 @@ func (cc *ClientConductor) OnAvailableImage(streamId int32, sessionId int32, log
 						image := NewImage(sessionId, correlationId, logbuffer.Wrap(logFilename))
 						image.subscriptionRegistrationId = sub.registrationId
 						image.sourceIdentity = sourceIdentity
-						image.subscriberPosition = buffer.NewPosition(cc.counterValuesBuffer,
+						image.subscriberPosition = NewPosition(cc.counterValuesBuffer,
 							subPos.IndicatorId())
 						image.exceptionHandler = cc.errorHandler
 						logger.Debugf("OnAvailableImage: new image position: %v -> %d",
-							image.subscriberPosition, image.subscriberPosition.Get())
+							image.subscriberPosition, image.subscriberPosition.get())
 
 						sub.subscription.addImage(image)
 

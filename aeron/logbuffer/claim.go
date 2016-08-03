@@ -14,15 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package buffer
+package logbuffer
 
-import "unsafe"
+import (
+	"unsafe"
+	"github.com/lirm/aeron-go/aeron/buffer"
+)
 
 type Claim struct {
-	buffer Atomic
+	buffer buffer.Atomic
 }
 
-func (c *Claim) Wrap(buf *Atomic, offset, length int32) {
+func (c *Claim) Wrap(buf *buffer.Atomic, offset, length int32) {
 	buf.BoundsCheck(offset, length)
 	ptr := unsafe.Pointer(uintptr(buf.Ptr()) + uintptr(offset))
 	c.buffer.Wrap(ptr, length)

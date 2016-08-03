@@ -14,22 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package buffer
+package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/util"
-	"github.com/op/go-logging"
+	"github.com/lirm/aeron-go/aeron/buffer"
 )
 
-var logger = logging.MustGetLogger("buffer")
-
 type Position struct {
-	buffer *Atomic
+	buffer *buffer.Atomic
 	id     int32
 	offset int32
 }
 
-func NewPosition(buffer *Atomic, id int32) Position {
+func NewPosition(buffer *buffer.Atomic, id int32) Position {
 	pos := new(Position)
 
 	pos.buffer = buffer
@@ -41,11 +39,11 @@ func NewPosition(buffer *Atomic, id int32) Position {
 	return *pos
 }
 
-func (pos *Position) Get() int64 {
+func (pos *Position) get() int64 {
 	p := pos.buffer.GetInt64(pos.offset)
 	return p
 }
 
-func (pos *Position) Set(value int64) {
+func (pos *Position) set(value int64) {
 	pos.buffer.PutInt64(pos.offset, value)
 }

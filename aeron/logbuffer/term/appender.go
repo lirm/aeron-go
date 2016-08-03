@@ -94,7 +94,7 @@ func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
 	return appender.tailBuffer.GetAndAddInt64(appender.tailOffset, int64(alignedLength))
 }
 
-func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, length int32, claim *buffer.Claim) {
+func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, length int32, claim *logbuffer.Claim) {
 
 	frameLength := length + logbuffer.DataFrameHeader.LENGTH
 	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameDescriptor.FRAME_ALIGNMENT)

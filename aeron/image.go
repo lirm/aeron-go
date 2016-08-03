@@ -63,7 +63,7 @@ type Image struct {
 	termBuffers [logbuffer.PARTITION_COUNT]*buffer.Atomic
 	header      logbuffer.Header
 
-	subscriberPosition buffer.Position
+	subscriberPosition Position
 
 	logBuffers *logbuffer.LogBuffers
 
@@ -108,7 +108,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	result := IMAGE_CLOSED
 
 	if !image.IsClosed() {
-		position := image.subscriberPosition.Get()
+		position := image.subscriberPosition.get()
 		//logger.Debugf("Image position: %d, mask:%X", position, image.termLengthMask)
 		termOffset := int32(position) & image.termLengthMask
 		index := logbuffer.IndexByPosition(position, image.positionBitsToShift)
@@ -120,7 +120,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 		newPosition := position + int64(readOutcome.Offset()-termOffset)
 		if newPosition > position {
-			image.subscriberPosition.Set(newPosition)
+			image.subscriberPosition.set(newPosition)
 			//logger.Debugf("New position: %d, term offset: %d", newPosition, termOffset)
 		}
 

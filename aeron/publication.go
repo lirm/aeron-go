@@ -42,7 +42,7 @@ type Publication struct {
 	initialTermId       int32
 	maxPayloadLength    int32
 	positionBitsToShift int32
-	publicationLimit    buffer.Position
+	publicationLimit    Position
 
 	isClosed atomic.Bool
 
@@ -111,7 +111,7 @@ func (pub *Publication) Offer(buffer *buffer.Atomic, offset int32, length int32,
 	newPosition := PUBLICATION_CLOSED
 
 	if !pub.IsClosed() {
-		limit := pub.publicationLimit.Get()
+		limit := pub.publicationLimit.get()
 		partitionIndex := logbuffer.ActivePartitionIndex(pub.logMetaDataBuffer)
 		termAppender := pub.appenders[partitionIndex]
 		rawTail := termAppender.RawTail()
