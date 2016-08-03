@@ -17,19 +17,19 @@ limitations under the License.
 package driver
 
 import (
-	"github.com/lirm/aeron-go/aeron/ringbuffer"
-	"github.com/lirm/aeron-go/aeron/command"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/command"
+	"github.com/lirm/aeron-go/aeron/ringbuffer"
 )
 
 type Proxy struct {
 	toDriverCommandBuffer *rb.ManyToOne
-	clientId              int64
+	clientID              int64
 }
 
 func (driver *Proxy) Init(buffer *rb.ManyToOne) *Proxy {
 	driver.toDriverCommandBuffer = buffer
-	driver.clientId = driver.toDriverCommandBuffer.NextCorrelationId()
+	driver.clientID = driver.toDriverCommandBuffer.NextCorrelationID()
 
 	return driver
 }
@@ -38,105 +38,105 @@ func (driver *Proxy) TimeOfLastDriverKeepalive() int64 {
 	return driver.toDriverCommandBuffer.ConsumerHeartbeatTime()
 }
 
-func (driver *Proxy) AddSubscription(channel string, streamId int32) int64 {
+func (driver *Proxy) AddSubscription(channel string, streamID int32) int64 {
 
-	correlationId := driver.toDriverCommandBuffer.NextCorrelationId()
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
-	logger.Debugf("driver.AddSubscription: correlationId=%d", correlationId)
+	logger.Debugf("driver.AddSubscription: correlationId=%d", correlationID)
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {
 
 		var message command.SubscriptionMessage
 		message.Wrap(buffer, 0)
 
-		message.ClientId.Set(driver.clientId)
-		message.CorrelationId.Set(correlationId)
-		message.RegistrationCorrelationId.Set(-1)
-		message.StreamId.Set(streamId)
+		message.ClientID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationID)
+		message.RegistrationCorrelationID.Set(-1)
+		message.StreamID.Set(streamID)
 		message.Channel.Set(channel)
 
 		*length = message.Size()
 
-		return command.ADD_SUBSCRIPTION
+		return command.AddSubscription
 	}
 
 	driver.writeCommandToDriver(filler)
 
-	return correlationId
+	return correlationID
 
 }
 
-func (driver *Proxy) RemoveSubscription(registrationId int64) int64 {
-	correlationId := driver.toDriverCommandBuffer.NextCorrelationId()
+func (driver *Proxy) RemoveSubscription(registrationID int64) int64 {
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
-	logger.Debugf("driver.RemoveSubscription: correlationId=%d (subId=%d)", correlationId, registrationId)
+	logger.Debugf("driver.RemoveSubscription: correlationId=%d (subId=%d)", correlationID, registrationID)
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {
 
 		var message command.RemoveMessage
 		message.Wrap(buffer, 0)
 
-		message.CorrelationId.Set(driver.clientId)
-		message.CorrelationId.Set(correlationId)
-		message.RegistrationId.Set(registrationId)
+		message.CorrelationID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationID)
+		message.RegistrationID.Set(registrationID)
 
 		*length = message.Size()
 
-		return command.REMOVE_SUBSCRIPTION
+		return command.RemoveSubscription
 	}
 
 	driver.writeCommandToDriver(filler)
 
-	return correlationId
+	return correlationID
 }
 
-func (driver *Proxy) AddPublication(channel string, streamId int32) int64 {
+func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
 
-	correlationId := driver.toDriverCommandBuffer.NextCorrelationId()
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
-	logger.Debugf("driver.AddPublication: correlationId=%d", correlationId)
+	logger.Debugf("driver.AddPublication: correlationId=%d", correlationID)
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {
 
 		var message command.PublicationMessage
 		message.Wrap(buffer, 0)
-		message.ClientId.Set(driver.clientId)
-		message.CorrelationId.Set(correlationId)
-		message.StreamId.Set(streamId)
+		message.ClientID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationID)
+		message.StreamID.Set(streamID)
 		message.Channel.Set(channel)
 
 		*length = message.Size()
 
-		return command.ADD_PUBLICATION
+		return command.AddPublication
 	}
 
 	driver.writeCommandToDriver(filler)
 
-	return correlationId
+	return correlationID
 }
 
-func (driver *Proxy) RemovePublication(registrationId int64) int64 {
-	correlationId := driver.toDriverCommandBuffer.NextCorrelationId()
+func (driver *Proxy) RemovePublication(registrationID int64) int64 {
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
-	logger.Debugf("driver.RemovePublication: correlationId=%d (pudId=%d)", correlationId, registrationId)
+	logger.Debugf("driver.RemovePublication: correlationId=%d (pudId=%d)", correlationID, registrationID)
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {
 
 		var message command.RemoveMessage
 		message.Wrap(buffer, 0)
 
-		message.CorrelationId.Set(driver.clientId)
-		message.CorrelationId.Set(correlationId)
-		message.RegistrationId.Set(registrationId)
+		message.CorrelationID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationID)
+		message.RegistrationID.Set(registrationID)
 
 		*length = message.Size()
 
-		return command.REMOVE_PUBLICATION
+		return command.RemovePublication
 	}
 
 	driver.writeCommandToDriver(filler)
 
-	return correlationId
+	return correlationID
 }
 
 func (driver *Proxy) SendClientKeepalive() {
@@ -145,12 +145,12 @@ func (driver *Proxy) SendClientKeepalive() {
 
 		var message command.CorrelatedMessage
 		message.Wrap(buffer, 0)
-		message.ClientId.Set(driver.clientId)
-		message.CorrelationId.Set(0)
+		message.ClientID.Set(driver.clientID)
+		message.CorrelationID.Set(0)
 
 		*length = message.Size()
 
-		return command.CLIENT_KEEPALIVE
+		return command.ClientKeepalive
 	}
 
 	driver.writeCommandToDriver(filler)
@@ -163,15 +163,9 @@ func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int3
 
 	length := len(messageBuffer)
 
-	msgTypeId := filler(buffer, &length)
+	msgTypeID := filler(buffer, &length)
 
-	//fmt.Printf("DriverProxy.writeCommandToDriver: ")
-	//for i := 0; i < int(length); i++ {
-	//	fmt.Printf("%x ", messageBuffer[i])
-	//}
-	//fmt.Printf("\n")
-
-	if !driver.toDriverCommandBuffer.Write(int32(msgTypeId), buffer, 0, int32(length)) {
+	if !driver.toDriverCommandBuffer.Write(int32(msgTypeID), buffer, 0, int32(length)) {
 		panic("couldn't write command to driver")
 	}
 }

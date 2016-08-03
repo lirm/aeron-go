@@ -22,19 +22,19 @@ import (
 )
 
 var FrameDescriptor = struct {
-	FRAME_ALIGNMENT int32
+	Alignment int32
 
-	BEGIN_FRAG   uint8
-	END_FRAG     uint8
-	UNFRAGMENTED uint8
+	BeginFrag    uint8
+	EndFrag      uint8
+	Unfragmented uint8
 
-	ALIGNED_HEADER_LENGTH int32
+	alignedHeaderLength int32
 
-	VERSION_OFFSET int32
-	FLAGS_OFFSET   int32
-	TYPE_OFFSET    int32
-	LENGTH_OFFSET  int32
-	TERM_OFFSET    int32
+	versionOffset int32
+	flagsOffset   int32
+	typeOffset    int32
+	lengthOffset  int32
+	termOffset    int32
 }{
 	32,
 	0x80,
@@ -49,15 +49,15 @@ var FrameDescriptor = struct {
 }
 
 func flagsOffset(frameOffset int32) int32 {
-	return frameOffset + DataFrameHeader.FLAGS_FIELD_OFFSET
+	return frameOffset + DataFrameHeader.FlagsFieldOffset
 }
 
 func lengthOffset(frameOffset int32) int32 {
-	return frameOffset + DataFrameHeader.FRAME_LENGTH_FIELD_OFFSET
+	return frameOffset + DataFrameHeader.FrameLengthFieldOffset
 }
 
 func typeOffset(frameOffset int32) int32 {
-	return frameOffset + DataFrameHeader.TYPE_FIELD_OFFSET
+	return frameOffset + DataFrameHeader.TypeFieldOffset
 }
 
 func FrameLengthVolatile(logBuffer *atomic.Buffer, frameOffset int32) int32 {
@@ -70,7 +70,7 @@ func FrameLengthOrdered(logBuffer *atomic.Buffer, frameOffset int32, frameLength
 }
 
 func IsPaddingFrame(logBuffer *atomic.Buffer, frameOffset int32) bool {
-	return logBuffer.GetUInt16(typeOffset(frameOffset)) == DataFrameHeader.HDR_TYPE_PAD
+	return logBuffer.GetUInt16(typeOffset(frameOffset)) == DataFrameHeader.TypePad
 }
 
 func SetFrameType(logBuffer *atomic.Buffer, frameOffset int32, typ uint16) {
@@ -82,7 +82,7 @@ func FrameFlags(logBuffer *atomic.Buffer, frameOffset int32, flags uint8) {
 }
 
 func DefaultFrameHeader(logMetaDataBuffer *atomic.Buffer) *atomic.Buffer {
-	headerPtr := unsafe.Pointer(uintptr(logMetaDataBuffer.Ptr()) + Descriptor.LOG_DEFAULT_FRAME_HEADER_OFFSET)
+	headerPtr := unsafe.Pointer(uintptr(logMetaDataBuffer.Ptr()) + Descriptor.logDefaultFrameHeaderOffset)
 
-	return atomic.MakeBuffer(headerPtr, DataFrameHeader.LENGTH)
+	return atomic.MakeBuffer(headerPtr, DataFrameHeader.Length)
 }

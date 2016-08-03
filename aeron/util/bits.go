@@ -22,17 +22,22 @@ var i32 int32
 var i64 int64
 
 const (
-	CACHE_LINE_LENGTH int32 = 64
-	SIZEOF_INT32      int32 = int32(unsafe.Sizeof(i32))
-	SIZEOF_INT64      int32 = int32(unsafe.Sizeof(i64))
-	TRUE              int32 = 1
-	FALSE             int32 = 0
+	// CacheLineLength is a constant for the size of a CPU cache line
+	CacheLineLength int32 = 64
+
+	// SizeOfInt32 is a constant for the size of int32. Ha. Just for Clarity
+	SizeOfInt32     int32 = int32(unsafe.Sizeof(i32))
+
+	// SizeOfInt64 is a constant for the size of int64
+	SizeOfInt64     int32 = int32(unsafe.Sizeof(i64))
 )
 
+// AlignInt32 will return a number rounded up to the alignment boundary
 func AlignInt32(value, alignment int32) int32 {
 	return (value + (alignment - 1)) & ^(alignment - 1)
 }
 
+// NumberOfTrailingZeroes is HD recipe for determining the number of leading zeros on 32 bit integer
 func NumberOfTrailingZeroes(value int32) uint8 {
 	table := [32]uint8{
 		0, 1, 2, 24, 3, 19, 6, 25,
@@ -49,6 +54,7 @@ func NumberOfTrailingZeroes(value int32) uint8 {
 	return table[value>>27]
 }
 
+// FastMod3 is HD recipe for faster division by 3 for 32 bit integers
 func FastMod3(value uint64) int32 {
 
 	table := [62]int32{0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2,
@@ -62,12 +68,14 @@ func FastMod3(value uint64) int32 {
 	return table[value]
 }
 
+// IsPowerOfTwo checks that the argument number is a power of two
 func IsPowerOfTwo(value int32) bool {
 	return value > 0 && ((value & (^value + 1)) == value)
 }
 
+// Memcpy will copy length bytes from pointer src to dest
 func Memcpy(dest uintptr, src uintptr, length int32) {
-	var i int32 = 0
+	var i int32
 
 	// batches of 8
 	i8 := length >> 3

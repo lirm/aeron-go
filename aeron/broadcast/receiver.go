@@ -40,11 +40,11 @@ type Receiver struct {
 func NewReceiver(buffer *atomic.Buffer) *Receiver {
 	recv := new(Receiver)
 	recv.buffer = buffer
-	recv.capacity = buffer.Capacity() - BufferDescriptor.TRAILER_LENGTH
+	recv.capacity = buffer.Capacity() - BufferDescriptor.TrailerLength
 	recv.mask = int64(recv.capacity) - 1
-	recv.tailIntentCounterIndex = recv.capacity + BufferDescriptor.TAIL_INTENT_COUNTER_OFFSET
-	recv.tailCounterIndex = recv.capacity + BufferDescriptor.TAIL_COUNTER_OFFSET
-	recv.latestCounterIndex = recv.capacity + BufferDescriptor.LATEST_COUNTER_OFFSET
+	recv.tailIntentCounterIndex = recv.capacity + BufferDescriptor.TailIntentCounterOffset
+	recv.tailCounterIndex = recv.capacity + BufferDescriptor.TailCounterOffset
+	recv.latestCounterIndex = recv.capacity + BufferDescriptor.LatestCounterOffset
 	recv.lappedCount.Set(0)
 
 	CheckCapacity(recv.capacity)
@@ -64,7 +64,7 @@ func (recv *Receiver) GetLappedCount() int64 {
 	return recv.lappedCount.Get()
 }
 
-func (recv *Receiver) typeId() int32 {
+func (recv *Receiver) typeID() int32 {
 	return recv.buffer.GetInt32(rb.TypeOffset(recv.recordOffset))
 }
 
@@ -73,7 +73,7 @@ func (recv *Receiver) offset() int32 {
 }
 
 func (recv *Receiver) length() int32 {
-	return int32(recv.buffer.GetInt32(rb.LengthOffset(recv.recordOffset))) - rb.RecordDescriptor.HEADER_LENGTH
+	return int32(recv.buffer.GetInt32(rb.LengthOffset(recv.recordOffset))) - rb.RecordDescriptor.HeaderLength
 }
 
 func (recv *Receiver) receiveNext() bool {
@@ -93,10 +93,10 @@ func (recv *Receiver) receiveNext() bool {
 
 		recv.cursor = cursor
 		length := recv.buffer.GetInt32(rb.LengthOffset(recordOffset))
-		alignedLength := int64(util.AlignInt32(length, rb.RecordDescriptor.RECORD_ALIGNMENT))
+		alignedLength := int64(util.AlignInt32(length, rb.RecordDescriptor.RecordAlignment))
 		recv.nextRecord = cursor + alignedLength
 
-		if rb.RecordDescriptor.PADDING_MSG_TYPE_ID == recv.buffer.GetInt32(rb.TypeOffset(recordOffset)) {
+		if rb.RecordDescriptor.PaddingMsgTypeID == recv.buffer.GetInt32(rb.TypeOffset(recordOffset)) {
 			recordOffset = 0
 			recv.cursor = recv.nextRecord
 			recv.nextRecord += alignedLength

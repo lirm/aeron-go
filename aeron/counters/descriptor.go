@@ -24,24 +24,32 @@ import (
 )
 
 var Descriptor = struct {
-	CNC_FILE                     string
-	CNC_VERSION                  int32
-	VERSION_AND_META_DATA_LENGTH int
+	CncFile               string
+	CncVersion            int32
+	VersionAndMetaDataLen int
 }{
 	"cnc.dat",
 	5,
-	int(util.CACHE_LINE_LENGTH * 2),
+	int(util.CacheLineLength * 2),
 }
 
-const (
-	METADATA_OFFSET_CNCVERSION     uintptr = 0
-	METADATA_OFFSET_DRIVERBUFLEN   uintptr = 4
-	METADATA_OFFSET_CLIENTSBUFLEN  uintptr = 8
-	METADATA_OFFSET_METADATABUFLEN uintptr = 12
-	METADATA_OFFSET_VALUESBUFLEN   uintptr = 16
-	METADATA_OFFSET_LIVELINESSTO   uintptr = 20
-	METADATA_OFFSET_ERRORLOGBUFLEN uintptr = 28
-)
+var MetadataOffsets = struct {
+	cncVersion     uintptr
+	driverBufLen   uintptr
+	clientsBufLen  uintptr
+	metaDataBufLen uintptr
+	valuesBufLen   uintptr
+	livelinessTo   uintptr
+	errorLogBufLen uintptr
+}{
+	0,
+	4,
+	8,
+	12,
+	16,
+	20,
+	28,
+}
 
 type MetaDataDefn struct {
 	cncVersion                  int32
@@ -55,9 +63,9 @@ type MetaDataDefn struct {
 
 func CreateToDriverBuffer(cncFile *memmap.File) *atomic.Buffer {
 
-	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_DRIVERBUFLEN)
+	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.driverBufLen)
 
-	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH)
+	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VersionAndMetaDataLen)
 
 	return atomic.MakeBuffer(unsafe.Pointer(ptr), toDriverBufferLength)
 }
@@ -66,8 +74,8 @@ func CreateToClientsBuffer(cncFile *memmap.File) *atomic.Buffer {
 	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
 	// log.Printf("createToClientsBuffer: MetaData: %v\n", metaData)
 
-	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_DRIVERBUFLEN)
-	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH) + uintptr(toDriverBufferLength)
+	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.driverBufLen)
+	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VersionAndMetaDataLen) + uintptr(toDriverBufferLength)
 
 	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.toClientsBufferLength)
 }
@@ -76,7 +84,7 @@ func CreateCounterMetadataBuffer(cncFile *memmap.File) *atomic.Buffer {
 	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
 	// log.Printf("createCounterMetadataBuffer: MetaData: %v\n", metaData)
 
-	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH) + uintptr(metaData.toDriverBufferLength) + uintptr(metaData.toClientsBufferLength)
+	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VersionAndMetaDataLen) + uintptr(metaData.toDriverBufferLength) + uintptr(metaData.toClientsBufferLength)
 
 	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.counterMetadataBufferLength)
 }
@@ -86,7 +94,7 @@ func CreateCounterValuesBuffer(cncFile *memmap.File) *atomic.Buffer {
 	// log.Printf("createCounterValuesBuffer: MetaData: %v\n", metaData)
 
 	ptr := uintptr(cncFile.GetMemoryPtr()) +
-		uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH) +
+		uintptr(Descriptor.VersionAndMetaDataLen) +
 		uintptr(metaData.toDriverBufferLength) +
 		uintptr(metaData.toClientsBufferLength) +
 		uintptr(metaData.counterMetadataBufferLength)
@@ -98,14 +106,14 @@ func CreateErrorLogBuffer(cncFile *memmap.File) *atomic.Buffer {
 	// metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
 	// log.Printf("createErrorLogBuffer: MetaData: %v\n", metaData)
 
-	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_DRIVERBUFLEN)
-	toClientsBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_CLIENTSBUFLEN)
-	counterMetadataBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_METADATABUFLEN)
-	counterValuesBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_VALUESBUFLEN)
-	errorLogBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), METADATA_OFFSET_ERRORLOGBUFLEN)
+	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.driverBufLen)
+	toClientsBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.clientsBufLen)
+	counterMetadataBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.metaDataBufLen)
+	counterValuesBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.valuesBufLen)
+	errorLogBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.errorLogBufLen)
 
 	ptr := uintptr(cncFile.GetMemoryPtr()) +
-		uintptr(Descriptor.VERSION_AND_META_DATA_LENGTH) +
+		uintptr(Descriptor.VersionAndMetaDataLen) +
 		uintptr(toDriverBufferLength) +
 		uintptr(toClientsBufferLength) +
 		uintptr(counterMetadataBufferLength) +
@@ -121,7 +129,7 @@ func CncVersion(cncFile *memmap.File) int32 {
 }
 
 func ClientLivenessTimeout(cncFile *memmap.File) int64 {
-	ptr := uintptr(cncFile.GetMemoryPtr()) + METADATA_OFFSET_LIVELINESSTO
+	ptr := uintptr(cncFile.GetMemoryPtr()) + MetadataOffsets.livelinessTo
 
 	return *(*int64)(unsafe.Pointer(ptr))
 }

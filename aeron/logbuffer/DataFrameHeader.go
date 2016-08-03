@@ -17,28 +17,28 @@ limitations under the License.
 package logbuffer
 
 var DataFrameHeader = struct {
-	FRAME_LENGTH_FIELD_OFFSET   int32
-	VERSION_FIELD_OFFSET        int32
-	FLAGS_FIELD_OFFSET          int32
-	TYPE_FIELD_OFFSET           int32
-	TERM_OFFSET_FIELD_OFFSET    int32
-	SESSION_ID_FIELD_OFFSET     int32
-	STREAM_ID_FIELD_OFFSET      int32
-	TERM_ID_FIELD_OFFSET        int32
-	RESERVED_VALUE_FIELD_OFFSET int32
-	DATA_OFFSET                 int32
+	FrameLengthFieldOffset   int32
+	VersionFieldOffset       int32
+	FlagsFieldOffset         int32
+	TypeFieldOffset          int32
+	TermOffsetFieldOffset    int32
+	SessionIDFieldOffset     int32
+	StreamIDFieldOffset      int32
+	TermIDFieldOffset        int32
+	ReservedValueFieldOffset int32
+	DataOffset               int32
 
-	LENGTH int32
+	Length int32
 
-	HDR_TYPE_PAD   uint16
-	HDR_TYPE_DATA  uint16
-	HDR_TYPE_NAK   uint16
-	HDR_TYPE_SM    uint16
-	HDR_TYPE_ERR   uint16
-	HDR_TYPE_SETUP uint16
-	HDR_TYPE_EXT   uint16
+	TypePad   uint16
+	TypeData  uint16
+	TypeNAK   uint16
+	TypeSM    uint16
+	TypeErr   uint16
+	TypeSetup uint16
+	TypeExt   uint16
 
-	CURRENT_VERSION int8
+	CurrentVersion int8
 }{
 	0,
 	4,

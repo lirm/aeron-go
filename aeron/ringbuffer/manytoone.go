@@ -18,11 +18,27 @@ package rb
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
-const INSUFFICIENT_CAPACITY int32 = -2
+const InsufficientCapacity int32 = -2
+
+var Descriptor = struct {
+	tailPositionOffset       int32
+	headCachePositionOffset  int32
+	headPositionOffset       int32
+	correlationCounterOffset int32
+	consumerHeartbeatOffset  int32
+	trailerLength            int32
+}{
+	util.CacheLineLength * 2,
+	util.CacheLineLength * 4,
+	util.CacheLineLength * 6,
+	util.CacheLineLength * 8,
+	util.CacheLineLength * 10,
+	util.CacheLineLength * 12,
+}
 
 type ManyToOne struct {
 	buffer                    *atomic.Buffer
@@ -31,29 +47,29 @@ type ManyToOne struct {
 	headPositionIndex         int32
 	headCachePositionIndex    int32
 	tailPositionIndex         int32
-	correlationIdCounterIndex int32
+	correlationIDCounterIndex int32
 	consumerHeartbeatIndex    int32
 }
 
 func (buf *ManyToOne) Init(buffer *atomic.Buffer) *ManyToOne {
 
 	buf.buffer = buffer
-	buf.capacity = buffer.Capacity() - Descriptor.TRAILER_LENGTH
+	buf.capacity = buffer.Capacity() - Descriptor.trailerLength
 
 	util.IsPowerOfTwo(buf.capacity)
 
 	buf.maxMsgLength = buf.capacity / 8
-	buf.tailPositionIndex = buf.capacity + Descriptor.TAIL_POSITION_OFFSET
-	buf.headCachePositionIndex = buf.capacity + Descriptor.HEAD_CACHE_POSITION_OFFSET
-	buf.headPositionIndex = buf.capacity + Descriptor.HEAD_POSITION_OFFSET
-	buf.correlationIdCounterIndex = buf.capacity + Descriptor.CORRELATION_COUNTER_OFFSET
-	buf.consumerHeartbeatIndex = buf.capacity + Descriptor.CONSUMER_HEARTBEAT_OFFSET
+	buf.tailPositionIndex = buf.capacity + Descriptor.tailPositionOffset
+	buf.headCachePositionIndex = buf.capacity + Descriptor.headCachePositionOffset
+	buf.headPositionIndex = buf.capacity + Descriptor.headPositionOffset
+	buf.correlationIDCounterIndex = buf.capacity + Descriptor.correlationCounterOffset
+	buf.consumerHeartbeatIndex = buf.capacity + Descriptor.consumerHeartbeatOffset
 
 	return buf
 }
 
-func (buf *ManyToOne) NextCorrelationId() int64 {
-	return buf.buffer.GetAndAddInt64(buf.correlationIdCounterIndex, 1)
+func (buf *ManyToOne) NextCorrelationID() int64 {
+	return buf.buffer.GetAndAddInt64(buf.correlationIDCounterIndex, 1)
 }
 
 func (buf *ManyToOne) SetConsumerHeartbeatTime(time int64) {
@@ -93,7 +109,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 			head = buf.buffer.GetInt64Volatile(buf.headPositionIndex)
 
 			if requiredCapacity > (buf.capacity - int32(tail-head)) {
-				return INSUFFICIENT_CAPACITY
+				return InsufficientCapacity
 			}
 
 			buf.buffer.PutInt64Ordered(buf.headCachePositionIndex, head)
@@ -111,7 +127,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 				headIndex = int32(head & int64(mask))
 
 				if requiredCapacity > headIndex {
-					return INSUFFICIENT_CAPACITY
+					return InsufficientCapacity
 				}
 
 				buf.buffer.PutInt64Ordered(buf.headCachePositionIndex, head)
@@ -122,7 +138,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 	}
 
 	if 0 != padding {
-		buf.buffer.PutInt64Ordered(tailIndex, MakeHeader(int32(padding), RecordDescriptor.PADDING_MSG_TYPE_ID))
+		buf.buffer.PutInt64Ordered(tailIndex, MakeHeader(int32(padding), RecordDescriptor.PaddingMsgTypeID))
 		tailIndex = 0
 	}
 
@@ -135,19 +151,19 @@ func (buf *ManyToOne) checkMsgLength(length int32) {
 	}
 }
 
-func (buf *ManyToOne) Write(msgTypeId int32, srcBuffer *atomic.Buffer, srcIndex int32, length int32) bool {
+func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex int32, length int32) bool {
 
-	var isSuccessful bool = false
+	isSuccessful := false
 
-	CheckMsgTypeId(msgTypeId)
+	CheckMsgTypeID(msgTypeID)
 	buf.checkMsgLength(length)
 
-	recordLength := length + RecordDescriptor.HEADER_LENGTH
-	requiredCapacity := util.AlignInt32(recordLength, RecordDescriptor.RECORD_ALIGNMENT)
+	recordLength := length + RecordDescriptor.HeaderLength
+	requiredCapacity := util.AlignInt32(recordLength, RecordDescriptor.RecordAlignment)
 	recordIndex := buf.claimCapacity(requiredCapacity)
 
-	if INSUFFICIENT_CAPACITY != recordIndex {
-		buf.buffer.PutInt64Ordered(recordIndex, MakeHeader(-recordLength, msgTypeId))
+	if InsufficientCapacity != recordIndex {
+		buf.buffer.PutInt64Ordered(recordIndex, MakeHeader(-recordLength, msgTypeID))
 		buf.buffer.PutBytes(EncodedMsgOffset(recordIndex), srcBuffer, srcIndex, length)
 		buf.buffer.PutInt32Ordered(LengthOffset(recordIndex), recordLength)
 

@@ -49,11 +49,11 @@ func main() {
 
 	a := aeron.Connect(ctx)
 
-	subscription := <-a.AddSubscription(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamId))
+	subscription := <-a.AddSubscription(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamID))
 	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
 
-	publication := <-a.AddPublication(*examples.PingPongConfig.PongChannel, int32(*examples.PingPongConfig.PongStreamId))
+	publication := <-a.AddPublication(*examples.PingPongConfig.PongChannel, int32(*examples.PingPongConfig.PongStreamID))
 	defer publication.Close()
 	log.Printf("Publication found %v", publication)
 

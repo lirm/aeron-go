@@ -23,7 +23,9 @@ import (
 	"time"
 )
 
-// https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
+/*
+ * Context configuration options are located here https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
+ */
 type Context struct {
 	aeronDir      string // aeron.dir
 	mediaDriverTo time.Duration
@@ -106,10 +108,10 @@ func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
 
 func (ctx *Context) cncFileName() string {
 	user, err := user.Current()
-	var uName string = "unknown"
+	uName := "unknown"
 	if err != nil {
 		logger.Warningf("Failed to get current user name: %v", err)
 	}
 	uName = user.Username
-	return ctx.aeronDir + "/aeron-" + uName + "/" + counters.Descriptor.CNC_FILE
+	return ctx.aeronDir + "/aeron-" + uName + "/" + counters.Descriptor.CncFile
 }

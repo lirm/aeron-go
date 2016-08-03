@@ -22,7 +22,7 @@ var ExamplesConfig = struct {
 	AeronPrefix     *string
 	ProfilerEnabled *bool
 	DriverTo        *int64
-	StreamId        *int
+	StreamID        *int
 	Channel         *string
 	Messages        *int
 }{
@@ -35,8 +35,8 @@ var ExamplesConfig = struct {
 }
 
 var PingPongConfig = struct {
-	PongStreamId *int
-	PingStreamId *int
+	PongStreamID *int
+	PingStreamID *int
 	PongChannel  *string
 	PingChannel  *string
 }{

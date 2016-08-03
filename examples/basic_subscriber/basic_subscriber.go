@@ -44,7 +44,7 @@ func main() {
 
 	a := aeron.Connect(ctx)
 
-	subscription := <-a.AddSubscription(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamId))
+	subscription := <-a.AddSubscription(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
 	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
 

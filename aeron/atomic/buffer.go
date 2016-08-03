@@ -38,8 +38,8 @@ type Buffer struct {
 		MakeAtomicBuffer([]byte, len)
 */
 func MakeBuffer(args ...interface{}) *Buffer {
-	var bufPtr unsafe.Pointer = nil
-	var bufLen int32 = 0
+	var bufPtr unsafe.Pointer
+	var bufLen int32
 
 	switch len(args) {
 	case 1:

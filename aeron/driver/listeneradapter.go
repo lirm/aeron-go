@@ -17,8 +17,8 @@ limitations under the License.
 package driver
 
 import (
-	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/command"
 	"github.com/op/go-logging"
 )
@@ -27,16 +27,16 @@ var logger = logging.MustGetLogger("driver")
 
 var Events = struct {
 	/** Error Response */
-	ON_ERROR int32
+	OnError int32
 	/** New subscription Buffer Notification */
-	ON_AVAILABLE_IMAGE int32
+	OnAvailableImage int32
 	/** New publication Buffer Notification */
-	ON_PUBLICATION_READY int32
+	OnPublicationReady int32
 	/** Operation Succeeded */
-	ON_OPERATION_SUCCESS int32
+	OnOperationSuccess int32
 
 	/** Inform client of timeout and removal of inactive image */
-	ON_UNAVAILABLE_IMAGE int32
+	OnUnavailableImage int32
 }{
 	0x0F01,
 	0x0F02,
@@ -47,28 +47,28 @@ var Events = struct {
 }
 
 type SubscriberPosition struct {
-	indicatorId    int32
-	registrationId int64
+	indicatorID    int32
+	registrationID int64
 }
 
-func (pos *SubscriberPosition) RegistrationId() int64 {
-	return pos.registrationId
+func (pos *SubscriberPosition) RegistrationID() int64 {
+	return pos.registrationID
 }
 
-func (pos *SubscriberPosition) IndicatorId() int32 {
-	return pos.indicatorId
+func (pos *SubscriberPosition) IndicatorID() int32 {
+	return pos.indicatorID
 }
 
 type Listener interface {
-	OnNewPublication(streamId int32, sessionId int32, positionLimitCounterId int32,
-		logFileName string, registrationId int64)
-	OnAvailableImage(streamId int32, sessionId int32, logFilename string,
+	OnNewPublication(streamID int32, sessionID int32, positionLimitCounterID int32,
+		logFileName string, registrationID int64)
+	OnAvailableImage(streamID int32, sessionID int32, logFilename string,
 		sourceIdentity string, subscriberPositionCount int,
 		subscriberPositions []SubscriberPosition,
-		correlationId int64)
-	OnUnavailableImage(streamId int32, correlationId int64)
-	OnOperationSuccess(correlationId int64)
-	OnErrorResponse(offendingCommandCorrelationId int64, errorCode int32, errorMessage string)
+		correlationID int64)
+	OnUnavailableImage(streamID int32, correlationID int64)
+	OnOperationSuccess(correlationID int64)
+	OnErrorResponse(offendingCommandCorrelationID int64, errorCode int32, errorMessage string)
 }
 
 type ListenerAdapter struct {
@@ -85,31 +85,31 @@ func NewAdapter(driverListener Listener, broadcastReceiver *broadcast.CopyReceiv
 }
 
 func (adapter *ListenerAdapter) ReceiveMessages() int {
-	handler := func(msgTypeId int32, buffer *atomic.Buffer, offset int32, length int32) {
-		logger.Debugf("received %d", msgTypeId)
-		switch int32(msgTypeId) {
-		case Events.ON_PUBLICATION_READY:
+	handler := func(msgTypeID int32, buffer *atomic.Buffer, offset int32, length int32) {
+		logger.Debugf("received %d", msgTypeID)
+		switch int32(msgTypeID) {
+		case Events.OnPublicationReady:
 			logger.Debugf("received ON_PUBLICATION_READY")
 
 			var msg PublicationReady
 			msg.Wrap(buffer, int(offset))
 
-			correlationId := msg.correlationId.Get()
-			sessionId := msg.sessionId.Get()
-			streamId := msg.streamId.Get()
-			positionLimitCounterId := msg.publicationLimitOffset.Get()
+			correlationID := msg.correlationID.Get()
+			sessionID := msg.sessionID.Get()
+			streamID := msg.streamID.Get()
+			positionLimitCounterID := msg.publicationLimitOffset.Get()
 			logFileName := msg.logFile.Get()
 
-			adapter.listener.OnNewPublication(streamId, sessionId, positionLimitCounterId, logFileName, correlationId)
-		case Events.ON_AVAILABLE_IMAGE:
+			adapter.listener.OnNewPublication(streamID, sessionID, positionLimitCounterID, logFileName, correlationID)
+		case Events.OnAvailableImage:
 			logger.Debugf("received ON_AVAILABLE_IMAGE")
 
 			var header ImageReadyHeader
 			header.Wrap(buffer, int(offset))
 
-			correlationId := header.correlationId.Get()
-			sessionId := header.sessionId.Get()
-			streamId := header.streamId.Get()
+			correlationID := header.correlationID.Get()
+			sessionID := header.sessionID.Get()
+			streamID := header.streamID.Get()
 			subsPosBlockLen := header.subsPosBlockLen.Get()
 			subsPosBlockCnt := int(header.subsPosBlockCnt.Get())
 			logger.Debugf("position count: %d block len: %d", subsPosBlockCnt, subsPosBlockLen)
@@ -121,8 +121,8 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 				posFly.Wrap(buffer, int(pos))
 				pos += subsPosBlockLen
 
-				subscriberPositions[ix].indicatorId = posFly.indicatorId.Get()
-				subscriberPositions[ix].registrationId = posFly.registrationId.Get()
+				subscriberPositions[ix].indicatorID = posFly.indicatorID.Get()
+				subscriberPositions[ix].registrationID = posFly.registrationID.Get()
 			}
 			logger.Debugf("positions: %v", subscriberPositions)
 
@@ -135,37 +135,37 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			sourceIdentity := trailer.sourceIdentity.Get()
 			logger.Debugf("sourceIdentity: %v", sourceIdentity)
 
-			adapter.listener.OnAvailableImage(streamId, sessionId, logFileName, sourceIdentity,
-				subsPosBlockCnt, subscriberPositions, correlationId)
-		case Events.ON_OPERATION_SUCCESS:
+			adapter.listener.OnAvailableImage(streamID, sessionID, logFileName, sourceIdentity,
+				subsPosBlockCnt, subscriberPositions, correlationID)
+		case Events.OnOperationSuccess:
 			logger.Debugf("received ON_OPERATION_SUCCESS")
 
 			var msg command.CorrelatedMessage
 			msg.Wrap(buffer, int(offset))
 
-			correlationId := msg.CorrelationId.Get()
+			correlationID := msg.CorrelationID.Get()
 
-			adapter.listener.OnOperationSuccess(correlationId)
-		case Events.ON_UNAVAILABLE_IMAGE:
+			adapter.listener.OnOperationSuccess(correlationID)
+		case Events.OnUnavailableImage:
 			logger.Debugf("received ON_UNAVAILABLE_IMAGE")
 
 			var msg command.ImageMessage
 			msg.Wrap(buffer, int(offset))
 
-			streamId := msg.StreamId.Get()
-			correlationId := msg.CorrelationId.Get()
+			streamID := msg.StreamID.Get()
+			correlationID := msg.CorrelationID.Get()
 
-			adapter.listener.OnUnavailableImage(streamId, correlationId)
-		case Events.ON_ERROR:
+			adapter.listener.OnUnavailableImage(streamID, correlationID)
+		case Events.OnError:
 			logger.Debugf("received ON_ERROR")
 
 			var msg ErrorMessage
 			msg.Wrap(buffer, int(offset))
 
-			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationId.Get(),
+			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationID.Get(),
 				msg.errorCode.Get(), msg.errorMessage.Get())
 		default:
-			logger.Debugf("received unhandled %d", msgTypeId)
+			logger.Debugf("received unhandled %d", msgTypeID)
 		}
 	}
 

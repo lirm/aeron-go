@@ -22,15 +22,15 @@ import (
 )
 
 var BufferDescriptor = struct {
-	TAIL_INTENT_COUNTER_OFFSET int32
-	TAIL_COUNTER_OFFSET        int32
-	LATEST_COUNTER_OFFSET      int32
-	TRAILER_LENGTH             int32
+	TailIntentCounterOffset int32
+	TailCounterOffset       int32
+	LatestCounterOffset     int32
+	TrailerLength           int32
 }{
 	0,
-	util.SIZEOF_INT64,
-	util.SIZEOF_INT64 * 2,
-	util.CACHE_LINE_LENGTH * 2,
+	util.SizeOfInt64,
+	util.SizeOfInt64 * 2,
+	util.CacheLineLength * 2,
 }
 
 func CheckCapacity(capacity int32) {

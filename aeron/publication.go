@@ -25,41 +25,41 @@ import (
 )
 
 const (
-	NOT_CONNECTED      int64 = -1
-	BACK_PRESSURED     int64 = -2
-	ADMIN_ACTION       int64 = -3
-	PUBLICATION_CLOSED int64 = -4
+	NotConnected      int64 = -1
+	BackPressured     int64 = -2
+	AdminAction       int64 = -3
+	PublicationClosed int64 = -4
 )
 
 type Publication struct {
 	conductor           *ClientConductor
 	logMetaDataBuffer   *atomic.Buffer
 	channel             string
-	registrationId      int64
-	streamId            int32
-	sessionId           int32
-	initialTermId       int32
+	registrationID      int64
+	streamID            int32
+	sessionID           int32
+	initialTermID       int32
 	maxPayloadLength    int32
 	positionBitsToShift int32
 	publicationLimit    Position
 
 	isClosed atomic.Bool
 
-	appenders    [logbuffer.PARTITION_COUNT]*term.Appender
+	appenders    [logbuffer.PartitionCount]*term.Appender
 	headerWriter term.HeaderWriter
 }
 
 func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub := new(Publication)
-	pub.logMetaDataBuffer = logBuffers.Buffer(logbuffer.Descriptor.LOG_META_DATA_SECTION_INDEX)
-	pub.initialTermId = logbuffer.InitialTermId(pub.logMetaDataBuffer)
-	pub.maxPayloadLength = logbuffer.MtuLength(pub.logMetaDataBuffer) - logbuffer.DataFrameHeader.LENGTH
+	pub.logMetaDataBuffer = logBuffers.Buffer(logbuffer.LogMetaDataSectionIndex)
+	pub.initialTermID = logbuffer.InitialTermID(pub.logMetaDataBuffer)
+	pub.maxPayloadLength = logbuffer.MtuLength(pub.logMetaDataBuffer) - logbuffer.DataFrameHeader.Length
 	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(logBuffers.Buffer(0).Capacity()))
 	header := logbuffer.DefaultFrameHeader(pub.logMetaDataBuffer)
 	pub.headerWriter.Fill(header)
 	pub.isClosed.Set(false)
 
-	for i := 0; i < logbuffer.PARTITION_COUNT; i++ {
+	for i := 0; i < logbuffer.PartitionCount; i++ {
 		appender := term.MakeAppender(logBuffers.Buffer(i), pub.logMetaDataBuffer, i)
 		logger.Debugf("TermAppender[%d]: %v", i, appender)
 		pub.appenders[i] = appender
@@ -68,46 +68,25 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	return pub
 }
 
+func (pub *Publication) IsConnected() bool {
+	return !pub.IsClosed() && pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer))
+}
+
 func (pub *Publication) IsClosed() bool {
 	return pub.isClosed.Get()
 }
 
 func (pub *Publication) Close() error {
 	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
-		<-pub.conductor.releasePublication(pub.registrationId)
+		<-pub.conductor.releasePublication(pub.registrationID)
 	}
 
 	return nil
 }
 
-func (pub *Publication) checkForMaxMessageLength(length int32) {
-	if length > pub.maxPayloadLength {
-		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxPayloadLength, length))
-	}
-}
-
-func (pub *Publication) IsConnected() bool {
-	return !pub.IsClosed() && pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer))
-}
-
-func (pub *Publication) newPosition(index int32, currentTail int32, position int64, result *term.AppenderResult) int64 {
-	newPosition := ADMIN_ACTION
-
-	if result.TermOffset() > 0 {
-		newPosition = (position - int64(currentTail)) + result.TermOffset()
-	} else if result.TermOffset() == int64(term.APPENDER_TRIPPED) {
-		nextIndex := logbuffer.NextPartitionIndex(index)
-
-		pub.appenders[nextIndex].SetTailTermId(result.TermId() + 1)
-		logbuffer.SetActivePartitionIndex(pub.logMetaDataBuffer, nextIndex)
-	}
-
-	return newPosition
-}
-
 func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
 
-	newPosition := PUBLICATION_CLOSED
+	newPosition := PublicationClosed
 
 	if !pub.IsClosed() {
 		limit := pub.publicationLimit.get()
@@ -115,12 +94,12 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 		termAppender := pub.appenders[partitionIndex]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
-		position := logbuffer.ComputeTermBeginPosition(logbuffer.TermId(rawTail), pub.positionBitsToShift, pub.initialTermId) + termOffset
+		position := logbuffer.ComputeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
 
 		//logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
 		if position < limit {
 			var appendResult term.AppenderResult
-			var resValSupplier term.ReservedValueSupplier = term.DEFAULT_RESERVED_VALUE_SUPPLIER
+			resValSupplier := term.DEFAULT_RESERVED_VALUE_SUPPLIER
 			if nil != reservedValueSupplier {
 				resValSupplier = reservedValueSupplier
 			}
@@ -134,10 +113,31 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			newPosition = pub.newPosition(partitionIndex, int32(termOffset), position, &appendResult)
 			//logger.Debugf("publication new position: %d, term offset: %d", newPosition, termOffset)
 		} else if pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer)) {
-			newPosition = BACK_PRESSURED
+			newPosition = BackPressured
 		} else {
-			newPosition = NOT_CONNECTED
+			newPosition = NotConnected
 		}
+	}
+
+	return newPosition
+}
+
+func (pub *Publication) checkForMaxMessageLength(length int32) {
+	if length > pub.maxPayloadLength {
+		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxPayloadLength, length))
+	}
+}
+
+func (pub *Publication) newPosition(index int32, currentTail int32, position int64, result *term.AppenderResult) int64 {
+	newPosition := AdminAction
+
+	if result.TermOffset() > 0 {
+		newPosition = (position - int64(currentTail)) + result.TermOffset()
+	} else if result.TermOffset() == int64(term.APPENDER_TRIPPED) {
+		nextIndex := logbuffer.NextPartitionIndex(index)
+
+		pub.appenders[nextIndex].SetTailTermId(result.TermId() + 1)
+		logbuffer.SetActivePartitionIndex(pub.logMetaDataBuffer, nextIndex)
 	}
 
 	return newPosition

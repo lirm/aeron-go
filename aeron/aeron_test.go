@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	TEST_CHANNEL  = "aeron:udp?endpoint=localhost:40123"
-	TEST_STREAMID = 10
+	TestChannel  = "aeron:udp?endpoint=localhost:40123"
+	TestStreamID = 10
 )
 
 func send(n int, pub *Publication, t *testing.T) {
@@ -35,7 +35,7 @@ func send(n int, pub *Publication, t *testing.T) {
 
 	for i := 0; i < n; i++ {
 		timeoutAt := time.Now().Add(time.Second * 5)
-		var v int64 = 0
+		var v int64
 		for v <= 0 {
 			v = pub.Offer(srcBuffer, 0, int32(len(message)), nil)
 			if time.Now().After(timeoutAt) {
@@ -77,7 +77,7 @@ func receive(n int, sub *Subscription, t *testing.T) {
 }
 
 func subAndSend(n int, a *Aeron, pub *Publication, t *testing.T) {
-	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	sub := <-a.AddSubscription(TestChannel, TestStreamID)
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
@@ -108,7 +108,7 @@ func TestAeronBasics(t *testing.T) {
 	a := Connect(NewContext())
 	defer a.Close()
 
-	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	pub := <-a.AddPublication(TestChannel, TestStreamID)
 	defer pub.Close()
 
 	subAndSend(1, a, pub, t)
@@ -122,10 +122,10 @@ func TestAeronSendMultipleMessages(t *testing.T) {
 	a := Connect(NewContext())
 	defer a.Close()
 
-	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	pub := <-a.AddPublication(TestChannel, TestStreamID)
 	defer pub.Close()
 
-	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	sub := <-a.AddSubscription(TestChannel, TestStreamID)
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
@@ -160,13 +160,13 @@ func TestAeronSendMultiplePublications(t *testing.T) {
 	pubCount := 10
 	itCount := 100
 
-	sub := <-a.AddSubscription(TEST_CHANNEL, TEST_STREAMID)
+	sub := <-a.AddSubscription(TestChannel, TestStreamID)
 	defer sub.Close()
 
 	pubs := make([]*Publication, pubCount)
 
 	for i := 0; i < pubCount; i++ {
-		pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+		pub := <-a.AddPublication(TestChannel, TestStreamID)
 		defer pub.Close()
 
 		pubs[i] = pub
@@ -231,7 +231,7 @@ func TestAeronResubscribe(t *testing.T) {
 	a := Connect(NewContext())
 	defer a.Close()
 
-	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	pub := <-a.AddPublication(TestChannel, TestStreamID)
 
 	subAndSend(1, a, pub, t)
 	subAndSend(1, a, pub, t)
@@ -244,7 +244,7 @@ func TestResubStress(t *testing.T) {
 	a := Connect(NewContext())
 	defer a.Close()
 
-	pub := <-a.AddPublication(TEST_CHANNEL, TEST_STREAMID)
+	pub := <-a.AddPublication(TestChannel, TestStreamID)
 	for i := 0; i < 100; i++ {
 		subAndSend(1, a, pub, t)
 		t.Logf("bounce %d", i)

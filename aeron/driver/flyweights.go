@@ -24,14 +24,14 @@ import (
 type SubscriberPositionFly struct {
 	flyweight.FWBase
 
-	indicatorId    flyweight.Int32Field
-	registrationId flyweight.Int64Field
+	indicatorID    flyweight.Int32Field
+	registrationID flyweight.Int64Field
 }
 
 func (m *SubscriberPositionFly) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
-	pos += m.indicatorId.Wrap(buf, pos)
-	pos += m.registrationId.Wrap(buf, pos)
+	pos += m.indicatorID.Wrap(buf, pos)
+	pos += m.registrationID.Wrap(buf, pos)
 
 	m.SetSize(pos - offset)
 	return m
@@ -56,14 +56,14 @@ func (m *ImageReadyTrailer) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 type ErrorMessage struct {
 	flyweight.FWBase
 
-	offendingCommandCorrelationId flyweight.Int64Field
+	offendingCommandCorrelationID flyweight.Int64Field
 	errorCode                     flyweight.Int32Field
 	errorMessage                  flyweight.StringField
 }
 
 func (m *ErrorMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
-	pos += m.offendingCommandCorrelationId.Wrap(buf, pos)
+	pos += m.offendingCommandCorrelationID.Wrap(buf, pos)
 	pos += m.errorCode.Wrap(buf, pos)
 	pos += m.errorMessage.Wrap(buf, pos, m)
 
@@ -74,18 +74,18 @@ func (m *ErrorMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight 
 type PublicationReady struct {
 	flyweight.FWBase
 
-	correlationId          flyweight.Int64Field
-	sessionId              flyweight.Int32Field
-	streamId               flyweight.Int32Field
+	correlationID          flyweight.Int64Field
+	sessionID              flyweight.Int32Field
+	streamID               flyweight.Int32Field
 	publicationLimitOffset flyweight.Int32Field
 	logFile                flyweight.StringField
 }
 
 func (m *PublicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
-	pos += m.correlationId.Wrap(buf, pos)
-	pos += m.sessionId.Wrap(buf, pos)
-	pos += m.streamId.Wrap(buf, pos)
+	pos += m.correlationID.Wrap(buf, pos)
+	pos += m.sessionID.Wrap(buf, pos)
+	pos += m.streamID.Wrap(buf, pos)
 	pos += m.publicationLimitOffset.Wrap(buf, pos)
 	pos += m.logFile.Wrap(buf, pos, m)
 
@@ -96,18 +96,18 @@ func (m *PublicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywei
 type ImageReadyHeader struct {
 	flyweight.FWBase
 
-	correlationId   flyweight.Int64Field
-	sessionId       flyweight.Int32Field
-	streamId        flyweight.Int32Field
+	correlationID   flyweight.Int64Field
+	sessionID       flyweight.Int32Field
+	streamID        flyweight.Int32Field
 	subsPosBlockLen flyweight.Int32Field
 	subsPosBlockCnt flyweight.Int32Field
 }
 
 func (m *ImageReadyHeader) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
-	pos += m.correlationId.Wrap(buf, pos)
-	pos += m.sessionId.Wrap(buf, pos)
-	pos += m.streamId.Wrap(buf, pos)
+	pos += m.correlationID.Wrap(buf, pos)
+	pos += m.sessionID.Wrap(buf, pos)
+	pos += m.streamID.Wrap(buf, pos)
 	pos += m.subsPosBlockLen.Wrap(buf, pos)
 	pos += m.subsPosBlockCnt.Wrap(buf, pos)
 

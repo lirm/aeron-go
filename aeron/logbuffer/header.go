@@ -24,7 +24,7 @@ import (
 type Header struct {
 	buffer              atomic.Buffer
 	offset              int32
-	initialTermId       int32
+	initialTermID       int32
 	positionBitsToShift int32
 }
 
@@ -38,8 +38,8 @@ func (hdr *Header) SetOffset(offset int32) *Header {
 	return hdr
 }
 
-func (hdr *Header) SetInitialTermId(initialTermId int32) *Header {
-	hdr.initialTermId = initialTermId
+func (hdr *Header) SetInitialTermID(initialTermID int32) *Header {
+	hdr.initialTermID = initialTermID
 	return hdr
 }
 

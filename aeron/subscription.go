@@ -25,21 +25,21 @@ type Subscription struct {
 	conductor       *ClientConductor
 	channel         string
 	roundRobinIndex int
-	registrationId  int64
-	streamId        int32
+	registrationID  int64
+	streamID        int32
 
 	images *ImageList
 
 	isClosed atomic.Bool
 }
 
-func NewSubscription(conductor *ClientConductor, channel string, registrationId int64, streamId int32) *Subscription {
+func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32) *Subscription {
 	sub := new(Subscription)
 	sub.images = NewImageList()
 	sub.conductor = conductor
 	sub.channel = channel
-	sub.registrationId = registrationId
-	sub.streamId = streamId
+	sub.registrationID = registrationID
+	sub.streamID = streamID
 	sub.roundRobinIndex = 0
 	sub.isClosed.Set(false)
 
@@ -53,7 +53,7 @@ func (sub *Subscription) IsClosed() bool {
 func (sub *Subscription) Close() error {
 	if sub.isClosed.CompareAndSet(false, true) {
 		images := sub.images.Empty()
-		<-sub.conductor.releaseSubscription(sub.registrationId, images)
+		<-sub.conductor.releaseSubscription(sub.registrationID, images)
 	}
 
 	return nil
@@ -63,10 +63,10 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 
 	img := sub.images.Get()
 	length := len(img)
-	var fragmentsRead int = 0
+	var fragmentsRead int
 
 	if length > 0 {
-		var startingIndex int = sub.roundRobinIndex
+		startingIndex := sub.roundRobinIndex
 		sub.roundRobinIndex++
 		if startingIndex >= length {
 			sub.roundRobinIndex = 0
@@ -85,10 +85,10 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 	return fragmentsRead
 }
 
-func (sub *Subscription) hasImage(sessionId int32) bool {
+func (sub *Subscription) hasImage(sessionID int32) bool {
 	img := sub.images.Get()
 	for _, image := range img {
-		if image.sessionId == sessionId {
+		if image.sessionID == sessionID {
 			return true
 		}
 	}
@@ -104,12 +104,12 @@ func (sub *Subscription) addImage(image *Image) *[]*Image {
 	return &images
 }
 
-func (sub *Subscription) removeImage(correlationId int64) *Image {
+func (sub *Subscription) removeImage(correlationID int64) *Image {
 
 	img := sub.images.Get()
 	for ix, image := range img {
-		if image.correlationId == correlationId {
-			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationId)
+		if image.correlationID == correlationID {
+			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationID)
 
 			img[ix] = img[len(img)-1]
 			img[len(img)-1] = nil
@@ -131,9 +131,9 @@ func (sub *Subscription) HasImages() bool {
 
 func IsConnectedTo(sub *Subscription, pub *Publication) bool {
 	img := sub.images.Get()
-	if sub.channel == pub.channel && sub.streamId == pub.streamId {
+	if sub.channel == pub.channel && sub.streamID == pub.streamID {
 		for _, image := range img {
-			if image.sessionId == pub.sessionId {
+			if image.sessionID == pub.sessionID {
 				return true
 			}
 		}

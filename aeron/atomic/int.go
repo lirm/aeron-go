@@ -22,12 +22,6 @@ type Int struct {
 	value int32
 }
 
-func NewInt() *Int {
-	i := new(Int)
-
-	return i
-}
-
 func (i *Int) Get() int32 {
 	return atomic.LoadInt32(&i.value)
 }

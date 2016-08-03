@@ -27,7 +27,7 @@ var logger = logging.MustGetLogger("logbuffers")
 
 type LogBuffers struct {
 	mmapFiles []*memmap.File
-	buffers   [PARTITION_COUNT + 1]atomic.Buffer
+	buffers   [PartitionCount + 1]atomic.Buffer
 }
 
 func Wrap(fileName string) *LogBuffers {
@@ -38,7 +38,7 @@ func Wrap(fileName string) *LogBuffers {
 
 	checkTermLength(termLength)
 
-	if logLength < Descriptor.MAX_SINGLE_MAPPING_SIZE {
+	if logLength < Descriptor.maxSingleMappingSize {
 		mmap, err := memmap.MapExisting(fileName, 0, 0)
 		if err != nil {
 			panic(err)
@@ -46,16 +46,16 @@ func Wrap(fileName string) *LogBuffers {
 
 		buffers.mmapFiles = [](*memmap.File){mmap}
 		basePtr := uintptr(buffers.mmapFiles[0].GetMemoryPtr())
-		for i := 0; i < PARTITION_COUNT; i++ {
+		for i := 0; i < PartitionCount; i++ {
 			ptr := unsafe.Pointer(basePtr + uintptr(int64(i)*termLength))
 			buffers.buffers[i].Wrap(ptr, int32(termLength))
 		}
 
-		ptr := unsafe.Pointer(basePtr + uintptr(logLength-int64(Descriptor.LOG_META_DATA_LENGTH)))
-		buffers.buffers[PARTITION_COUNT].Wrap(ptr, Descriptor.LOG_META_DATA_LENGTH)
+		ptr := unsafe.Pointer(basePtr + uintptr(logLength-int64(Descriptor.logMetaDataLength)))
+		buffers.buffers[PartitionCount].Wrap(ptr, Descriptor.logMetaDataLength)
 	} else {
-		buffers.mmapFiles = make([](*memmap.File), PARTITION_COUNT+1)
-		metaDataSectionOffset := termLength * int64(PARTITION_COUNT)
+		buffers.mmapFiles = make([](*memmap.File), PartitionCount+1)
+		metaDataSectionOffset := termLength * int64(PartitionCount)
 		metaDataSectionLength := int(logLength - metaDataSectionOffset)
 
 		mmap, err := memmap.MapExisting(fileName, metaDataSectionOffset, metaDataSectionLength)
@@ -64,7 +64,7 @@ func Wrap(fileName string) *LogBuffers {
 		}
 		buffers.mmapFiles = append(buffers.mmapFiles, mmap)
 
-		for i := 0; i < PARTITION_COUNT; i++ {
+		for i := 0; i < PartitionCount; i++ {
 			// one map for each term
 			mmap, err := memmap.MapExisting(fileName, int64(i)*termLength, int(termLength))
 			if err != nil {
@@ -77,15 +77,8 @@ func Wrap(fileName string) *LogBuffers {
 			buffers.buffers[i].Wrap(basePtr, int32(termLength))
 		}
 		metaDataBasePtr := buffers.mmapFiles[0].GetMemoryPtr()
-		buffers.buffers[PARTITION_COUNT].Wrap(metaDataBasePtr, Descriptor.LOG_META_DATA_LENGTH)
+		buffers.buffers[PartitionCount].Wrap(metaDataBasePtr, Descriptor.logMetaDataLength)
 	}
-
-	//log.Printf("WrapLogBuffers: activePartitionIndex:%d, initialTermId:%d, mtuLength:%d, timeOfLastStatusMessage:%d; LogBuffer: %v",
-	//	ActivePartitionIndex(&buffers.buffers[PARTITION_COUNT]),
-	//	InitialTermId(&buffers.buffers[PARTITION_COUNT]),
-	//	MtuLength(&buffers.buffers[PARTITION_COUNT]),
-	//	TimeOfLastStatusMessage(&buffers.buffers[PARTITION_COUNT]),
-	//	buffers)
 
 	return buffers
 }

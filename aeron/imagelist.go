@@ -28,7 +28,7 @@ type ImageList struct {
 func NewImageList() *ImageList {
 	list := new(ImageList)
 
-	images := make([]*Image, 0)
+	var images []*Image
 	list.img = unsafe.Pointer(&images)
 
 	return list

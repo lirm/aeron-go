@@ -17,8 +17,8 @@ limitations under the License.
 package aeron
 
 import (
-	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 type Position struct {
@@ -32,7 +32,7 @@ func NewPosition(buffer *atomic.Buffer, id int32) Position {
 
 	pos.buffer = buffer
 	pos.id = id
-	pos.offset = id * 2 * util.CACHE_LINE_LENGTH
+	pos.offset = id * 2 * util.CacheLineLength
 
 	logger.Debugf("<+ Counter[%d]: %d", id, pos.buffer.GetInt64(pos.offset))
 

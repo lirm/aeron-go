@@ -26,29 +26,29 @@ import (
 var logger = logging.MustGetLogger("counters")
 
 var ReaderConsts = struct {
-	RECORD_UNUSED    int32
-	RECORD_ALLOCATED int32
-	RECORD_RECLAIMED int32
+	RecordUnused    int32
+	RecordAllocated int32
+	RecordReclaimed int32
 
-	COUNTER_LENGTH      int32
-	METADATA_LENGTH     int32
-	KEY_OFFSET          int32
-	LABEL_LENGTH_OFFSET int32
+	CounterLen     int32
+	MetadataLen    int32
+	KeyOffset      int32
+	LabelLenOffset int32
 
-	MAX_LABEL_LENGTH int32
-	MAX_KEY_LENGTH   int32
+	MaxLabelLen int32
+	MaxKeyLen   int32
 }{
 	0,
 	1,
 	-1,
 
-	2 * util.CACHE_LINE_LENGTH,
-	4 * util.CACHE_LINE_LENGTH,
+	2 * util.CacheLineLength,
+	4 * util.CacheLineLength,
 	8,
-	2 * util.CACHE_LINE_LENGTH,
+	2 * util.CacheLineLength,
 
-	2*int32(util.CACHE_LINE_LENGTH) - 4,
-	2*int32(util.CACHE_LINE_LENGTH) - 8,
+	2*int32(util.CacheLineLength) - 4,
+	2*int32(util.CacheLineLength) - 8,
 }
 
 func MapFile(filename string) *memmap.File {
@@ -62,7 +62,7 @@ func MapFile(filename string) *memmap.File {
 	cncVer := CncVersion(cncBuffer)
 	logger.Debugf("Mapped %s for ver %d", filename, cncVer)
 
-	if Descriptor.CNC_VERSION != cncVer {
+	if Descriptor.CncVersion != cncVer {
 		log.Fatalf("aeron cnc file version not understood: version=%d", cncVer)
 	}
 

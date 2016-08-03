@@ -22,12 +22,6 @@ type Long struct {
 	value int64
 }
 
-func NewLong() *Long {
-	i := new(Long)
-
-	return i
-}
-
 func (i *Long) Get() int64 {
 	return atomic.LoadInt64(&i.value)
 }

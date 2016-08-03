@@ -43,7 +43,7 @@ func main() {
 
 	a := aeron.Connect(ctx)
 
-	publication := <-a.AddPublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamId))
+	publication := <-a.AddPublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
 	defer publication.Close()
 	log.Printf("Publication found %v", publication)
 
@@ -52,9 +52,9 @@ func main() {
 		srcBuffer := atomic.MakeBuffer(([]byte)(message))
 		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
 		switch ret {
-		case aeron.NOT_CONNECTED:
+		case aeron.NotConnected:
 			log.Printf("%d: not connected yet", counter)
-		case aeron.BACK_PRESSURED:
+		case aeron.BackPressured:
 			log.Printf("%d: back pressured", counter)
 		default:
 			if ret < 0 {

@@ -26,7 +26,7 @@ import (
 type ControlledPollFragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
 
 const (
-	IMAGE_CLOSED int = -1
+	ImageClosed int = -1
 )
 
 var ControlledPollAction = struct {
@@ -59,7 +59,7 @@ var ControlledPollAction = struct {
 }
 
 type Image struct {
-	termBuffers [logbuffer.PARTITION_COUNT]*atomic.Buffer
+	termBuffers [logbuffer.PartitionCount]*atomic.Buffer
 	header      logbuffer.Header
 
 	subscriberPosition Position
@@ -71,27 +71,27 @@ type Image struct {
 
 	exceptionHandler func(error)
 
-	correlationId              int64
-	subscriptionRegistrationId int64
-	sessionId                  int32
+	correlationID              int64
+	subscriptionRegistrationID int64
+	sessionID                  int32
 	termLengthMask             int32
 	positionBitsToShift        uint8
 }
 
-func NewImage(sessionId int32, correlationId int64, logBuffers *logbuffer.LogBuffers) *Image {
+func NewImage(sessionID int32, correlationID int64, logBuffers *logbuffer.LogBuffers) *Image {
 
 	image := new(Image)
 
-	image.correlationId = correlationId
-	image.sessionId = sessionId
+	image.correlationID = correlationID
+	image.sessionID = sessionID
 	image.logBuffers = logBuffers
-	for i := 0; i < logbuffer.PARTITION_COUNT; i++ {
+	for i := 0; i < logbuffer.PartitionCount; i++ {
 		image.termBuffers[i] = logBuffers.Buffer(i)
 	}
 	capacity := logBuffers.Buffer(0).Capacity()
 	image.termLengthMask = capacity - 1
 	image.positionBitsToShift = util.NumberOfTrailingZeroes(capacity)
-	image.header.SetInitialTermId(logbuffer.InitialTermId(logBuffers.Buffer(logbuffer.Descriptor.LOG_META_DATA_SECTION_INDEX)))
+	image.header.SetInitialTermID(logbuffer.InitialTermID(logBuffers.Buffer(logbuffer.LogMetaDataSectionIndex)))
 	image.header.SetPositionBitsToShift(int32(image.positionBitsToShift))
 	image.isClosed.Set(false)
 
@@ -104,7 +104,7 @@ func (image *Image) IsClosed() bool {
 
 func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
-	result := IMAGE_CLOSED
+	result := ImageClosed
 
 	if !image.IsClosed() {
 		position := image.subscriberPosition.get()
@@ -130,7 +130,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 }
 
 func (image Image) Close() error {
-	var err error = nil
+	var err error
 	if image.isClosed.CompareAndSet(false, true) {
 		logger.Debugf("Closing %v", image)
 		err = image.logBuffers.Close()

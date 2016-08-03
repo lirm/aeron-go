@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	TRUE  int32 = 1
-	FALSE int32 = 0
+	True  int32 = 1
+	False int32 = 0
 )
 
 type Bool struct {
@@ -31,36 +31,35 @@ type Bool struct {
 
 func NewBool(val bool) *Bool {
 	if val {
-		return &Bool{val: TRUE}
-	} else {
-		return &Bool{val: FALSE}
+		return &Bool{val: True}
 	}
+	return &Bool{val: False}
 }
 
 func (b *Bool) Get() bool {
-	return atomic.LoadInt32(&b.val) == TRUE
+	return atomic.LoadInt32(&b.val) == True
 }
 
 func (b *Bool) Set(val bool) {
 	if val {
-		atomic.StoreInt32(&b.val, TRUE)
+		atomic.StoreInt32(&b.val, True)
 	} else {
-		atomic.StoreInt32(&b.val, FALSE)
+		atomic.StoreInt32(&b.val, False)
 	}
 }
 
 func (b *Bool) CompareAndSet(oldVal, newVal bool) bool {
 	var old, newer int32
 	if oldVal {
-		old = TRUE
+		old = True
 	} else {
-		old = FALSE
+		old = False
 	}
 
 	if newVal {
-		newer = TRUE
+		newer = True
 	} else {
-		newer = FALSE
+		newer = False
 	}
 
 	return atomic.CompareAndSwapInt32(&b.val, old, newer)

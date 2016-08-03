@@ -22,14 +22,14 @@ import (
 )
 
 var RecordDescriptor = struct {
-	HEADER_LENGTH       int32
-	RECORD_ALIGNMENT    int32
-	PADDING_MSG_TYPE_ID int32
-	LENGTH_OFFSET       int32
-	TYPE_OFFSET         int32
+	HeaderLength     int32
+	RecordAlignment  int32
+	PaddingMsgTypeID int32
+	LengthOffset     int32
+	TypeOffset       int32
 }{
-	util.SIZEOF_INT32 * 2,
-	util.SIZEOF_INT32 * 2,
+	util.SizeOfInt32 * 2,
+	util.SizeOfInt32 * 2,
 	-1,
 	0,
 	4,
@@ -40,19 +40,19 @@ func LengthOffset(recordOffset int32) int32 {
 }
 
 func TypeOffset(recordOffset int32) int32 {
-	return recordOffset + util.SIZEOF_INT32
+	return recordOffset + util.SizeOfInt32
 }
 
 func EncodedMsgOffset(recordOffset int32) int32 {
-	return recordOffset + RecordDescriptor.HEADER_LENGTH
+	return recordOffset + RecordDescriptor.HeaderLength
 }
 
-func MakeHeader(length, msgTypeId int32) int64 {
-	return ((int64(msgTypeId) & 0xFFFFFFFF) << 32) | (int64(length) & 0xFFFFFFFF)
+func MakeHeader(length, msgTypeID int32) int64 {
+	return ((int64(msgTypeID) & 0xFFFFFFFF) << 32) | (int64(length) & 0xFFFFFFFF)
 }
 
-func CheckMsgTypeId(msgTypeId int32) {
-	if msgTypeId < 1 {
-		panic(fmt.Sprintf("Message type id must be greater than zero, msgTypeId=%d", msgTypeId))
+func CheckMsgTypeID(msgTypeID int32) {
+	if msgTypeID < 1 {
+		panic(fmt.Sprintf("Message type id must be greater than zero, msgTypeId=%d", msgTypeID))
 	}
 }

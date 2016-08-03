@@ -17,8 +17,8 @@ limitations under the License.
 package logbuffer
 
 import (
-	"unsafe"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"unsafe"
 )
 
 type Claim struct {

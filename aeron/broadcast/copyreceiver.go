@@ -53,23 +53,14 @@ func (bcast *CopyReceiver) Receive(handler Handler) int {
 			panic(fmt.Sprintf("Buffer required size %d but only has %d", length, bcast.scratchBuffer.Capacity()))
 		}
 
-		msgTypeId := bcast.receiver.typeId()
+		msgTypeID := bcast.receiver.typeID()
 		bcast.scratchBuffer.PutBytes(0, bcast.receiver.buffer, bcast.receiver.offset(), length)
 
 		if !bcast.receiver.Validate() {
 			panic("Unable to keep up with broadcast buffer")
 		}
 
-		// DEBUG
-		// fmt.Printf("CopyBroadcastReceiver.Receive: ")
-		// bytes := bcast.scratchBuffer.GetBytesArray(0, length)
-		// for i := 0; i < int(length); i++ {
-		// 	fmt.Printf("%x ", bytes[i])
-		// }
-		// fmt.Printf("\n")
-		// END DEBUG
-
-		handler(msgTypeId, bcast.scratchBuffer, 0, length)
+		handler(msgTypeID, bcast.scratchBuffer, 0, length)
 
 		messagesReceived = 1
 	}

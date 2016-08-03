@@ -17,14 +17,14 @@ limitations under the License.
 package aeron
 
 import (
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
+	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
 	"time"
-	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 type NewPublicationHandler func(string, int32, int32, int64)
@@ -94,14 +94,14 @@ func (aeron *Aeron) Close() error {
 	return err
 }
 
-func (aeron *Aeron) AddSubscription(channel string, streamId int32) chan *Subscription {
+func (aeron *Aeron) AddSubscription(channel string, streamID int32) chan *Subscription {
 	ch := make(chan *Subscription, 1)
 
-	regId := aeron.conductor.AddSubscription(channel, streamId)
+	regID := aeron.conductor.AddSubscription(channel, streamID)
 	go func() {
-		subscription := aeron.conductor.FindSubscription(regId)
+		subscription := aeron.conductor.FindSubscription(regID)
 		for subscription == nil {
-			subscription = aeron.conductor.FindSubscription(regId)
+			subscription = aeron.conductor.FindSubscription(regID)
 			if subscription == nil {
 				aeron.context.idleStrategy.Idle(0)
 			}
@@ -113,14 +113,14 @@ func (aeron *Aeron) AddSubscription(channel string, streamId int32) chan *Subscr
 	return ch
 }
 
-func (aeron *Aeron) AddPublication(channel string, streamId int32) chan *Publication {
+func (aeron *Aeron) AddPublication(channel string, streamID int32) chan *Publication {
 	ch := make(chan *Publication, 1)
 
-	regId := aeron.conductor.AddPublication(channel, streamId)
+	regID := aeron.conductor.AddPublication(channel, streamID)
 	go func() {
-		publication := aeron.conductor.FindPublication(regId)
+		publication := aeron.conductor.FindPublication(regID)
 		for publication == nil {
-			publication = aeron.conductor.FindPublication(regId)
+			publication = aeron.conductor.FindPublication(regID)
 			if publication == nil {
 				aeron.context.idleStrategy.Idle(0)
 			}
