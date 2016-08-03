@@ -54,7 +54,7 @@ func NewContext() *Context {
 	ctx.availableImageHandler = func(*Image) {}
 	ctx.unavailableImageHandler = func(*Image) {}
 
-	ctx.mediaDriverTo = time.Second
+	ctx.mediaDriverTo = time.Second * 5
 	ctx.resourceLingerTo = time.Second * 3
 	ctx.publicationConnectionTo = time.Second * 5
 	ctx.interServiceTo = time.Second * 10
