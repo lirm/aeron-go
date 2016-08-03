@@ -17,10 +17,10 @@ limitations under the License.
 package aeron
 
 import (
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -52,13 +52,13 @@ func receive(n int, sub *Subscription, t *testing.T) {
 	handler := func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header) {
 		counter++
 	}
-	var fragmentsRead int32 = 0
+	var fragmentsRead atomic.Int
 	for i := 0; i < n; i++ {
 		timeoutAt := time.Now().Add(time.Second)
 		for {
 			recvd := sub.Poll(handler, 10)
 			if recvd == 1 {
-				atomic.AddInt32(&fragmentsRead, int32(recvd))
+				fragmentsRead.Add(int32(recvd))
 				t.Logf("  have %d fragments", fragmentsRead)
 				break
 			}
@@ -69,7 +69,7 @@ func receive(n int, sub *Subscription, t *testing.T) {
 			time.Sleep(time.Millisecond)
 		}
 	}
-	if int(fragmentsRead) != n {
+	if int(fragmentsRead.Get()) != n {
 		t.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
 	}
 	if counter != n {
@@ -186,13 +186,13 @@ func TestAeronSendMultiplePublications(t *testing.T) {
 		handler := func(buffer *buffer.Atomic, offset int32, length int32, header *logbuffer.Header) {
 			counter++
 		}
-		var fragmentsRead int32 = 0
+		var fragmentsRead atomic.Int
 		for i := 0; i < n; i++ {
 			timeoutAt := time.Now().Add(time.Second)
 			for {
 				recvd := sub.Poll(handler, 10)
 				if recvd == 1 {
-					atomic.AddInt32(&fragmentsRead, int32(recvd))
+					fragmentsRead.Add(int32(recvd))
 					t.Logf("  have %d fragments", fragmentsRead)
 					break
 				}
@@ -203,7 +203,7 @@ func TestAeronSendMultiplePublications(t *testing.T) {
 				time.Sleep(time.Millisecond)
 			}
 		}
-		if int(fragmentsRead) != n {
+		if int(fragmentsRead.Get()) != n {
 			t.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
 		}
 		if counter != n {

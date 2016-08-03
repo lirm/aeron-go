@@ -17,10 +17,10 @@ limitations under the License.
 package broadcast
 
 import (
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/buffer"
 	"github.com/lirm/aeron-go/aeron/buffer/rb"
 	"github.com/lirm/aeron-go/aeron/util"
-	"sync/atomic"
 )
 
 type Receiver struct {
@@ -35,7 +35,7 @@ type Receiver struct {
 	cursor       int64
 	nextRecord   int64
 
-	lappedCount int64
+	lappedCount atomic.Long
 }
 
 func NewReceiver(buffer *buffer.Atomic) *Receiver {
@@ -46,7 +46,7 @@ func NewReceiver(buffer *buffer.Atomic) *Receiver {
 	recv.tailIntentCounterIndex = recv.capacity + BufferDescriptor.TAIL_INTENT_COUNTER_OFFSET
 	recv.tailCounterIndex = recv.capacity + BufferDescriptor.TAIL_COUNTER_OFFSET
 	recv.latestCounterIndex = recv.capacity + BufferDescriptor.LATEST_COUNTER_OFFSET
-	recv.lappedCount = 0
+	recv.lappedCount.Set(0)
 
 	CheckCapacity(recv.capacity)
 
@@ -62,7 +62,7 @@ func (recv *Receiver) validate(cursor int64) bool {
 }
 
 func (recv *Receiver) GetLappedCount() int64 {
-	return atomic.LoadInt64(&recv.lappedCount)
+	return recv.lappedCount.Get()
 }
 
 func (recv *Receiver) typeId() int32 {
@@ -87,7 +87,7 @@ func (recv *Receiver) receiveNext() bool {
 		recordOffset := int32(cursor & recv.mask)
 
 		if !recv.validate(cursor) {
-			atomic.AddInt64(&recv.lappedCount, 1)
+			recv.lappedCount.Inc()
 			cursor = recv.buffer.GetInt64(recv.latestCounterIndex)
 			recordOffset = int32(cursor & recv.mask)
 		}
