@@ -17,7 +17,7 @@ limitations under the License.
 package flyweight
 
 import (
-	"github.com/lirm/aeron-go/aeron/ringbuffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"testing"
 )
 

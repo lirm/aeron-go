@@ -18,14 +18,14 @@ package memmap
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/ringbuffer"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"testing"
 )
 
 var MMAP string = "mmap.bin"
 
 func TestMmapBasics(t *testing.T) {
-	t.Logf("Beginning test")
+	t.Log("Beginning test")
 	mmap, err := New(MMAP, 0, 8000)
 	defer mmap.Close()
 	// t.Logf("mmap: %v, len:%d, err:%v", mmap.GetMemoryPtr(), mmap.GetMemorySize(), err)
