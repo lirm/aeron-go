@@ -58,7 +58,7 @@ func Connect(ctx *Context) *Aeron {
 	aeron.context = ctx
 	logger.Debugf("Connecting with context: %v", ctx)
 
-	aeron.cncBuffer = counters.MapFile(ctx.cncFileName())
+	aeron.cncBuffer = counters.MapFile(ctx.CncFileName())
 
 	aeron.toDriverAtomicBuffer = counters.CreateToDriverBuffer(aeron.cncBuffer)
 	aeron.toClientsAtomicBuffer = counters.CreateToClientsBuffer(aeron.cncBuffer)

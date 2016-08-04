@@ -46,6 +46,9 @@ func TestMakeAtomicBuffer(t *testing.T) {
 
 	b = MakeBuffer(unsafe.Pointer(&arr[0]), 64)
 	t.Logf("buf: %v", b)
+
+	b = MakeBuffer(uintptr(unsafe.Pointer(&arr[0])), 64)
+	t.Logf("buf: %v", b)
 }
 
 func TestInit(t *testing.T) {

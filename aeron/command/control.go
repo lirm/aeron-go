@@ -19,14 +19,14 @@ package command
 const (
 	// Clients to Media Driver
 
-	/** Add Publication */
+	// AddPublication command from client
 	AddPublication int32 = 0x01
-	/** Remove Publication */
+	// RemovePublication command from client
 	RemovePublication int32 = 0x02
-	/** Add Subscriber */
+	// AddSubscription command from client
 	AddSubscription int32 = 0x04
-	/** Remove Subscriber */
+	// RemoveSubscription command from client
 	RemoveSubscription int32 = 0x05
-	/** Keepalive from Client */
+	// ClientKeepalive message from client */
 	ClientKeepalive int32 = 0x06
 )

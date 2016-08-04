@@ -21,7 +21,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 	"math"
-	"unsafe"
 )
 
 const (
@@ -47,7 +46,7 @@ func (header *HeaderWriter) write(termBuffer *atomic.Buffer, offset, length, ter
 	termBuffer.PutInt32Ordered(offset, -length)
 
 	headerPtr := uintptr(termBuffer.Ptr()) + uintptr(offset)
-	headerBuffer := atomic.MakeBuffer(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.Length)
+	headerBuffer := atomic.MakeBuffer(headerPtr, logbuffer.DataFrameHeader.Length)
 
 	headerBuffer.PutInt8(logbuffer.DataFrameHeader.VersionFieldOffset, logbuffer.DataFrameHeader.CurrentVersion)
 	headerBuffer.PutUInt8(logbuffer.DataFrameHeader.FlagsFieldOffset, logbuffer.FrameDescriptor.BeginFrag|logbuffer.FrameDescriptor.EndFrag)

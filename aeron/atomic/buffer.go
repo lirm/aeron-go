@@ -30,13 +30,12 @@ type Buffer struct {
 	length    int32
 }
 
-/*
-	Options for calling
-		MakeAtomicBuffer(Pointer)
-		MakeAtomicBuffer([]byte)
-		MakeAtomicBuffer(Pointer, len)
-		MakeAtomicBuffer([]byte, len)
-*/
+// MakeBuffer takes a variety of argument options and returns a new atomic.Buffer to the best of its ability
+//	Options for calling
+//		MakeAtomicBuffer(Pointer)
+//		MakeAtomicBuffer([]byte)
+//		MakeAtomicBuffer(Pointer, len)
+//		MakeAtomicBuffer([]byte, len)
 func MakeBuffer(args ...interface{}) *Buffer {
 	var bufPtr unsafe.Pointer
 	var bufLen int32
@@ -60,7 +59,12 @@ func MakeBuffer(args ...interface{}) *Buffer {
 			t := reflect.TypeOf(int32(0))
 			bufLen = int32(v.Convert(t).Int())
 		}
+
+		// pointer
 		switch reflect.TypeOf(args[0]) {
+		case reflect.TypeOf(uintptr(0)):
+			bufPtr = unsafe.Pointer(args[0].(uintptr))
+
 		case reflect.TypeOf(unsafe.Pointer(nil)):
 			bufPtr = unsafe.Pointer(args[0].(unsafe.Pointer))
 

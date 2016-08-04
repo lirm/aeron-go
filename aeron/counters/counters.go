@@ -62,7 +62,7 @@ func MapFile(filename string) *memmap.File {
 	cncVer := CncVersion(cncBuffer)
 	logger.Debugf("Mapped %s for ver %d", filename, cncVer)
 
-	if Descriptor.CncVersion != cncVer {
+	if CurrentCncVersion != cncVer {
 		log.Fatalf("aeron cnc file version not understood: version=%d", cncVer)
 	}
 

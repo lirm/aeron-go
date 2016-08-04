@@ -106,12 +106,12 @@ func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
 	return ctx
 }
 
-func (ctx *Context) cncFileName() string {
+func (ctx *Context) CncFileName() string {
 	user, err := user.Current()
 	uName := "unknown"
 	if err != nil {
 		logger.Warningf("Failed to get current user name: %v", err)
 	}
 	uName = user.Username
-	return ctx.aeronDir + "/aeron-" + uName + "/" + counters.Descriptor.CncFile
+	return ctx.aeronDir + "/aeron-" + uName + "/" + counters.CncFile
 }

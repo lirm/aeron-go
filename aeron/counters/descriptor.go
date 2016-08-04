@@ -18,123 +18,113 @@ package counters
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/flyweight"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"unsafe"
 )
 
-var Descriptor = struct {
-	CncFile               string
-	CncVersion            int32
-	VersionAndMetaDataLen int
-}{
-	"cnc.dat",
-	5,
-	int(util.CacheLineLength * 2),
+const (
+	CncFile           string = "cnc.dat"
+	CurrentCncVersion int32  = 5
+)
+
+type MetaDataFlyweight struct {
+	flyweight.FWBase
+
+	cncVersion flyweight.Int32Field
+
+	driverBufLen     flyweight.Int32Field
+	clientBufLen     flyweight.Int32Field
+	metadataBuLen    flyweight.Int32Field
+	valuesBufLen     flyweight.Int32Field
+	clientLivenessTo flyweight.Int64Field
+	errorLogLen      flyweight.Int32Field
+
+	toDriverBuf  flyweight.RawDataField
+	toClientsBuf flyweight.RawDataField
+	metadataBuf  flyweight.RawDataField
+	valuesBuf    flyweight.RawDataField
+	errorBuf     flyweight.RawDataField
 }
 
-var MetadataOffsets = struct {
-	cncVersion     uintptr
-	driverBufLen   uintptr
-	clientsBufLen  uintptr
-	metaDataBufLen uintptr
-	valuesBufLen   uintptr
-	livelinessTo   uintptr
-	errorLogBufLen uintptr
-}{
-	0,
-	4,
-	8,
-	12,
-	16,
-	20,
-	28,
-}
+func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.cncVersion.Wrap(buf, pos)
+	pos += m.driverBufLen.Wrap(buf, pos)
+	pos += m.clientBufLen.Wrap(buf, pos)
+	pos += m.metadataBuLen.Wrap(buf, pos)
+	pos += m.valuesBufLen.Wrap(buf, pos)
+	pos += m.clientLivenessTo.Wrap(buf, pos)
+	pos += m.errorLogLen.Wrap(buf, pos)
 
-type MetaDataDefn struct {
-	cncVersion                  int32
-	toDriverBufferLength        int32
-	toClientsBufferLength       int32
-	counterMetadataBufferLength int32
-	counterValuesBufferLength   int32
-	clientLivenessTimeout       int64
-	errorLogBufferLength        int32
+	pos = int(util.AlignInt32(int32(pos), util.CacheLineLength*2))
+
+	pos += m.toDriverBuf.Wrap(buf, pos, m.driverBufLen.Get())
+	pos += m.toClientsBuf.Wrap(buf, pos, m.clientBufLen.Get())
+	pos += m.metadataBuf.Wrap(buf, pos, m.metadataBuLen.Get())
+	pos += m.valuesBuf.Wrap(buf, pos, m.valuesBufLen.Get())
+	pos += m.errorBuf.Wrap(buf, pos, m.errorLogLen.Get())
+
+	m.SetSize(pos - offset)
+	return m
 }
 
 func CreateToDriverBuffer(cncFile *memmap.File) *atomic.Buffer {
 
-	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.driverBufLen)
+	cncBuffer := atomic.MakeBuffer(cncFile.GetMemoryPtr(), cncFile.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
 
-	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VersionAndMetaDataLen)
-
-	return atomic.MakeBuffer(unsafe.Pointer(ptr), toDriverBufferLength)
+	return meta.toDriverBuf.Get()
 }
 
 func CreateToClientsBuffer(cncFile *memmap.File) *atomic.Buffer {
-	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
-	// log.Printf("createToClientsBuffer: MetaData: %v\n", metaData)
 
-	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.driverBufLen)
-	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VersionAndMetaDataLen) + uintptr(toDriverBufferLength)
+	cncBuffer := atomic.MakeBuffer(cncFile.GetMemoryPtr(), cncFile.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
 
-	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.toClientsBufferLength)
+	return meta.toClientsBuf.Get()
 }
 
 func CreateCounterMetadataBuffer(cncFile *memmap.File) *atomic.Buffer {
-	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
-	// log.Printf("createCounterMetadataBuffer: MetaData: %v\n", metaData)
 
-	ptr := uintptr(cncFile.GetMemoryPtr()) + uintptr(Descriptor.VersionAndMetaDataLen) + uintptr(metaData.toDriverBufferLength) + uintptr(metaData.toClientsBufferLength)
+	cncBuffer := atomic.MakeBuffer(cncFile.GetMemoryPtr(), cncFile.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
 
-	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.counterMetadataBufferLength)
+	return meta.metadataBuf.Get()
 }
 
 func CreateCounterValuesBuffer(cncFile *memmap.File) *atomic.Buffer {
-	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
-	// log.Printf("createCounterValuesBuffer: MetaData: %v\n", metaData)
 
-	ptr := uintptr(cncFile.GetMemoryPtr()) +
-		uintptr(Descriptor.VersionAndMetaDataLen) +
-		uintptr(metaData.toDriverBufferLength) +
-		uintptr(metaData.toClientsBufferLength) +
-		uintptr(metaData.counterMetadataBufferLength)
+	cncBuffer := atomic.MakeBuffer(cncFile.GetMemoryPtr(), cncFile.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
 
-	return atomic.MakeBuffer(unsafe.Pointer(ptr), metaData.counterValuesBufferLength)
+	return meta.valuesBuf.Get()
 }
 
 func CreateErrorLogBuffer(cncFile *memmap.File) *atomic.Buffer {
-	// metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
-	// log.Printf("createErrorLogBuffer: MetaData: %v\n", metaData)
+	cncBuffer := atomic.MakeBuffer(cncFile.GetMemoryPtr(), cncFile.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
 
-	toDriverBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.driverBufLen)
-	toClientsBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.clientsBufLen)
-	counterMetadataBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.metaDataBufLen)
-	counterValuesBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.valuesBufLen)
-	errorLogBufferLength := readInt32FromPointer(cncFile.GetMemoryPtr(), MetadataOffsets.errorLogBufLen)
-
-	ptr := uintptr(cncFile.GetMemoryPtr()) +
-		uintptr(Descriptor.VersionAndMetaDataLen) +
-		uintptr(toDriverBufferLength) +
-		uintptr(toClientsBufferLength) +
-		uintptr(counterMetadataBufferLength) +
-		uintptr(counterValuesBufferLength)
-
-	return atomic.MakeBuffer(unsafe.Pointer(ptr), errorLogBufferLength)
+	return meta.errorBuf.Get()
 }
 
 func CncVersion(cncFile *memmap.File) int32 {
-	metaData := (*MetaDataDefn)(cncFile.GetMemoryPtr())
+	cncBuffer := atomic.MakeBuffer(cncFile.GetMemoryPtr(), cncFile.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
 
-	return metaData.cncVersion
+	return meta.cncVersion.Get()
 }
 
 func ClientLivenessTimeout(cncFile *memmap.File) int64 {
-	ptr := uintptr(cncFile.GetMemoryPtr()) + MetadataOffsets.livelinessTo
+	cncBuffer := atomic.MakeBuffer(cncFile.GetMemoryPtr(), cncFile.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
 
-	return *(*int64)(unsafe.Pointer(ptr))
-}
-
-func readInt32FromPointer(basePtr unsafe.Pointer, offset uintptr) int32 {
-	ptr := uintptr(basePtr) + offset
-	return *(*int32)(unsafe.Pointer(ptr))
+	return meta.clientLivenessTo.Get()
 }

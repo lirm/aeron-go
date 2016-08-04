@@ -111,3 +111,18 @@ func (fld *StringField) Set(value string) {
 	size += int(length)
 	fld.fly.SetSize(size)
 }
+
+type RawDataField struct {
+	buf atomic.Buffer
+}
+
+func (f *RawDataField) Wrap(buffer *atomic.Buffer, offset int, length int32) int {
+	ptr := uintptr(buffer.Ptr()) + uintptr(offset)
+	f.buf.Wrap(unsafe.Pointer(ptr), length)
+
+	return int(length)
+}
+
+func (f *RawDataField) Get() *atomic.Buffer {
+	return &f.buf
+}

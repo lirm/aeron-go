@@ -18,7 +18,6 @@ package logbuffer
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"unsafe"
 )
 
 var FrameDescriptor = struct {
@@ -82,7 +81,7 @@ func FrameFlags(logBuffer *atomic.Buffer, frameOffset int32, flags uint8) {
 }
 
 func DefaultFrameHeader(logMetaDataBuffer *atomic.Buffer) *atomic.Buffer {
-	headerPtr := unsafe.Pointer(uintptr(logMetaDataBuffer.Ptr()) + Descriptor.logDefaultFrameHeaderOffset)
+	headerPtr := uintptr(logMetaDataBuffer.Ptr()) + Descriptor.logDefaultFrameHeaderOffset
 
 	return atomic.MakeBuffer(headerPtr, DataFrameHeader.Length)
 }
