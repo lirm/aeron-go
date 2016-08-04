@@ -17,7 +17,6 @@ limitations under the License.
 package aeron
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
@@ -41,11 +40,8 @@ type Aeron struct {
 	toDriverRingBuffer rb.ManyToOne
 	driverProxy        driver.Proxy
 
-	toDriverAtomicBuffer  *atomic.Buffer
-	toClientsAtomicBuffer *atomic.Buffer
-	counterValuesBuffer   *atomic.Buffer
-
-	cncBuffer *memmap.File
+	counters *counters.MetaDataFlyweight
+	cncFile  *memmap.File
 
 	toClientsBroadcastReceiver *broadcast.Receiver
 	toClientsCopyReceiver      *broadcast.CopyReceiver
@@ -58,25 +54,21 @@ func Connect(ctx *Context) *Aeron {
 	aeron.context = ctx
 	logger.Debugf("Connecting with context: %v", ctx)
 
-	aeron.cncBuffer = counters.MapFile(ctx.CncFileName())
+	aeron.counters, aeron.cncFile = counters.MapFile(ctx.CncFileName())
 
-	aeron.toDriverAtomicBuffer = counters.CreateToDriverBuffer(aeron.cncBuffer)
-	aeron.toClientsAtomicBuffer = counters.CreateToClientsBuffer(aeron.cncBuffer)
-	aeron.counterValuesBuffer = counters.CreateCounterValuesBuffer(aeron.cncBuffer)
-
-	aeron.toDriverRingBuffer.Init(aeron.toDriverAtomicBuffer)
+	aeron.toDriverRingBuffer.Init(aeron.counters.ToDriverBuf.Get())
 
 	aeron.driverProxy.Init(&aeron.toDriverRingBuffer)
 
-	aeron.toClientsBroadcastReceiver = broadcast.NewReceiver(aeron.toClientsAtomicBuffer)
+	aeron.toClientsBroadcastReceiver = broadcast.NewReceiver(aeron.counters.ToClientsBuf.Get())
 
 	aeron.toClientsCopyReceiver = broadcast.NewCopyReceiver(aeron.toClientsBroadcastReceiver)
 
-	clientLivenessTo := time.Duration(counters.ClientLivenessTimeout(aeron.cncBuffer))
+	clientLivenessTo := time.Duration(aeron.counters.ClientLivenessTo.Get())
 
 	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTo, ctx.mediaDriverTo,
 		ctx.publicationConnectionTo, ctx.resourceLingerTo)
-	aeron.conductor.counterValuesBuffer = aeron.counterValuesBuffer
+	aeron.conductor.counterValuesBuffer = aeron.counters.ValuesBuf.Get()
 
 	aeron.conductor.onAvailableImageHandler = ctx.availableImageHandler
 	aeron.conductor.onUnavailableImageHandler = ctx.unavailableImageHandler
@@ -89,7 +81,7 @@ func Connect(ctx *Context) *Aeron {
 func (aeron *Aeron) Close() error {
 	err := aeron.conductor.Close()
 
-	err = aeron.cncBuffer.Close()
+	err = aeron.cncFile.Close()
 
 	return err
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package counters
 
 import (
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/flyweight"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
@@ -25,46 +27,70 @@ import (
 
 var logger = logging.MustGetLogger("counters")
 
-var ReaderConsts = struct {
-	RecordUnused    int32
-	RecordAllocated int32
-	RecordReclaimed int32
+const (
+	CncFile           string = "cnc.dat"
+	CurrentCncVersion int32  = 5
+)
 
-	CounterLen     int32
-	MetadataLen    int32
-	KeyOffset      int32
-	LabelLenOffset int32
+type MetaDataFlyweight struct {
+	flyweight.FWBase
 
-	MaxLabelLen int32
-	MaxKeyLen   int32
-}{
-	0,
-	1,
-	-1,
+	CncVersion flyweight.Int32Field
 
-	2 * util.CacheLineLength,
-	4 * util.CacheLineLength,
-	8,
-	2 * util.CacheLineLength,
+	toDriverBufLen   flyweight.Int32Field
+	toClientBufLen   flyweight.Int32Field
+	metadataBuLen    flyweight.Int32Field
+	valuesBufLen     flyweight.Int32Field
+	ClientLivenessTo flyweight.Int64Field
+	errorLogLen      flyweight.Int32Field
 
-	2*int32(util.CacheLineLength) - 4,
-	2*int32(util.CacheLineLength) - 8,
+	ToDriverBuf  flyweight.RawDataField
+	ToClientsBuf flyweight.RawDataField
+	MetaDataBuf  flyweight.RawDataField
+	ValuesBuf    flyweight.RawDataField
+	ErrorBuf     flyweight.RawDataField
 }
 
-func MapFile(filename string) *memmap.File {
+func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.CncVersion.Wrap(buf, pos)
+	pos += m.toDriverBufLen.Wrap(buf, pos)
+	pos += m.toClientBufLen.Wrap(buf, pos)
+	pos += m.metadataBuLen.Wrap(buf, pos)
+	pos += m.valuesBufLen.Wrap(buf, pos)
+	pos += m.ClientLivenessTo.Wrap(buf, pos)
+	pos += m.errorLogLen.Wrap(buf, pos)
+
+	pos = int(util.AlignInt32(int32(pos), util.CacheLineLength*2))
+
+	pos += m.ToDriverBuf.Wrap(buf, pos, m.toDriverBufLen.Get())
+	pos += m.ToClientsBuf.Wrap(buf, pos, m.toClientBufLen.Get())
+	pos += m.MetaDataBuf.Wrap(buf, pos, m.metadataBuLen.Get())
+	pos += m.ValuesBuf.Wrap(buf, pos, m.valuesBufLen.Get())
+	pos += m.ErrorBuf.Wrap(buf, pos, m.errorLogLen.Get())
+
+	m.SetSize(pos - offset)
+	return m
+}
+
+func MapFile(filename string) (*MetaDataFlyweight, *memmap.File) {
 
 	logger.Debugf("Trying to map file: %s", filename)
-	cncBuffer, err := memmap.MapExisting(filename, 0, 0)
+	cncMap, err := memmap.MapExisting(filename, 0, 0)
 	if err != nil {
 		log.Fatalf("Failed to map the file %s with %s", filename, err.Error())
 	}
 
-	cncVer := CncVersion(cncBuffer)
+	cncBuffer := atomic.MakeBuffer(cncMap.GetMemoryPtr(), cncMap.GetMemorySize())
+	var meta MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
+
+	cncVer := meta.CncVersion.Get()
 	logger.Debugf("Mapped %s for ver %d", filename, cncVer)
 
 	if CurrentCncVersion != cncVer {
 		log.Fatalf("aeron cnc file version not understood: version=%d", cncVer)
 	}
 
-	return cncBuffer
+	return &meta, cncMap
 }

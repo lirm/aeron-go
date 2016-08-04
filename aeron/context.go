@@ -23,9 +23,7 @@ import (
 	"time"
 )
 
-/*
- * Context configuration options are located here https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
- */
+// Context configuration options are located here https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
 type Context struct {
 	aeronDir      string // aeron.dir
 	mediaDriverTo time.Duration
@@ -44,6 +42,7 @@ type Context struct {
 	idleStrategy idlestrategy.Idler
 }
 
+// NewContext creates and initializes new Context for Aeron
 func NewContext() *Context {
 	ctx := new(Context)
 
@@ -66,16 +65,19 @@ func NewContext() *Context {
 	return ctx
 }
 
+// ErrorHandler sets the error handler callback
 func (ctx *Context) ErrorHandler(handler func(error)) *Context {
 	ctx.errorHandler = handler
 	return ctx
 }
 
+// AeronDir sets the root directory for media driver files
 func (ctx *Context) AeronDir(dir string) *Context {
 	ctx.aeronDir = dir
 	return ctx
 }
 
+// MediaDriverTimeout sets the timeout for keep alives to media driver
 func (ctx *Context) MediaDriverTimeout(to time.Duration) *Context {
 	ctx.mediaDriverTo = to
 	return ctx

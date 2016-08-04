@@ -18,13 +18,10 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
-	"reflect"
 	"testing"
 	"time"
-	"unsafe"
 )
 
 const (
@@ -262,24 +259,4 @@ func TestAeronClose(t *testing.T) {
 	ctx := NewContext().MediaDriverTimeout(time.Second * 5)
 	a := Connect(ctx)
 	a.Close()
-}
-
-func TestCncFile(t *testing.T) {
-
-	logtest(false)
-	ctx := NewContext()
-	p := uintptr(unsafe.Pointer(ctx))
-	logger.Debugf("v: %v %v", p, reflect.TypeOf(p))
-
-	mmap := counters.MapFile(ctx.CncFileName())
-	defer mmap.Close()
-
-	driverBuf := counters.CreateToDriverBuffer(mmap)
-	t.Logf("got driver buffer: %v", driverBuf)
-
-	cncBuffer := atomic.MakeBuffer(mmap.GetMemoryPtr(), mmap.GetMemorySize())
-	var meta counters.MetaDataFlyweight
-	meta.Wrap(cncBuffer, 0)
-
-	t.Logf("META: %v", meta)
 }
