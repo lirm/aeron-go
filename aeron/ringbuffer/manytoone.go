@@ -72,24 +72,20 @@ func (buf *ManyToOne) NextCorrelationID() int64 {
 	return buf.buffer.GetAndAddInt64(buf.correlationIDCounterIndex, 1)
 }
 
-func (buf *ManyToOne) SetConsumerHeartbeatTime(time int64) {
-	buf.buffer.PutInt64Ordered(buf.consumerHeartbeatIndex, time)
-}
-
 func (buf *ManyToOne) ConsumerHeartbeatTime() int64 {
 	return buf.buffer.GetInt64Volatile(buf.consumerHeartbeatIndex)
 }
 
-func (buf *ManyToOne) ProducerPosition() int64 {
+func (buf *ManyToOne) setConsumerHeartbeatTime(time int64) {
+	buf.buffer.PutInt64Ordered(buf.consumerHeartbeatIndex, time)
+}
+
+func (buf *ManyToOne) producerPosition() int64 {
 	return buf.buffer.GetInt64Volatile(buf.tailPositionIndex)
 }
 
-func (buf *ManyToOne) ConsumerPosition() int64 {
+func (buf *ManyToOne) consumerPosition() int64 {
 	return buf.buffer.GetInt64Volatile(buf.headPositionIndex)
-}
-
-func (buf *ManyToOne) Capacity() int32 {
-	return buf.capacity
 }
 
 func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
@@ -138,7 +134,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 	}
 
 	if 0 != padding {
-		buf.buffer.PutInt64Ordered(tailIndex, MakeHeader(int32(padding), RecordDescriptor.PaddingMsgTypeID))
+		buf.buffer.PutInt64Ordered(tailIndex, makeHeader(int32(padding), RecordDescriptor.PaddingMsgTypeID))
 		tailIndex = 0
 	}
 
@@ -155,7 +151,7 @@ func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex 
 
 	isSuccessful := false
 
-	CheckMsgTypeID(msgTypeID)
+	checkMsgTypeID(msgTypeID)
 	buf.checkMsgLength(length)
 
 	recordLength := length + RecordDescriptor.HeaderLength
@@ -163,7 +159,7 @@ func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex 
 	recordIndex := buf.claimCapacity(requiredCapacity)
 
 	if InsufficientCapacity != recordIndex {
-		buf.buffer.PutInt64Ordered(recordIndex, MakeHeader(-recordLength, msgTypeID))
+		buf.buffer.PutInt64Ordered(recordIndex, makeHeader(-recordLength, msgTypeID))
 		buf.buffer.PutBytes(EncodedMsgOffset(recordIndex), srcBuffer, srcIndex, length)
 		buf.buffer.PutInt32Ordered(LengthOffset(recordIndex), recordLength)
 
@@ -173,6 +169,6 @@ func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex 
 	return isSuccessful
 }
 
-func (buf *ManyToOne) Read(Handler, messageCountLimit int) int32 {
+func (buf *ManyToOne) read(Handler, messageCountLimit int) int32 {
 	panic("Not implemented yet")
 }

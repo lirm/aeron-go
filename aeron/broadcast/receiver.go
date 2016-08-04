@@ -20,7 +20,26 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
+	"log"
 )
+
+var BufferDescriptor = struct {
+	tailIntentCounterOffset int32
+	tailCounterOffset       int32
+	latestCounterOffset     int32
+	trailerLength           int32
+}{
+	0,
+	util.SizeOfInt64,
+	util.SizeOfInt64 * 2,
+	util.CacheLineLength * 2,
+}
+
+func checkCapacity(capacity int32) {
+	if !util.IsPowerOfTwo(capacity) {
+		log.Fatalf("Capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=%d", capacity)
+	}
+}
 
 type Receiver struct {
 	buffer                 *atomic.Buffer
@@ -40,14 +59,14 @@ type Receiver struct {
 func NewReceiver(buffer *atomic.Buffer) *Receiver {
 	recv := new(Receiver)
 	recv.buffer = buffer
-	recv.capacity = buffer.Capacity() - BufferDescriptor.TrailerLength
+	recv.capacity = buffer.Capacity() - BufferDescriptor.trailerLength
 	recv.mask = int64(recv.capacity) - 1
-	recv.tailIntentCounterIndex = recv.capacity + BufferDescriptor.TailIntentCounterOffset
-	recv.tailCounterIndex = recv.capacity + BufferDescriptor.TailCounterOffset
-	recv.latestCounterIndex = recv.capacity + BufferDescriptor.LatestCounterOffset
+	recv.tailIntentCounterIndex = recv.capacity + BufferDescriptor.tailIntentCounterOffset
+	recv.tailCounterIndex = recv.capacity + BufferDescriptor.tailCounterOffset
+	recv.latestCounterIndex = recv.capacity + BufferDescriptor.latestCounterOffset
 	recv.lappedCount.Set(0)
 
-	CheckCapacity(recv.capacity)
+	checkCapacity(recv.capacity)
 
 	return recv
 }

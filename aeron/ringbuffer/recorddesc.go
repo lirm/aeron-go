@@ -47,11 +47,11 @@ func EncodedMsgOffset(recordOffset int32) int32 {
 	return recordOffset + RecordDescriptor.HeaderLength
 }
 
-func MakeHeader(length, msgTypeID int32) int64 {
+func makeHeader(length, msgTypeID int32) int64 {
 	return ((int64(msgTypeID) & 0xFFFFFFFF) << 32) | (int64(length) & 0xFFFFFFFF)
 }
 
-func CheckMsgTypeID(msgTypeID int32) {
+func checkMsgTypeID(msgTypeID int32) {
 	if msgTypeID < 1 {
 		panic(fmt.Sprintf("Message type id must be greater than zero, msgTypeId=%d", msgTypeID))
 	}
