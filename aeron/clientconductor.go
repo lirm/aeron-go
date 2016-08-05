@@ -92,7 +92,7 @@ func (sub *SubscriptionStateDefn) Init(ch string, regID int64, sID int32, now in
 	return sub
 }
 
-type LingerResourse struct {
+type lingerResourse struct {
 	lastTime int64
 	resource io.Closer
 }
@@ -110,7 +110,7 @@ type ClientConductor struct {
 	adminLock sync.Mutex
 
 	pendingCloses      map[int64]chan bool
-	lingeringResources chan LingerResourse
+	lingeringResources chan lingerResourse
 
 	onNewPublicationHandler   NewPublicationHandler
 	onNewSubscriptionHandler  NewSubscriptionHandler
@@ -147,7 +147,7 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	cc.resourceLingerTimeoutNs = lingerTo.Nanoseconds()
 
 	cc.pendingCloses = make(map[int64]chan bool)
-	cc.lingeringResources = make(chan LingerResourse, 1024)
+	cc.lingeringResources = make(chan lingerResourse, 1024)
 
 	return cc
 }
@@ -310,11 +310,7 @@ func (cc *ClientConductor) AddSubscription(channel string, streamID int32) int64
 	registrationID := cc.driverProxy.AddSubscription(channel, streamID)
 
 	subState := new(SubscriptionStateDefn)
-	subState.status = RegistrationStatus.AwaitingMediaDriver
-	subState.registrationID = registrationID
-	subState.channel = channel
-	subState.streamID = streamID
-	subState.timeOfRegistration = now
+	subState.Init(channel, registrationID, streamID, now)
 
 	cc.subs = append(cc.subs, subState)
 
@@ -378,7 +374,7 @@ func (cc *ClientConductor) releaseSubscription(registrationID int64, images []*I
 					cc.onUnavailableImageHandler(image)
 				}
 				image.Close()
-				cc.lingeringResources <- LingerResourse{now, *image}
+				cc.lingeringResources <- lingerResourse{now, *image}
 			}
 
 			cc.pendingCloses[corrID] = ch
@@ -466,7 +462,7 @@ func (cc *ClientConductor) OnUnavailableImage(streamID int32, correlationID int6
 				image := sub.subscription.removeImage(correlationID)
 				// FIXME Howzzat?!
 				if nil != image {
-					cc.lingeringResources <- LingerResourse{time.Now().UnixNano(), *image}
+					cc.lingeringResources <- lingerResourse{time.Now().UnixNano(), *image}
 				}
 			}
 		}
