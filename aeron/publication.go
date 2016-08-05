@@ -110,8 +110,18 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 				termAppender.AppendFragmentedMessage(&appendResult, &pub.headerWriter, buffer, offset, length, pub.maxPayloadLength, resValSupplier)
 			}
 
-			newPosition = pub.newPosition(partitionIndex, int32(termOffset), position, &appendResult)
-			//logger.Debugf("publication new position: %d, term offset: %d", newPosition, termOffset)
+
+			if appendResult.TermOffset() > 0 {
+				newPosition = (position - termOffset) + appendResult.TermOffset()
+			} else {
+				newPosition = AdminAction
+				if appendResult.TermOffset() == term.APPENDER_TRIPPED {
+					nextIndex := logbuffer.NextPartitionIndex(partitionIndex)
+
+					pub.appenders[nextIndex].SetTailTermId(appendResult.TermId() + 1)
+					logbuffer.SetActivePartitionIndex(pub.logMetaDataBuffer, nextIndex)
+				}
+			}
 		} else if pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer)) {
 			newPosition = BackPressured
 		} else {
@@ -126,19 +136,4 @@ func (pub *Publication) checkForMaxMessageLength(length int32) {
 	if length > pub.maxPayloadLength {
 		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxPayloadLength, length))
 	}
-}
-
-func (pub *Publication) newPosition(index int32, currentTail int32, position int64, result *term.AppenderResult) int64 {
-	newPosition := AdminAction
-
-	if result.TermOffset() > 0 {
-		newPosition = (position - int64(currentTail)) + result.TermOffset()
-	} else if result.TermOffset() == int64(term.APPENDER_TRIPPED) {
-		nextIndex := logbuffer.NextPartitionIndex(index)
-
-		pub.appenders[nextIndex].SetTailTermId(result.TermId() + 1)
-		logbuffer.SetActivePartitionIndex(pub.logMetaDataBuffer, nextIndex)
-	}
-
-	return newPosition
 }

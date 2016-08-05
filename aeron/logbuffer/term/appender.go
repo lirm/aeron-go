@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	APPENDER_TRIPPED int32 = -1
-	APPENDER_FAILED  int32 = -2
+	APPENDER_TRIPPED int64 = -1
+	APPENDER_FAILED  int64 = -2
 )
 
 var DEFAULT_RESERVED_VALUE_SUPPLIER ReservedValueSupplier = func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64 { return 0 }
@@ -107,7 +107,7 @@ func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, le
 	result.termId = logbuffer.TermID(rawTail)
 	result.termOffset = termOffset + int64(alignedLength)
 	if result.termOffset > int64(termLength) {
-		appender.handleEndOfLogCondition(result, appender.termBuffer, int32(termOffset), header, termLength)
+		result.termOffset = handleEndOfLogCondition(result.termId, appender.termBuffer, int32(termOffset), header, termLength)
 	} else {
 		offset := int32(termOffset)
 		header.write(appender.termBuffer, offset, frameLength, result.termId)
@@ -128,7 +128,7 @@ func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, head
 	result.termId = logbuffer.TermID(rawTail)
 	result.termOffset = termOffset + int64(alignedLength)
 	if result.termOffset > int64(termLength) {
-		appender.handleEndOfLogCondition(result, appender.termBuffer, int32(termOffset), header, termLength)
+		result.termOffset = handleEndOfLogCondition(result.termId, appender.termBuffer, int32(termOffset), header, termLength)
 	} else {
 		offset := int32(termOffset)
 		header.write(appender.termBuffer, offset, frameLength, logbuffer.TermID(rawTail))
@@ -161,7 +161,7 @@ func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header
 	result.termId = logbuffer.TermID(rawTail)
 	result.termOffset = termOffset + int64(requiredLength)
 	if result.termOffset > int64(termLength) {
-		appender.handleEndOfLogCondition(result, appender.termBuffer, int32(termOffset), header, termLength)
+		result.termOffset = handleEndOfLogCondition(result.termId, appender.termBuffer, int32(termOffset), header, termLength)
 	} else {
 		flags := logbuffer.FrameDescriptor.BeginFrag
 		remaining := length
@@ -194,20 +194,22 @@ func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header
 	}
 }
 
-func (appender *Appender) handleEndOfLogCondition(result *AppenderResult,
-	termBuffer *atomic.Buffer, termOffset int32, header *HeaderWriter, termLength int32) {
-	result.termOffset = int64(APPENDER_FAILED)
+func handleEndOfLogCondition(termId int32, termBuffer *atomic.Buffer, termOffset int32,
+	header *HeaderWriter, termLength int32) int64 {
+	newOffset := APPENDER_FAILED
 
 	if termOffset <= termLength {
-		result.termOffset = int64(APPENDER_TRIPPED)
+		newOffset = APPENDER_TRIPPED
 
 		if termOffset < termLength {
 			paddingLength := termLength - termOffset
-			header.write(termBuffer, termOffset, paddingLength, result.termId)
+			header.write(termBuffer, termOffset, paddingLength, termId)
 			logbuffer.SetFrameType(termBuffer, termOffset, logbuffer.DataFrameHeader.TypePad)
 			logbuffer.FrameLengthOrdered(termBuffer, termOffset, paddingLength)
 		}
 	}
+
+	return newOffset
 }
 
 func (appender *Appender) SetTailTermId(termId int32) {
