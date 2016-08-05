@@ -24,28 +24,15 @@ import (
 
 type FragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
 
-type ReadOutcome struct {
-	offset        int32
-	fragmentsRead int
-}
-
-func (outcome *ReadOutcome) Offset() int32 {
-	return outcome.offset
-}
-
-func (outcome *ReadOutcome) FragmentsRead() int {
-	return outcome.fragmentsRead
-}
-
-func Read(outcome *ReadOutcome, termBuffer *atomic.Buffer, termOffset int32,
-	handler FragmentHandler, fragmentsLimit int, header *logbuffer.Header) {
-
-	outcome.fragmentsRead = 0
-	outcome.offset = termOffset
+// Read will attempt to read the next frame from the term and invoke the callback if successful.
+// Method will return a tuple of new term offset and number of fragments read
+func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, fragmentsLimit int,
+	header *logbuffer.Header) (int32, int) {
 
 	capacity := termBuffer.Capacity()
 
-	for outcome.fragmentsRead < fragmentsLimit {
+	var fragmentsRead int
+	for fragmentsRead < fragmentsLimit {
 		frameLength := logbuffer.FrameLengthVolatile(termBuffer, termOffset)
 		if frameLength <= 0 {
 			break
@@ -60,7 +47,7 @@ func Read(outcome *ReadOutcome, termBuffer *atomic.Buffer, termOffset int32,
 			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
 				frameLength-logbuffer.DataFrameHeader.Length, header)
 
-			outcome.fragmentsRead++
+			fragmentsRead++
 		}
 
 		if termOffset >= capacity {
@@ -68,5 +55,5 @@ func Read(outcome *ReadOutcome, termBuffer *atomic.Buffer, termOffset int32,
 		}
 	}
 
-	outcome.offset = termOffset
+	return termOffset, fragmentsRead
 }

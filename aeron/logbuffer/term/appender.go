@@ -36,7 +36,7 @@ type ReservedValueSupplier func(termBuffer *atomic.Buffer, termOffset int32, len
 type HeaderWriter struct {
 	sessionId int32
 	streamId  int32
-	buffer atomic.Buffer
+	buffer    atomic.Buffer
 }
 
 func (header *HeaderWriter) Fill(defaultHdr *atomic.Buffer) {
