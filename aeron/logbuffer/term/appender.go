@@ -21,6 +21,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 	"math"
+	"unsafe"
 )
 
 const (
@@ -35,6 +36,7 @@ type ReservedValueSupplier func(termBuffer *atomic.Buffer, termOffset int32, len
 type HeaderWriter struct {
 	sessionId int32
 	streamId  int32
+	buffer atomic.Buffer
 }
 
 func (header *HeaderWriter) Fill(defaultHdr *atomic.Buffer) {
@@ -46,15 +48,15 @@ func (header *HeaderWriter) write(termBuffer *atomic.Buffer, offset, length, ter
 	termBuffer.PutInt32Ordered(offset, -length)
 
 	headerPtr := uintptr(termBuffer.Ptr()) + uintptr(offset)
-	headerBuffer := atomic.MakeBuffer(headerPtr, logbuffer.DataFrameHeader.Length)
+	header.buffer.Wrap(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.Length)
 
-	headerBuffer.PutInt8(logbuffer.DataFrameHeader.VersionFieldOffset, logbuffer.DataFrameHeader.CurrentVersion)
-	headerBuffer.PutUInt8(logbuffer.DataFrameHeader.FlagsFieldOffset, logbuffer.FrameDescriptor.BeginFrag|logbuffer.FrameDescriptor.EndFrag)
-	headerBuffer.PutUInt16(logbuffer.DataFrameHeader.TypeFieldOffset, logbuffer.DataFrameHeader.TypeData)
-	headerBuffer.PutInt32(logbuffer.DataFrameHeader.TermOffsetFieldOffset, offset)
-	headerBuffer.PutInt32(logbuffer.DataFrameHeader.SessionIDFieldOffset, header.sessionId)
-	headerBuffer.PutInt32(logbuffer.DataFrameHeader.StreamIDFieldOffset, header.streamId)
-	headerBuffer.PutInt32(logbuffer.DataFrameHeader.TermIDFieldOffset, termId)
+	header.buffer.PutInt8(logbuffer.DataFrameHeader.VersionFieldOffset, logbuffer.DataFrameHeader.CurrentVersion)
+	header.buffer.PutUInt8(logbuffer.DataFrameHeader.FlagsFieldOffset, logbuffer.FrameDescriptor.BeginFrag|logbuffer.FrameDescriptor.EndFrag)
+	header.buffer.PutUInt16(logbuffer.DataFrameHeader.TypeFieldOffset, logbuffer.DataFrameHeader.TypeData)
+	header.buffer.PutInt32(logbuffer.DataFrameHeader.TermOffsetFieldOffset, offset)
+	header.buffer.PutInt32(logbuffer.DataFrameHeader.SessionIDFieldOffset, header.sessionId)
+	header.buffer.PutInt32(logbuffer.DataFrameHeader.StreamIDFieldOffset, header.streamId)
+	header.buffer.PutInt32(logbuffer.DataFrameHeader.TermIDFieldOffset, termId)
 }
 
 type Appender struct {
