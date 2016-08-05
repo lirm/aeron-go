@@ -63,7 +63,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 
 	size := fi.Size()
 	if size == 0 {
-		return nil, errors.New("zero size for existing file?!")
+		return nil, errors.New("zero size for existing file")
 	}
 	if size < 0 {
 		return nil, fmt.Errorf("mmap: stat %q returned %d", filename, size)

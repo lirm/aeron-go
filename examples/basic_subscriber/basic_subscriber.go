@@ -56,7 +56,7 @@ func main() {
 		counter++
 	}
 
-	idleStrategy := idlestrategy.Sleeping{time.Millisecond}
+	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond}
 
 	for {
 		fragmentsRead := subscription.Poll(handler, 10)

@@ -22,11 +22,13 @@ import (
 	"github.com/lirm/aeron-go/aeron/ringbuffer"
 )
 
+// Proxy is a media driver proxy class that is used to send commands
 type Proxy struct {
 	toDriverCommandBuffer *rb.ManyToOne
 	clientID              int64
 }
 
+// Init initializes media driver proxy class
 func (driver *Proxy) Init(buffer *rb.ManyToOne) *Proxy {
 	driver.toDriverCommandBuffer = buffer
 	driver.clientID = driver.toDriverCommandBuffer.NextCorrelationID()
@@ -34,10 +36,12 @@ func (driver *Proxy) Init(buffer *rb.ManyToOne) *Proxy {
 	return driver
 }
 
+// TimeOfLastDriverKeepalive gets the time of the last keep alive update sent to media driver
 func (driver *Proxy) TimeOfLastDriverKeepalive() int64 {
 	return driver.toDriverCommandBuffer.ConsumerHeartbeatTime()
 }
 
+// AddSubscription sends driver command to add new subscription
 func (driver *Proxy) AddSubscription(channel string, streamID int32) int64 {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
@@ -66,6 +70,7 @@ func (driver *Proxy) AddSubscription(channel string, streamID int32) int64 {
 
 }
 
+// RemoveSubscription sends driver command to remove subscription
 func (driver *Proxy) RemoveSubscription(registrationID int64) int64 {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -90,6 +95,7 @@ func (driver *Proxy) RemoveSubscription(registrationID int64) int64 {
 	return correlationID
 }
 
+// AddPublication sends driver command to add new publication
 func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
@@ -115,6 +121,7 @@ func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
 	return correlationID
 }
 
+// RemovePublication sends driver command to remove publication
 func (driver *Proxy) RemovePublication(registrationID int64) int64 {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -139,6 +146,7 @@ func (driver *Proxy) RemovePublication(registrationID int64) int64 {
 	return correlationID
 }
 
+// SendClientKeepalive send keep alive message to the driver
 func (driver *Proxy) SendClientKeepalive() {
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {

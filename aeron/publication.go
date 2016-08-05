@@ -25,12 +25,17 @@ import (
 )
 
 const (
-	NotConnected      int64 = -1
-	BackPressured     int64 = -2
-	AdminAction       int64 = -3
+	// NotConnected indicates that this Publication is not connected to the driver
+	NotConnected int64 = -1
+	// BackPressured indicates that sending ring buffer is full
+	BackPressured int64 = -2
+	// AdminAction indicates that terms needs to be rotated. User should retry the Offer
+	AdminAction int64 = -3
+	// PublicationClosed indicates that this Publication is closed an no further Offers shall succeed
 	PublicationClosed int64 = -4
 )
 
+// Publication is a sender structure
 type Publication struct {
 	conductor           *ClientConductor
 	logMetaDataBuffer   *atomic.Buffer
@@ -49,6 +54,7 @@ type Publication struct {
 	headerWriter term.HeaderWriter
 }
 
+// NewPublication is a factory method create new publications
 func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub := new(Publication)
 	pub.logMetaDataBuffer = logBuffers.Buffer(logbuffer.LogMetaDataSectionIndex)
@@ -68,14 +74,17 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	return pub
 }
 
+// IsConnected returns whether this publication is connected to the driver (not whether it has any Subscriptions)
 func (pub *Publication) IsConnected() bool {
 	return !pub.IsClosed() && pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer))
 }
 
+// IsClosed returns whether this Publication has been closed
 func (pub *Publication) IsClosed() bool {
 	return pub.isClosed.Get()
 }
 
+// Close will close this publication with the driver. This is a blocking call.
 func (pub *Publication) Close() error {
 	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
 		<-pub.conductor.releasePublication(pub.registrationID)
@@ -84,6 +93,7 @@ func (pub *Publication) Close() error {
 	return nil
 }
 
+// Offer is the primary send mechanism on Publication
 func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
 
 	newPosition := PublicationClosed
@@ -99,7 +109,7 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 		//logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
 		if position < limit {
 			var appendResult term.AppenderResult
-			resValSupplier := term.DEFAULT_RESERVED_VALUE_SUPPLIER
+			resValSupplier := term.DefaultReservedValueSupplier
 			if nil != reservedValueSupplier {
 				resValSupplier = reservedValueSupplier
 			}
@@ -110,15 +120,14 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 				termAppender.AppendFragmentedMessage(&appendResult, &pub.headerWriter, buffer, offset, length, pub.maxPayloadLength, resValSupplier)
 			}
 
-
 			if appendResult.TermOffset() > 0 {
 				newPosition = (position - termOffset) + appendResult.TermOffset()
 			} else {
 				newPosition = AdminAction
-				if appendResult.TermOffset() == term.APPENDER_TRIPPED {
+				if appendResult.TermOffset() == term.AppenderTripped {
 					nextIndex := logbuffer.NextPartitionIndex(partitionIndex)
 
-					pub.appenders[nextIndex].SetTailTermId(appendResult.TermId() + 1)
+					pub.appenders[nextIndex].SetTailTermID(appendResult.TermID() + 1)
 					logbuffer.SetActivePartitionIndex(pub.logMetaDataBuffer, nextIndex)
 				}
 			}

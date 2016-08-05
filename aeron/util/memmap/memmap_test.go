@@ -22,7 +22,9 @@ import (
 	"testing"
 )
 
-var MMAP string = "mmap.bin"
+const (
+	MMAP = "mmap.bin"
+)
 
 func TestMmapBasics(t *testing.T) {
 	t.Log("Beginning test")
