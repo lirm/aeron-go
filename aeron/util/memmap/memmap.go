@@ -26,6 +26,7 @@ import (
 	"unsafe"
 )
 
+// File is the wrapper around memory mapped file
 type File struct {
 	mmap unsafe.Pointer
 	data []byte
@@ -34,20 +35,26 @@ type File struct {
 
 var logger = logging.MustGetLogger("memmap")
 
+// GetFileSize is a helper function to retrieve file size
 func GetFileSize(filename string) int64 {
 	file, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error(err)
+		return -1
 	}
-
 	defer file.Close()
+
 	fi, err := file.Stat()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
+		return -1
 	}
+
 	return fi.Size()
 }
 
+// MapExisting is the factory method used to create memory maps for existing file. This function will fail if
+// the file does not exist.
 func MapExisting(filename string, offset int64, length int) (*File, error) {
 	logger.Debugf("Will try to map existing %s, %d, %d", filename, offset, length)
 
@@ -93,7 +100,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 	return mmap, nil
 }
 
-func New(filename string, offset int64, length int) (*File, error) {
+func newFile(filename string, offset int64, length int) (*File, error) {
 	logger.Debugf("Will try to map new %s, %d, %d", filename, offset, length)
 
 	f, err := os.Create(filename)
@@ -124,6 +131,7 @@ func New(filename string, offset int64, length int) (*File, error) {
 	return mmap, nil
 }
 
+// Close attempts to unmap the mapped memory region
 func (mmap *File) Close() error {
 	err := syscall.Munmap(mmap.data)
 	if err != nil {
@@ -136,10 +144,12 @@ func (mmap *File) Close() error {
 	return err
 }
 
+// GetMemoryPtr return the pointer to the mapped region of the file
 func (mmap *File) GetMemoryPtr() unsafe.Pointer {
 	return mmap.mmap
 }
 
+// GetMemorySize return the size of the mapped region of the file
 func (mmap *File) GetMemorySize() int {
 	return mmap.size
 }

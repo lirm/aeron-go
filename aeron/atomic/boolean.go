@@ -21,25 +21,21 @@ import (
 )
 
 const (
-	True  int32 = 1
-	False int32 = 0
+	True  int32 = 1 // True value for atomic.Bool
+	False int32 = 0 // False value for atomic.Bool
 )
 
+// Bool is an atomic boolean implementation used by aeron-go
 type Bool struct {
 	val int32
 }
 
-func NewBool(val bool) *Bool {
-	if val {
-		return &Bool{val: True}
-	}
-	return &Bool{val: False}
-}
-
+// Get returns the current state of the variable
 func (b *Bool) Get() bool {
 	return atomic.LoadInt32(&b.val) == True
 }
 
+// Set atomically sets the value of the variable
 func (b *Bool) Set(val bool) {
 	if val {
 		atomic.StoreInt32(&b.val, True)
@@ -48,6 +44,7 @@ func (b *Bool) Set(val bool) {
 	}
 }
 
+// CompareAndSet performs an atomic CAS operation on this variable
 func (b *Bool) CompareAndSet(oldVal, newVal bool) bool {
 	var old, newer int32
 	if oldVal {
