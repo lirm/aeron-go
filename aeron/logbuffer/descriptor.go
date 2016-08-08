@@ -69,9 +69,9 @@ func checkTermLength(termLength int64) {
 			Descriptor.termMinLength, termLength))
 	}
 
-	if (termLength & (int64(FrameDescriptor.Alignment) - 1)) != 0 {
+	if (termLength & (int64(FrameAlignment) - 1)) != 0 {
 		panic(fmt.Sprintf("Term length not a multiple of %d, length=%d",
-			FrameDescriptor.Alignment, termLength))
+			FrameAlignment, termLength))
 	}
 }
 

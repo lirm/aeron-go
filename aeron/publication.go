@@ -51,7 +51,6 @@ type Publication struct {
 	isClosed atomic.Bool
 
 	appenders    [logbuffer.PartitionCount]*term.Appender
-	headerWriter term.HeaderWriter
 }
 
 // NewPublication is a factory method create new publications
@@ -61,8 +60,6 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub.initialTermID = logbuffer.InitialTermID(pub.logMetaDataBuffer)
 	pub.maxPayloadLength = logbuffer.MtuLength(pub.logMetaDataBuffer) - logbuffer.DataFrameHeader.Length
 	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(logBuffers.Buffer(0).Capacity()))
-	header := logbuffer.DefaultFrameHeader(pub.logMetaDataBuffer)
-	pub.headerWriter.Fill(header)
 	pub.isClosed.Set(false)
 
 	for i := 0; i < logbuffer.PartitionCount; i++ {
@@ -114,10 +111,10 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 				resValSupplier = reservedValueSupplier
 			}
 			if length <= pub.maxPayloadLength {
-				termAppender.AppendUnfragmentedMessage(&appendResult, &pub.headerWriter, buffer, offset, length, resValSupplier)
+				termAppender.AppendUnfragmentedMessage(&appendResult, buffer, offset, length, resValSupplier)
 			} else {
 				pub.checkForMaxMessageLength(length)
-				termAppender.AppendFragmentedMessage(&appendResult, &pub.headerWriter, buffer, offset, length, pub.maxPayloadLength, resValSupplier)
+				termAppender.AppendFragmentedMessage(&appendResult, buffer, offset, length, pub.maxPayloadLength, resValSupplier)
 			}
 
 			if appendResult.TermOffset() > 0 {

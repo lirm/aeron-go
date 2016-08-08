@@ -20,32 +20,10 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
-var FrameDescriptor = struct {
-	Alignment int32
-
-	BeginFrag    uint8
-	EndFrag      uint8
-	Unfragmented uint8
-
-	alignedHeaderLength int32
-
-	versionOffset int32
-	flagsOffset   int32
-	typeOffset    int32
-	lengthOffset  int32
-	termOffset    int32
-}{
-	32,
-	0x80,
-	0x40,
-	0x80 | 0x40,
-	32,
-	4,
-	5,
-	6,
-	0,
-	8,
-}
+const (
+	// FrameAlignment frame alignment
+	FrameAlignment int32 = 32
+)
 
 func flagsOffset(frameOffset int32) int32 {
 	return frameOffset + DataFrameHeader.FlagsFieldOffset

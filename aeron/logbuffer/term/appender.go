@@ -25,33 +25,41 @@ import (
 )
 
 const (
+	// AppenderTripped is returned when the end of the term has been reached and buffer roll was done
 	AppenderTripped int64 = -1
+
+	// AppenderFailed is returned when appending is not possible due to position being outside of the term. ??
 	AppenderFailed  int64 = -2
+
+	beginFrag    uint8 = 0x80
+	endFrag      uint8 = 0x40
+	unfragmented uint8 = 0x80 | 0x40
 )
 
 var DefaultReservedValueSupplier ReservedValueSupplier = func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64 { return 0 }
 
 type ReservedValueSupplier func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64
 
-type HeaderWriter struct {
+// HeaderWriter is a helper class for writing frame header to the term
+type headerWriter struct {
 	sessionID int32
 	streamID  int32
 	buffer    atomic.Buffer
 }
 
-func (header *HeaderWriter) Fill(defaultHdr *atomic.Buffer) {
+func (header *headerWriter) Fill(defaultHdr *atomic.Buffer) {
 	header.sessionID = defaultHdr.GetInt32(logbuffer.DataFrameHeader.SessionIDFieldOffset)
 	header.streamID = defaultHdr.GetInt32(logbuffer.DataFrameHeader.StreamIDFieldOffset)
 }
 
-func (header *HeaderWriter) write(termBuffer *atomic.Buffer, offset, length, termID int32) {
+func (header *headerWriter) write(termBuffer *atomic.Buffer, offset, length, termID int32) {
 	termBuffer.PutInt32Ordered(offset, -length)
 
 	headerPtr := uintptr(termBuffer.Ptr()) + uintptr(offset)
 	header.buffer.Wrap(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.Length)
 
 	header.buffer.PutInt8(logbuffer.DataFrameHeader.VersionFieldOffset, logbuffer.DataFrameHeader.CurrentVersion)
-	header.buffer.PutUInt8(logbuffer.DataFrameHeader.FlagsFieldOffset, logbuffer.FrameDescriptor.BeginFrag|logbuffer.FrameDescriptor.EndFrag)
+	header.buffer.PutUInt8(logbuffer.DataFrameHeader.FlagsFieldOffset, unfragmented)
 	header.buffer.PutUInt16(logbuffer.DataFrameHeader.TypeFieldOffset, logbuffer.DataFrameHeader.TypeData)
 	header.buffer.PutInt32(logbuffer.DataFrameHeader.TermOffsetFieldOffset, offset)
 	header.buffer.PutInt32(logbuffer.DataFrameHeader.SessionIDFieldOffset, header.sessionID)
@@ -60,9 +68,10 @@ func (header *HeaderWriter) write(termBuffer *atomic.Buffer, offset, length, ter
 }
 
 type Appender struct {
-	termBuffer *atomic.Buffer
-	tailBuffer *atomic.Buffer
-	tailOffset int32
+	termBuffer   *atomic.Buffer
+	tailBuffer   *atomic.Buffer
+	tailOffset   int32
+	headerWriter headerWriter
 }
 
 type AppenderResult struct {
@@ -84,6 +93,9 @@ func MakeAppender(termBuffer *atomic.Buffer, metaDataBuffer *atomic.Buffer, part
 	appender.tailBuffer = metaDataBuffer
 	appender.tailOffset = logbuffer.Descriptor.TermTailCounterOffset + (int32(partitionIndex) * util.SizeOfInt64)
 
+	header := logbuffer.DefaultFrameHeader(metaDataBuffer)
+	appender.headerWriter.Fill(header)
+
 	return appender
 }
 
@@ -95,10 +107,10 @@ func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
 	return appender.tailBuffer.GetAndAddInt64(appender.tailOffset, int64(alignedLength))
 }
 
-func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, length int32, claim *logbuffer.Claim) {
+func (appender *Appender) Claim(result *AppenderResult, length int32, claim *logbuffer.Claim) {
 
 	frameLength := length + logbuffer.DataFrameHeader.Length
-	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameDescriptor.Alignment)
+	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameAlignment)
 	rawTail := appender.getAndAddRawTail(alignedLength)
 	termOffset := rawTail & 0xFFFFFFFF
 
@@ -107,19 +119,20 @@ func (appender *Appender) Claim(result *AppenderResult, header *HeaderWriter, le
 	result.termID = logbuffer.TermID(rawTail)
 	result.termOffset = termOffset + int64(alignedLength)
 	if result.termOffset > int64(termLength) {
-		result.termOffset = handleEndOfLogCondition(result.termID, appender.termBuffer, int32(termOffset), header, termLength)
+		result.termOffset = handleEndOfLogCondition(result.termID, appender.termBuffer, int32(termOffset),
+			&appender.headerWriter, termLength)
 	} else {
 		offset := int32(termOffset)
-		header.write(appender.termBuffer, offset, frameLength, result.termID)
+		appender.headerWriter.write(appender.termBuffer, offset, frameLength, result.termID)
 		claim.Wrap(appender.termBuffer, offset, frameLength)
 	}
 }
 
-func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, header *HeaderWriter,
+func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult,
 	srcBuffer *atomic.Buffer, srcOffset int32, length int32, reservedValueSupplier ReservedValueSupplier) {
 
 	frameLength := length + logbuffer.DataFrameHeader.Length
-	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameDescriptor.Alignment)
+	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameAlignment)
 	rawTail := appender.getAndAddRawTail(alignedLength)
 	termOffset := rawTail & 0xFFFFFFFF
 
@@ -128,10 +141,11 @@ func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, head
 	result.termID = logbuffer.TermID(rawTail)
 	result.termOffset = termOffset + int64(alignedLength)
 	if result.termOffset > int64(termLength) {
-		result.termOffset = handleEndOfLogCondition(result.termID, appender.termBuffer, int32(termOffset), header, termLength)
+		result.termOffset = handleEndOfLogCondition(result.termID, appender.termBuffer, int32(termOffset),
+			&appender.headerWriter, termLength)
 	} else {
 		offset := int32(termOffset)
-		header.write(appender.termBuffer, offset, frameLength, logbuffer.TermID(rawTail))
+		appender.headerWriter.write(appender.termBuffer, offset, frameLength, logbuffer.TermID(rawTail))
 		appender.termBuffer.PutBytes(offset+logbuffer.DataFrameHeader.Length, srcBuffer, srcOffset, length)
 
 		if nil != reservedValueSupplier {
@@ -143,14 +157,14 @@ func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult, head
 	}
 }
 
-func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header *HeaderWriter,
+func (appender *Appender) AppendFragmentedMessage(result *AppenderResult,
 	srcBuffer *atomic.Buffer, srcOffset int32, length int32, maxPayloadLength int32, reservedValueSupplier ReservedValueSupplier) {
 
 	numMaxPayloads := length / maxPayloadLength
 	remainingPayload := length % maxPayloadLength
 	var lastFrameLength int32
 	if remainingPayload > 0 {
-		lastFrameLength = util.AlignInt32(remainingPayload+logbuffer.DataFrameHeader.Length, logbuffer.FrameDescriptor.Alignment)
+		lastFrameLength = util.AlignInt32(remainingPayload+logbuffer.DataFrameHeader.Length, logbuffer.FrameAlignment)
 	}
 	requiredLength := (numMaxPayloads * (maxPayloadLength + logbuffer.DataFrameHeader.Length)) + lastFrameLength
 	rawTail := appender.getAndAddRawTail(requiredLength)
@@ -161,23 +175,24 @@ func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header
 	result.termID = logbuffer.TermID(rawTail)
 	result.termOffset = termOffset + int64(requiredLength)
 	if result.termOffset > int64(termLength) {
-		result.termOffset = handleEndOfLogCondition(result.termID, appender.termBuffer, int32(termOffset), header, termLength)
+		result.termOffset = handleEndOfLogCondition(result.termID, appender.termBuffer, int32(termOffset),
+			&appender.headerWriter, termLength)
 	} else {
-		flags := logbuffer.FrameDescriptor.BeginFrag
+		flags := beginFrag
 		remaining := length
 		offset := int32(termOffset)
 
 		for remaining > 0 {
 			bytesToWrite := int32(math.Min(float64(remaining), float64(maxPayloadLength)))
 			frameLength := bytesToWrite + logbuffer.DataFrameHeader.Length
-			alignedLength := util.AlignInt32(frameLength, logbuffer.FrameDescriptor.Alignment)
+			alignedLength := util.AlignInt32(frameLength, logbuffer.FrameAlignment)
 
-			header.write(appender.termBuffer, offset, frameLength, result.termID)
+			appender.headerWriter.write(appender.termBuffer, offset, frameLength, result.termID)
 			appender.termBuffer.PutBytes(
 				offset+logbuffer.DataFrameHeader.Length, srcBuffer, srcOffset+(length-remaining), bytesToWrite)
 
 			if remaining <= maxPayloadLength {
-				flags |= logbuffer.FrameDescriptor.EndFrag
+				flags |= endFrag
 			}
 
 			logbuffer.FrameFlags(appender.termBuffer, offset, flags)
@@ -195,7 +210,7 @@ func (appender *Appender) AppendFragmentedMessage(result *AppenderResult, header
 }
 
 func handleEndOfLogCondition(termID int32, termBuffer *atomic.Buffer, termOffset int32,
-	header *HeaderWriter, termLength int32) int64 {
+	header *headerWriter, termLength int32) int64 {
 	newOffset := AppenderFailed
 
 	if termOffset <= termLength {
