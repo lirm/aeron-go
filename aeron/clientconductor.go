@@ -17,6 +17,7 @@ limitations under the License.
 package aeron
 
 import (
+	"errors"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
@@ -45,14 +46,14 @@ const (
 )
 
 type PublicationStateDefn struct {
-	channel            string
 	registrationID     int64
+	timeOfRegistration int64
 	streamID           int32
 	sessionID          int32
 	posLimitCounterID  int32
-	timeOfRegistration int64
-	status             int
 	errorCode          int32
+	status             int
+	channel            string
 	errorMessage       string
 	buffers            *logbuffer.LogBuffers
 	publication        *Publication
@@ -71,14 +72,13 @@ func (pub *PublicationStateDefn) Init(channel string, registrationID int64, stre
 }
 
 type SubscriptionStateDefn struct {
-	channel            string
 	registrationID     int64
-	streamID           int32
 	timeOfRegistration int64
-	status             int
+	streamID           int32
 	errorCode          int32
+	status             int
+	channel            string
 	errorMessage       string
-	subscriptionCache  *Subscription
 	subscription       *Subscription
 }
 
@@ -176,14 +176,26 @@ func (cc *ClientConductor) Close() error {
 	return err
 }
 
+// Run is the main execution loop of ClientConductor.
 func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 
-	cc.timeOfLastKeepalive = time.Now().UnixNano()
-	cc.timeOfLastCheckManagedResources = time.Now().UnixNano()
-	cc.timeOfLastDoWork = time.Now().UnixNano()
+	now := time.Now().UnixNano()
+	cc.timeOfLastKeepalive = now
+	cc.timeOfLastCheckManagedResources = now
+	cc.timeOfLastDoWork = now
 
 	// In Go 1.7 should have the following line
 	// runtime.LockOSThread()
+
+	// Clean exit from this particular go routine
+	defer func() {
+		if err := recover(); err != nil {
+			errStr := fmt.Sprintf("Panic: %v", err)
+			logger.Error(errStr)
+			cc.errorHandler(errors.New(errStr))
+			cc.running.Set(false)
+		}
+	}()
 
 	for cc.running.Get() {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
@@ -198,6 +210,7 @@ func (cc *ClientConductor) verifyDriverIsActive() {
 	}
 }
 
+// AddPublication sends the add publication command through the driver proxy
 func (cc *ClientConductor) AddPublication(channel string, streamID int32) int64 {
 	logger.Debugf("AddPublication: channel=%s, streamId=%d", channel, streamID)
 
@@ -237,8 +250,7 @@ func (cc *ClientConductor) FindPublication(registrationID int64) *Publication {
 			} else {
 				switch pub.status {
 				case RegistrationStatus.AwaitingMediaDriver:
-					now := time.Now().UnixNano()
-					if now > (pub.timeOfRegistration + cc.driverTimeoutNs) {
+					if now := time.Now().UnixNano(); now > (pub.timeOfRegistration + cc.driverTimeoutNs) {
 						logger.Errorf("No response from driver. started: %d, now: %d, to: %d",
 							pub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
 							cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
@@ -297,6 +309,7 @@ func (cc *ClientConductor) releasePublication(registrationID int64) chan bool {
 	return ch
 }
 
+// AddSubscription sends the add subscription command through the driver proxy
 func (cc *ClientConductor) AddSubscription(channel string, streamID int32) int64 {
 	logger.Debugf("AddSubscription: channel=%s, streamId=%d", channel, streamID)
 
@@ -328,15 +341,16 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) *Subscription 
 
 			switch sub.status {
 			case RegistrationStatus.AwaitingMediaDriver:
-				now := time.Now().UnixNano()
-				if now > (sub.timeOfRegistration + cc.driverTimeoutNs) {
+				if now := time.Now().UnixNano(); now > (sub.timeOfRegistration + cc.driverTimeoutNs) {
 					logger.Errorf("No response from driver. started: %d, now: %d, to: %d",
 						sub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
 						cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
 					log.Fatalf("No response on %v of %v", sub, cc.subs)
 				}
 			case RegistrationStatus.ErroredMediaDriver:
-				log.Fatalf("Error on %d: %d: %s", registrationID, sub.errorCode, sub.errorMessage)
+				errStr := fmt.Sprintf("Error on %d: %d: %s", registrationID, sub.errorCode, sub.errorMessage)
+				cc.errorHandler(errors.New(errStr))
+				log.Fatalf(errStr)
 			}
 
 			subscription = sub.subscription
@@ -373,7 +387,11 @@ func (cc *ClientConductor) releaseSubscription(registrationID int64, images []*I
 				if cc.onUnavailableImageHandler != nil {
 					cc.onUnavailableImageHandler(image)
 				}
-				image.Close()
+				err := image.Close()
+				if err != nil {
+					logger.Warningf("Failed to close subscription: %d", registrationID)
+					cc.errorHandler(err)
+				}
 				cc.lingeringResources <- lingerResourse{now, *image}
 			}
 
@@ -479,6 +497,10 @@ func (cc *ClientConductor) OnOperationSuccess(corrID int64) {
 		if sub.registrationID == corrID && sub.status == RegistrationStatus.AwaitingMediaDriver {
 			sub.status = RegistrationStatus.RegisteredMediaDriver
 			sub.subscription = NewSubscription(cc, sub.channel, corrID, sub.streamID)
+
+			if cc.onNewSubscriptionHandler != nil {
+				cc.onNewSubscriptionHandler(sub.channel, sub.streamID, corrID)
+			}
 		}
 	}
 
@@ -519,7 +541,11 @@ func (cc *ClientConductor) onInterServiceTimeout(now int64) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	cc.Close()
+	err := cc.Close()
+	if err != nil {
+		logger.Warningf("Failed to close client conductor: %v", err)
+		cc.errorHandler(err)
+	}
 }
 
 func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
@@ -575,7 +601,11 @@ func (cc *ClientConductor) onCheckManagedResources(now int64) {
 				logger.Debugf("lingering resource expired(%dms old): %v",
 					(now-r.lastTime)/time.Millisecond.Nanoseconds(), res)
 				if res != nil {
-					res.Close()
+					err := res.Close()
+					if err != nil {
+						logger.Warningf("Failed to close lingering resource: %v", err)
+						cc.errorHandler(err)
+					}
 				}
 			} else {
 				// The assumption is that resources are queued in order

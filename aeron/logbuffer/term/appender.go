@@ -29,7 +29,7 @@ const (
 	AppenderTripped int64 = -1
 
 	// AppenderFailed is returned when appending is not possible due to position being outside of the term. ??
-	AppenderFailed  int64 = -2
+	AppenderFailed int64 = -2
 
 	beginFrag    uint8 = 0x80
 	endFrag      uint8 = 0x40

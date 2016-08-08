@@ -26,7 +26,7 @@ type Claim struct {
 }
 
 func (c *Claim) Wrap(buf *atomic.Buffer, offset, length int32) {
-	buf.BoundsCheck(offset, length)
+	atomic.BoundsCheck(offset, length, buf.Capacity())
 	ptr := unsafe.Pointer(uintptr(buf.Ptr()) + uintptr(offset))
 	c.buffer.Wrap(ptr, length)
 }

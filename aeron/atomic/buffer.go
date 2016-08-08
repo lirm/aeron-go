@@ -105,7 +105,7 @@ func (buf *Buffer) Fill(b uint8) {
 }
 
 func (buf *Buffer) GetUInt8(offset int32) uint8 {
-	buf.BoundsCheck(offset, 1)
+	BoundsCheck(offset, 1, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -113,7 +113,7 @@ func (buf *Buffer) GetUInt8(offset int32) uint8 {
 }
 
 func (buf *Buffer) GetUInt16(offset int32) uint16 {
-	buf.BoundsCheck(offset, 2)
+	BoundsCheck(offset, 2, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -121,7 +121,7 @@ func (buf *Buffer) GetUInt16(offset int32) uint16 {
 }
 
 func (buf *Buffer) GetInt32(offset int32) int32 {
-	buf.BoundsCheck(offset, 4)
+	BoundsCheck(offset, 4, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -129,7 +129,7 @@ func (buf *Buffer) GetInt32(offset int32) int32 {
 }
 
 func (buf *Buffer) GetInt64(offset int32) int64 {
-	buf.BoundsCheck(offset, 8)
+	BoundsCheck(offset, 8, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -137,7 +137,7 @@ func (buf *Buffer) GetInt64(offset int32) int64 {
 }
 
 func (buf *Buffer) PutUInt8(offset int32, value uint8) {
-	buf.BoundsCheck(offset, 1)
+	BoundsCheck(offset, 1, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -145,7 +145,7 @@ func (buf *Buffer) PutUInt8(offset int32, value uint8) {
 }
 
 func (buf *Buffer) PutInt8(offset int32, value int8) {
-	buf.BoundsCheck(offset, 1)
+	BoundsCheck(offset, 1, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -153,7 +153,7 @@ func (buf *Buffer) PutInt8(offset int32, value int8) {
 }
 
 func (buf *Buffer) PutUInt16(offset int32, value uint16) {
-	buf.BoundsCheck(offset, 2)
+	BoundsCheck(offset, 2, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -161,7 +161,7 @@ func (buf *Buffer) PutUInt16(offset int32, value uint16) {
 }
 
 func (buf *Buffer) PutInt32(offset int32, value int32) {
-	buf.BoundsCheck(offset, 4)
+	BoundsCheck(offset, 4, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -169,7 +169,7 @@ func (buf *Buffer) PutInt32(offset int32, value int32) {
 }
 
 func (buf *Buffer) PutInt64(offset int32, value int64) {
-	buf.BoundsCheck(offset, 8)
+	BoundsCheck(offset, 8, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 
@@ -177,7 +177,7 @@ func (buf *Buffer) PutInt64(offset int32, value int64) {
 }
 
 func (buf *Buffer) GetAndAddInt64(offset int32, delta int64) int64 {
-	buf.BoundsCheck(offset, 8)
+	BoundsCheck(offset, 8, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	newVal := atomic.AddUint64((*uint64)(uptr), uint64(delta))
@@ -186,7 +186,7 @@ func (buf *Buffer) GetAndAddInt64(offset int32, delta int64) int64 {
 }
 
 func (buf *Buffer) GetInt32Volatile(offset int32) int32 {
-	buf.BoundsCheck(offset, 4)
+	BoundsCheck(offset, 4, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	cur := atomic.LoadUint32((*uint32)(uptr))
@@ -195,7 +195,7 @@ func (buf *Buffer) GetInt32Volatile(offset int32) int32 {
 }
 
 func (buf *Buffer) GetInt64Volatile(offset int32) int64 {
-	buf.BoundsCheck(offset, 8)
+	BoundsCheck(offset, 8, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	cur := atomic.LoadUint64((*uint64)(uptr))
@@ -204,49 +204,49 @@ func (buf *Buffer) GetInt64Volatile(offset int32) int64 {
 }
 
 func (buf *Buffer) PutInt64Ordered(offset int32, value int64) {
-	buf.BoundsCheck(offset, 8)
+	BoundsCheck(offset, 8, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	atomic.StoreInt64((*int64)(uptr), value)
 }
 
 func (buf *Buffer) PutInt32Ordered(offset int32, value int32) {
-	buf.BoundsCheck(offset, 4)
+	BoundsCheck(offset, 4, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	atomic.StoreInt32((*int32)(uptr), value)
 }
 
 func (buf *Buffer) PutIntOrdered(offset int32, value int) {
-	buf.BoundsCheck(offset, 4)
+	BoundsCheck(offset, 4, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	atomic.StoreInt32((*int32)(uptr), int32(value))
 }
 
 func (buf *Buffer) CompareAndSetInt64(offset int32, expectedValue, updateValue int64) bool {
-	buf.BoundsCheck(offset, 8)
+	BoundsCheck(offset, 8, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	return atomic.CompareAndSwapInt64((*int64)(uptr), expectedValue, updateValue)
 }
 
 func (buf *Buffer) CompareAndSetInt32(offset int32, expectedValue, updateValue int32) bool {
-	buf.BoundsCheck(offset, 4)
+	BoundsCheck(offset, 4, buf.length)
 
 	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
 	return atomic.CompareAndSwapInt32((*int32)(uptr), expectedValue, updateValue)
 }
 
 func (buf *Buffer) PutBytes(index int32, srcBuffer *Buffer, srcint32 int32, length int32) {
-	buf.BoundsCheck(index, length)
-	srcBuffer.BoundsCheck(srcint32, length)
+	BoundsCheck(index, length, buf.length)
+	BoundsCheck(srcint32, length, srcBuffer.length)
 
 	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(srcBuffer.bufferPtr)+uintptr(srcint32), length)
 }
 
 func (buf *Buffer) GetBytesArray(offset int32, length int32) []byte {
-	buf.BoundsCheck(offset, length)
+	BoundsCheck(offset, length, buf.length)
 
 	bArr := make([]byte, length)
 	for ix := 0; ix < int(length); ix++ {
@@ -258,22 +258,16 @@ func (buf *Buffer) GetBytesArray(offset int32, length int32) []byte {
 }
 
 func (buf *Buffer) PutBytesArray(index int32, arr *[]byte, srcint32 int32, length int32) {
-	buf.BoundsCheck(index, length)
-	boundsCheck(srcint32, length, int32(len(*arr)))
+	BoundsCheck(index, length, buf.length)
+	BoundsCheck(srcint32, length, int32(len(*arr)))
 
 	bArr := *arr
 
 	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(unsafe.Pointer(&bArr[0]))+uintptr(srcint32), length)
 }
 
-func (buf *Buffer) BoundsCheck(index int32, length int32) {
-	if (index + length) > buf.length {
-		log.Fatal(fmt.Sprintf("int32 Out of Bounds[%p]. int32: %d + %d Capacity: %d", buf, index, length, buf.length))
-	}
-}
-
-func boundsCheck(index int32, length int32, myLength int32) {
+func BoundsCheck(index int32, length int32, myLength int32) {
 	if (index + length) > myLength {
-		log.Fatal(fmt.Sprintf("int32 Out of Bounds. int32: %d + %d Capacity: %d", index, length, myLength))
+		log.Fatal(fmt.Sprintf("Out of Bounds. int32: %d + %d Capacity: %d", index, length, myLength))
 	}
 }

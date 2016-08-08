@@ -32,7 +32,7 @@ type Int32Field struct {
 }
 
 func (fld *Int32Field) Wrap(buffer *atomic.Buffer, offset int) int {
-	buffer.BoundsCheck(int32(offset), 4)
+	atomic.BoundsCheck(int32(offset), 4, buffer.Capacity())
 
 	fld.offset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
 	return 4
@@ -51,7 +51,7 @@ type Int64Field struct {
 }
 
 func (fld *Int64Field) Wrap(buffer *atomic.Buffer, offset int) int {
-	buffer.BoundsCheck(int32(offset), 8)
+	atomic.BoundsCheck(int32(offset), 8, buffer.Capacity())
 
 	fld.offset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
 	return 8
@@ -72,12 +72,12 @@ type StringField struct {
 }
 
 func (fld *StringField) Wrap(buffer *atomic.Buffer, offset int, fly Flyweight) int {
-	buffer.BoundsCheck(int32(offset), 4)
+	atomic.BoundsCheck(int32(offset), 4, buffer.Capacity())
 
 	fld.lenOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
 	len := *(*int32)(fld.lenOffset)
 
-	buffer.BoundsCheck(int32(offset)+4, len)
+	atomic.BoundsCheck(int32(offset)+4, len, buffer.Capacity())
 
 	fld.fly = fly
 	fld.dataOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset+4))

@@ -22,9 +22,9 @@ import (
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-const InsufficientCapacity int32 = -2
+const insufficientCapacity int32 = -2
 
-var Descriptor = struct {
+var descriptor = struct {
 	tailPositionOffset       int32
 	headCachePositionOffset  int32
 	headPositionOffset       int32
@@ -51,19 +51,20 @@ type ManyToOne struct {
 	consumerHeartbeatIndex    int32
 }
 
+// Init is the main initialization method
 func (buf *ManyToOne) Init(buffer *atomic.Buffer) *ManyToOne {
 
 	buf.buffer = buffer
-	buf.capacity = buffer.Capacity() - Descriptor.trailerLength
+	buf.capacity = buffer.Capacity() - descriptor.trailerLength
 
 	util.IsPowerOfTwo(buf.capacity)
 
 	buf.maxMsgLength = buf.capacity / 8
-	buf.tailPositionIndex = buf.capacity + Descriptor.tailPositionOffset
-	buf.headCachePositionIndex = buf.capacity + Descriptor.headCachePositionOffset
-	buf.headPositionIndex = buf.capacity + Descriptor.headPositionOffset
-	buf.correlationIDCounterIndex = buf.capacity + Descriptor.correlationCounterOffset
-	buf.consumerHeartbeatIndex = buf.capacity + Descriptor.consumerHeartbeatOffset
+	buf.tailPositionIndex = buf.capacity + descriptor.tailPositionOffset
+	buf.headCachePositionIndex = buf.capacity + descriptor.headCachePositionOffset
+	buf.headPositionIndex = buf.capacity + descriptor.headPositionOffset
+	buf.correlationIDCounterIndex = buf.capacity + descriptor.correlationCounterOffset
+	buf.consumerHeartbeatIndex = buf.capacity + descriptor.consumerHeartbeatOffset
 
 	return buf
 }
@@ -105,7 +106,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 			head = buf.buffer.GetInt64Volatile(buf.headPositionIndex)
 
 			if requiredCapacity > (buf.capacity - int32(tail-head)) {
-				return InsufficientCapacity
+				return insufficientCapacity
 			}
 
 			buf.buffer.PutInt64Ordered(buf.headCachePositionIndex, head)
@@ -123,7 +124,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 				headIndex = int32(head & int64(mask))
 
 				if requiredCapacity > headIndex {
-					return InsufficientCapacity
+					return insufficientCapacity
 				}
 
 				buf.buffer.PutInt64Ordered(buf.headCachePositionIndex, head)
@@ -147,6 +148,7 @@ func (buf *ManyToOne) checkMsgLength(length int32) {
 	}
 }
 
+// Write will attempt to append the bytes from srcBuffer to this rinf buffer
 func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex int32, length int32) bool {
 
 	isSuccessful := false
@@ -158,7 +160,7 @@ func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex 
 	requiredCapacity := util.AlignInt32(recordLength, RecordDescriptor.RecordAlignment)
 	recordIndex := buf.claimCapacity(requiredCapacity)
 
-	if InsufficientCapacity != recordIndex {
+	if insufficientCapacity != recordIndex {
 		buf.buffer.PutInt64Ordered(recordIndex, makeHeader(-recordLength, msgTypeID))
 		buf.buffer.PutBytes(EncodedMsgOffset(recordIndex), srcBuffer, srcIndex, length)
 		buf.buffer.PutInt32Ordered(LengthOffset(recordIndex), recordLength)

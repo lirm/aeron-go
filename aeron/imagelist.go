@@ -21,10 +21,12 @@ import (
 	"unsafe"
 )
 
+// ImageList is a helper class to manage list of images atomically without locks
 type ImageList struct {
 	img unsafe.Pointer
 }
 
+// NewImageList is a factory method for ImageList
 func NewImageList() *ImageList {
 	list := new(ImageList)
 
@@ -34,14 +36,17 @@ func NewImageList() *ImageList {
 	return list
 }
 
+// Get returns a pointer to the underlying image array loaded atomically
 func (l *ImageList) Get() []*Image {
 	return *(*[]*Image)(atomic.LoadPointer(&l.img))
 }
 
+// Set atomically sets the reference to the underlying array
 func (l *ImageList) Set(imgs []*Image) {
 	atomic.StorePointer(&l.img, unsafe.Pointer(&imgs))
 }
 
+// Empty is a convenience method to reset the contents of the list
 func (l *ImageList) Empty() (oldList []*Image) {
 	oldList = l.Get()
 	l.Set(make([]*Image, 0))

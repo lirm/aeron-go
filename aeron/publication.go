@@ -50,7 +50,7 @@ type Publication struct {
 
 	isClosed atomic.Bool
 
-	appenders    [logbuffer.PartitionCount]*term.Appender
+	appenders [logbuffer.PartitionCount]*term.Appender
 }
 
 // NewPublication is a factory method create new publications
