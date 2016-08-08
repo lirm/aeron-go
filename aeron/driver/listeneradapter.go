@@ -91,7 +91,7 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 		case Events.OnPublicationReady:
 			logger.Debugf("received ON_PUBLICATION_READY")
 
-			var msg PublicationReady
+			var msg publicationReady
 			msg.Wrap(buffer, int(offset))
 
 			correlationID := msg.correlationID.Get()
@@ -104,7 +104,7 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 		case Events.OnAvailableImage:
 			logger.Debugf("received ON_AVAILABLE_IMAGE")
 
-			var header ImageReadyHeader
+			var header imageReadyHeader
 			header.Wrap(buffer, int(offset))
 
 			correlationID := header.correlationID.Get()
@@ -116,7 +116,7 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 
 			subscriberPositions := make([]SubscriberPosition, subsPosBlockCnt)
 			pos := offset + int32(24)
-			var posFly SubscriberPositionFly
+			var posFly subscriberPositionFly
 			for ix := 0; ix < subsPosBlockCnt; ix++ {
 				posFly.Wrap(buffer, int(pos))
 				pos += subsPosBlockLen
@@ -126,7 +126,7 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			}
 			logger.Debugf("positions: %v", subscriberPositions)
 
-			var trailer ImageReadyTrailer
+			var trailer imageReadyTrailer
 			trailer.Wrap(buffer, int(pos))
 
 			logFileName := trailer.logFile.Get()
@@ -159,7 +159,7 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 		case Events.OnError:
 			logger.Debugf("received ON_ERROR")
 
-			var msg ErrorMessage
+			var msg errorMessage
 			msg.Wrap(buffer, int(offset))
 
 			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationID.Get(),

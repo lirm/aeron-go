@@ -21,14 +21,14 @@ import (
 	"github.com/lirm/aeron-go/aeron/flyweight"
 )
 
-type SubscriberPositionFly struct {
+type subscriberPositionFly struct {
 	flyweight.FWBase
 
 	indicatorID    flyweight.Int32Field
 	registrationID flyweight.Int64Field
 }
 
-func (m *SubscriberPositionFly) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+func (m *subscriberPositionFly) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.indicatorID.Wrap(buf, pos)
 	pos += m.registrationID.Wrap(buf, pos)
@@ -37,14 +37,14 @@ func (m *SubscriberPositionFly) Wrap(buf *atomic.Buffer, offset int) flyweight.F
 	return m
 }
 
-type ImageReadyTrailer struct {
+type imageReadyTrailer struct {
 	flyweight.FWBase
 
 	logFile        flyweight.StringField
 	sourceIdentity flyweight.StringField
 }
 
-func (m *ImageReadyTrailer) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+func (m *imageReadyTrailer) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.logFile.Wrap(buf, pos, m)
 	pos += m.sourceIdentity.Wrap(buf, pos, m)
@@ -53,7 +53,7 @@ func (m *ImageReadyTrailer) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	return m
 }
 
-type ErrorMessage struct {
+type errorMessage struct {
 	flyweight.FWBase
 
 	offendingCommandCorrelationID flyweight.Int64Field
@@ -61,7 +61,7 @@ type ErrorMessage struct {
 	errorMessage                  flyweight.StringField
 }
 
-func (m *ErrorMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+func (m *errorMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.offendingCommandCorrelationID.Wrap(buf, pos)
 	pos += m.errorCode.Wrap(buf, pos)
@@ -71,7 +71,7 @@ func (m *ErrorMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight 
 	return m
 }
 
-type PublicationReady struct {
+type publicationReady struct {
 	flyweight.FWBase
 
 	correlationID          flyweight.Int64Field
@@ -81,7 +81,7 @@ type PublicationReady struct {
 	logFile                flyweight.StringField
 }
 
-func (m *PublicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+func (m *publicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.correlationID.Wrap(buf, pos)
 	pos += m.sessionID.Wrap(buf, pos)
@@ -93,7 +93,7 @@ func (m *PublicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywei
 	return m
 }
 
-type ImageReadyHeader struct {
+type imageReadyHeader struct {
 	flyweight.FWBase
 
 	correlationID   flyweight.Int64Field
@@ -103,7 +103,7 @@ type ImageReadyHeader struct {
 	subsPosBlockCnt flyweight.Int32Field
 }
 
-func (m *ImageReadyHeader) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+func (m *imageReadyHeader) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.correlationID.Wrap(buf, pos)
 	pos += m.sessionID.Wrap(buf, pos)

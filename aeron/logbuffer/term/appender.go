@@ -36,8 +36,10 @@ const (
 	unfragmented uint8 = 0x80 | 0x40
 )
 
+// DefaultReservedValueSupplier is the default reserved value provider
 var DefaultReservedValueSupplier ReservedValueSupplier = func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64 { return 0 }
 
+// ReservedValueSupplier is the type definition for a provider of user supplied header data
 type ReservedValueSupplier func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64
 
 // HeaderWriter is a helper class for writing frame header to the term
@@ -47,7 +49,7 @@ type headerWriter struct {
 	buffer    atomic.Buffer
 }
 
-func (header *headerWriter) Fill(defaultHdr *atomic.Buffer) {
+func (header *headerWriter) fill(defaultHdr *atomic.Buffer) {
 	header.sessionID = defaultHdr.GetInt32(logbuffer.DataFrameHeader.SessionIDFieldOffset)
 	header.streamID = defaultHdr.GetInt32(logbuffer.DataFrameHeader.StreamIDFieldOffset)
 }
@@ -67,6 +69,7 @@ func (header *headerWriter) write(termBuffer *atomic.Buffer, offset, length, ter
 	header.buffer.PutInt32(logbuffer.DataFrameHeader.TermIDFieldOffset, termID)
 }
 
+// Appender type is the term writer
 type Appender struct {
 	termBuffer   *atomic.Buffer
 	tailBuffer   *atomic.Buffer
@@ -87,6 +90,7 @@ func (result *AppenderResult) TermID() int32 {
 	return result.termID
 }
 
+// MakeAppender is the factory function for term Appenders
 func MakeAppender(termBuffer *atomic.Buffer, metaDataBuffer *atomic.Buffer, partitionIndex int) *Appender {
 	appender := new(Appender)
 	appender.termBuffer = termBuffer
@@ -94,11 +98,12 @@ func MakeAppender(termBuffer *atomic.Buffer, metaDataBuffer *atomic.Buffer, part
 	appender.tailOffset = logbuffer.Descriptor.TermTailCounterOffset + (int32(partitionIndex) * util.SizeOfInt64)
 
 	header := logbuffer.DefaultFrameHeader(metaDataBuffer)
-	appender.headerWriter.Fill(header)
+	appender.headerWriter.fill(header)
 
 	return appender
 }
 
+// RawTail is the accessor to the raw value of the tail offset used by Publication
 func (appender *Appender) RawTail() int64 {
 	return appender.tailBuffer.GetInt64Volatile(appender.tailOffset)
 }
@@ -107,6 +112,7 @@ func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
 	return appender.tailBuffer.GetAndAddInt64(appender.tailOffset, int64(alignedLength))
 }
 
+// Claim is the interface for using Buffer Claims for zero copy sends
 func (appender *Appender) Claim(result *AppenderResult, length int32, claim *logbuffer.Claim) {
 
 	frameLength := length + logbuffer.DataFrameHeader.Length
@@ -128,6 +134,7 @@ func (appender *Appender) Claim(result *AppenderResult, length int32, claim *log
 	}
 }
 
+// AppendUnfragmentedMessage appends an unfragmented message in a single frame to the term
 func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult,
 	srcBuffer *atomic.Buffer, srcOffset int32, length int32, reservedValueSupplier ReservedValueSupplier) {
 
@@ -157,6 +164,7 @@ func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult,
 	}
 }
 
+// AppendFragmentedMessage appends a message greater than frame length as a batch of fragments
 func (appender *Appender) AppendFragmentedMessage(result *AppenderResult,
 	srcBuffer *atomic.Buffer, srcOffset int32, length int32, maxPayloadLength int32, reservedValueSupplier ReservedValueSupplier) {
 
