@@ -26,6 +26,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"io"
 	"log"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -184,8 +185,8 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 	cc.timeOfLastCheckManagedResources = now
 	cc.timeOfLastDoWork = now
 
-	// In Go 1.7 should have the following line
-	// runtime.LockOSThread()
+	// Stay on the same thread for performance
+	runtime.LockOSThread()
 
 	// Clean exit from this particular go routine
 	defer func() {

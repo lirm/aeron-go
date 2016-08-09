@@ -56,7 +56,7 @@ func main() {
 	log.Printf("Publication found %v", publication)
 
 	if *examples.ExamplesConfig.ProfilerEnabled {
-		fname := fmt.Sprintf("pong-%d.pprof", time.Now().Unix())
+		fname := fmt.Sprintf("ping-%d.pprof", time.Now().Unix())
 		log.Printf("Profiling enabled. Will use: %s", fname)
 		f, err := os.Create(fname)
 		if err == nil {

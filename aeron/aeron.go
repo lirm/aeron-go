@@ -26,14 +26,19 @@ import (
 	"time"
 )
 
+// NewPublicationHandler is the handler type for new publication notification from the media driver
 type NewPublicationHandler func(string, int32, int32, int64)
 
+// NewSubscriptionHandler is the handler type for new subscription notification from the media driver
 type NewSubscriptionHandler func(string, int32, int64)
 
+// AvailableImageHandler is the handler type for image available notification from the media driver
 type AvailableImageHandler func(*Image)
 
+// UnavailableImageHandler is the handler type for image unavailable notification from the media driver
 type UnavailableImageHandler func(*Image)
 
+// Aeron is the primary interface to the media driver for managing subscriptions and publications
 type Aeron struct {
 	context            *Context
 	conductor          ClientConductor
@@ -49,6 +54,7 @@ type Aeron struct {
 
 var logger = logging.MustGetLogger("aeron")
 
+// Connect is the factory method used to create a new instance of Aeron based on Context settings
 func Connect(ctx *Context) *Aeron {
 	aeron := new(Aeron)
 	aeron.context = ctx
@@ -78,10 +84,17 @@ func Connect(ctx *Context) *Aeron {
 	return aeron
 }
 
+// Close will terminate client conductor and remove all publications and subscriptions from the media driver
 func (aeron *Aeron) Close() error {
 	err := aeron.conductor.Close()
+	if nil != err {
+		aeron.context.errorHandler(err)
+	}
 
 	err = aeron.cncFile.Close()
+	if nil != err {
+		aeron.context.errorHandler(err)
+	}
 
 	return err
 }
