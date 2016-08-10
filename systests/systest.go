@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aeron
+package systests
 
 import (
+	. "github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
@@ -28,6 +29,8 @@ const (
 	TestChannel  = "aeron:udp?endpoint=localhost:40123" // TestChannel is the default channel used for testing
 	TestStreamID = 10                                   // TestStreamID is the default stream ID used for testing
 )
+
+var logger = logging.MustGetLogger("systests")
 
 func send(n int, pub *Publication, t *testing.T) {
 	message := "this is a message"
