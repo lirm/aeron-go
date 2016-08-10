@@ -32,3 +32,4 @@ examples/basic_subscriber/basic_subscriber
 examples/basic_publisher/basic_publisher
 aeron/util/memmap/mmap.bin
 *.iml
+systests/systests

@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package systests
+package main
 
 import (
 	. "github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
-	"testing"
 	"time"
 )
 
@@ -32,7 +31,7 @@ const (
 
 var logger = logging.MustGetLogger("systests")
 
-func send(n int, pub *Publication, t *testing.T) {
+func send(n int, pub *Publication) {
 	message := "this is a message"
 	srcBuffer := atomic.MakeBuffer(([]byte)(message))
 
@@ -42,14 +41,14 @@ func send(n int, pub *Publication, t *testing.T) {
 		for v <= 0 {
 			v = pub.Offer(srcBuffer, 0, int32(len(message)), nil)
 			if time.Now().After(timeoutAt) {
-				t.Fatalf("Timed out at %v", time.Now())
+				logger.Fatalf("Timed out at %v", time.Now())
 			}
 			time.Sleep(time.Millisecond * 50)
 		}
 	}
 }
 
-func receive(n int, sub *Subscription, t *testing.T) {
+func receive(n int, sub *Subscription) {
 	counter := 0
 	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		counter++
@@ -61,25 +60,25 @@ func receive(n int, sub *Subscription, t *testing.T) {
 			recvd := sub.Poll(handler, 10)
 			if recvd == 1 {
 				fragmentsRead.Add(int32(recvd))
-				t.Logf("  have %d fragments", fragmentsRead)
+				logger.Debugf("  have %d fragments", fragmentsRead)
 				break
 			}
 			if time.Now().After(timeoutAt) {
-				t.Fatalf("%v: timed out waiting for message", time.Now())
+				logger.Fatalf("%v: timed out waiting for message", time.Now())
 				break
 			}
 			time.Sleep(time.Millisecond)
 		}
 	}
 	if int(fragmentsRead.Get()) != n {
-		t.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
+		logger.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
 	}
 	if counter != n {
-		t.Fatalf("Expected %d message. Got %d", n, counter)
+		logger.Fatalf("Expected %d message. Got %d", n, counter)
 	}
 }
 
-func subAndSend(n int, a *Aeron, pub *Publication, t *testing.T) {
+func subAndSend(n int, a *Aeron, pub *Publication) {
 	sub := <-a.AddSubscription(TestChannel, TestStreamID)
 	defer sub.Close()
 
@@ -88,8 +87,8 @@ func subAndSend(n int, a *Aeron, pub *Publication, t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 
-	send(n, pub, t)
-	receive(n, sub, t)
+	send(n, pub)
+	receive(n, sub)
 }
 
 func logtest(flag bool) {
@@ -103,7 +102,7 @@ func logtest(flag bool) {
 	}
 }
 
-func TestAeronBasics(t *testing.T) {
+func TestAeronBasics() {
 
 	logtest(false)
 	logger.Debug("Started TestAeronBasics")
@@ -114,10 +113,10 @@ func TestAeronBasics(t *testing.T) {
 	pub := <-a.AddPublication(TestChannel, TestStreamID)
 	defer pub.Close()
 
-	subAndSend(1, a, pub, t)
+	subAndSend(1, a, pub)
 }
 
-func TestAeronSendMultipleMessages(t *testing.T) {
+func TestAeronSendMultipleMessages() {
 
 	logtest(false)
 	logger.Debug("Started TestAeronSendMultipleMessages")
@@ -137,11 +136,11 @@ func TestAeronSendMultipleMessages(t *testing.T) {
 	}
 
 	itCount := 100
-	go send(itCount, pub, t)
-	receive(itCount, sub, t)
+	go send(itCount, pub)
+	receive(itCount, sub)
 }
 
-func TestAeronSendMultiplePublications(t *testing.T) {
+func TestAeronSendMultiplePublications() {
 
 	logtest(false)
 	logger.Debug("Started TestAeronSendMultiplePublications")
@@ -182,22 +181,22 @@ func TestAeronSendMultiplePublications(t *testing.T) {
 
 	logger.Debugf(" ==> Got pubs %v", pubs)
 
-	go receive(itCount*pubCount, sub, t)
+	go receive(itCount*pubCount, sub)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// Send
 	for i := 0; i < itCount; i++ {
 		for pIx, p := range pubs {
-			send(1, p, t)
-			t.Logf("sent %d to pubs[%d]", i, pIx)
+			send(1, p)
+			logger.Debugf("sent %d to pubs[%d]", i, pIx)
 			logger.Debugf("sent %d to pubs[%d]", i, pIx)
 		}
 	}
 
 }
 
-func TestAeronResubscribe(t *testing.T) {
+func TestAeronResubscribe() {
 
 	logtest(false)
 	logger.Debug("Started TestAeronResubscribe")
@@ -207,11 +206,11 @@ func TestAeronResubscribe(t *testing.T) {
 
 	pub := <-a.AddPublication(TestChannel, TestStreamID)
 
-	subAndSend(1, a, pub, t)
-	subAndSend(1, a, pub, t)
+	subAndSend(1, a, pub)
+	subAndSend(1, a, pub)
 }
 
-func TestResubStress(t *testing.T) {
+func TestResubStress() {
 	logtest(false)
 	logger.Debug("Started TestAeronResubscribe")
 
@@ -220,12 +219,12 @@ func TestResubStress(t *testing.T) {
 
 	pub := <-a.AddPublication(TestChannel, TestStreamID)
 	for i := 0; i < 100; i++ {
-		subAndSend(1, a, pub, t)
-		t.Logf("bounce %d", i)
+		subAndSend(1, a, pub)
+		logger.Debugf("bounce %d", i)
 	}
 }
 
-func TestAeronClose(t *testing.T) {
+func TestAeronClose() {
 
 	logtest(false)
 	logger.Debug("Started TestAeronClose")
@@ -233,4 +232,18 @@ func TestAeronClose(t *testing.T) {
 	ctx := NewContext().MediaDriverTimeout(time.Second * 5)
 	a := Connect(ctx)
 	a.Close()
+}
+
+func main() {
+	TestAeronBasics()
+
+	TestAeronClose()
+
+	TestAeronResubscribe()
+
+	TestAeronSendMultipleMessages()
+
+	TestAeronSendMultiplePublications()
+
+	TestResubStress()
 }
