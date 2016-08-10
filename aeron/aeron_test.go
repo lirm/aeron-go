@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	TestChannel  = "aeron:udp?endpoint=localhost:40123"
-	TestStreamID = 10
+	TestChannel  = "aeron:udp?endpoint=localhost:40123" // TestChannel is the default channel used for testing
+	TestStreamID = 10                                   // TestStreamID is the default stream ID used for testing
 )
 
 func send(n int, pub *Publication, t *testing.T) {
@@ -179,36 +179,7 @@ func TestAeronSendMultiplePublications(t *testing.T) {
 
 	logger.Debugf(" ==> Got pubs %v", pubs)
 
-	go func() {
-		n := itCount * pubCount
-		counter := 0
-		handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-			counter++
-		}
-		var fragmentsRead atomic.Int
-		for i := 0; i < n; i++ {
-			timeoutAt := time.Now().Add(time.Second)
-			for {
-				recvd := sub.Poll(handler, 10)
-				if recvd == 1 {
-					fragmentsRead.Add(int32(recvd))
-					t.Logf("  have %d fragments", fragmentsRead)
-					break
-				}
-				if time.Now().After(timeoutAt) {
-					t.Fatalf("%v: timed out waiting for message", time.Now())
-					break
-				}
-				time.Sleep(time.Millisecond)
-			}
-		}
-		if int(fragmentsRead.Get()) != n {
-			t.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
-		}
-		if counter != n {
-			t.Fatalf("Expected %d message. Got %d", n, counter)
-		}
-	}()
+	go receive(itCount*pubCount, sub, t)
 
 	time.Sleep(200 * time.Millisecond)
 
