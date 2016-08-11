@@ -53,3 +53,33 @@ func TestStringFlyweight(t *testing.T) {
 		t.Error("Got", fw.s.Get(), "instead of", str)
 	}
 }
+
+type PaddedFly struct {
+	FWBase
+
+	i64 Int64Field
+	i32 Int32Field
+	pad Padding
+}
+
+func (m *PaddedFly) Wrap(buf *atomic.Buffer, offset int) Flyweight {
+	pos := offset
+	pos += m.i64.Wrap(buf, pos)
+	pos += m.i32.Wrap(buf, pos)
+	pos += m.pad.Wrap(buf, pos, 64)
+
+	m.SetSize(pos - offset)
+	return m
+}
+
+func TestPadding_Wrap(t *testing.T) {
+	buf := atomic.MakeBuffer(make([]byte, 128), 128)
+
+	var fw PaddedFly
+	fw.Wrap(buf, 0)
+
+	if fw.Size() != 64 {
+		t.Logf("fw size: %d", fw.size)
+		t.Fail()
+	}
+}

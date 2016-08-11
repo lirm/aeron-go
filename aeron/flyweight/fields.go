@@ -126,3 +126,17 @@ func (f *RawDataField) Wrap(buffer *atomic.Buffer, offset int, length int32) int
 func (f *RawDataField) Get() *atomic.Buffer {
 	return &f.buf
 }
+
+type Padding struct {
+	raw RawDataField
+}
+
+// Wrap for padding takes alignment as the third argument
+func (f *Padding) Wrap(buffer *atomic.Buffer, offset int, length int32) int {
+	newLen := util.AlignInt32(int32(offset), length)
+	return f.raw.Wrap(buffer, offset, newLen-int32(offset))
+}
+
+func (f *Padding) Get() *atomic.Buffer {
+	return f.raw.Get()
+}

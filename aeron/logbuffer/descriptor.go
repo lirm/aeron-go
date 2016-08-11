@@ -19,6 +19,7 @@ package logbuffer
 import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/flyweight"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
@@ -27,14 +28,95 @@ const (
 	NeedsCleaning           int32 = 1
 	PartitionCount          int   = 3
 	LogMetaDataSectionIndex int   = PartitionCount
+
+	termMinLength        int32 = 64 * 1024
+	maxSingleMappingSize int64 = 0x7FFFFFFF
+
+	sizeofLogMetadata int32 = util.CacheLineLength * 2
 )
 
+/**
+ * <pre>
+ *   0                   1                   2                   3
+ *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  |                       Tail Counter 0                          |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                       Tail Counter 1                          |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                       Tail Counter 2                          |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                   Active Partition Index                      |
+ *  +---------------------------------------------------------------+
+ *  |                      Cache Line Padding                      ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ *  |                 Time of Last Status Message                   |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                      Cache Line Padding                      ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ *  |                 Registration / Correlation ID                 |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                        Initial Term Id                        |
+ *  +---------------------------------------------------------------+
+ *  |                  Default Frame Header Length                  |
+ *  +---------------------------------------------------------------+
+ *  |                          MTU Length                           |
+ *  +---------------------------------------------------------------+
+ *  |                      Cache Line Padding                      ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ *  |                    Default Frame Header                      ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ * </pre>
+ */
+
+type LogBufferMetaData struct {
+	flyweight.FWBase
+
+	TailCounter0        flyweight.Int64Field
+	TailCounter1        flyweight.Int64Field
+	TailCounter2        flyweight.Int64Field
+	ActivePartitionIx   flyweight.Int32Field
+	padding0            flyweight.Padding
+	TimeOfLastStatusMsg flyweight.Int64Field
+	padding1            flyweight.Padding
+	RegID               flyweight.Int64Field
+	InitTermID          flyweight.Int32Field
+	DefaultFrameHdrLen  flyweight.Int32Field
+	MTULen              flyweight.Int32Field
+	padding2            flyweight.Padding
+	DefaultFrameHeader  flyweight.RawDataField
+}
+
+func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.TailCounter0.Wrap(buf, pos)
+	pos += m.TailCounter1.Wrap(buf, pos)
+	pos += m.TailCounter2.Wrap(buf, pos)
+	pos += m.ActivePartitionIx.Wrap(buf, pos)
+	pos += m.padding0.Wrap(buf, pos, util.CacheLineLength*2)
+	pos += m.TimeOfLastStatusMsg.Wrap(buf, pos)
+	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2)
+	pos += m.RegID.Wrap(buf, pos)
+	pos += m.InitTermID.Wrap(buf, pos)
+	pos += m.DefaultFrameHdrLen.Wrap(buf, pos)
+	pos += m.MTULen.Wrap(buf, pos)
+	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2)
+	pos += m.DefaultFrameHeader.Wrap(buf, pos, m.DefaultFrameHdrLen.Get())
+
+	m.SetSize(pos - offset)
+	return m
+}
+
 var Descriptor = struct {
-	termMinLength        int32
-	maxSingleMappingSize int64
-
-	sizeofLogMetadata int32
-
 	TermTailCounterOffset int32
 
 	logActivePartitionIndexOffset    int32
@@ -46,11 +128,6 @@ var Descriptor = struct {
 	logDefaultFrameHeaderOffset uintptr
 	logMetaDataLength           int32
 }{
-	64 * 1024,
-	0x7FFFFFFF,
-
-	util.CacheLineLength * 2,
-
 	0,
 
 	util.SizeOfInt64 * int32(PartitionCount),
@@ -64,9 +141,9 @@ var Descriptor = struct {
 }
 
 func checkTermLength(termLength int64) {
-	if termLength < int64(Descriptor.termMinLength) {
+	if termLength < int64(termMinLength) {
 		panic(fmt.Sprintf("Term length less than min size of %d, length=%d",
-			Descriptor.termMinLength, termLength))
+			termMinLength, termLength))
 	}
 
 	if (termLength & (int64(FrameAlignment) - 1)) != 0 {

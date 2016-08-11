@@ -29,6 +29,7 @@ var logger = logging.MustGetLogger("logbuffers")
 type LogBuffers struct {
 	mmapFiles []*memmap.File
 	buffers   [PartitionCount + 1]atomic.Buffer
+	meta      LogBufferMetaData
 }
 
 // Wrap is the factory method wrapping the LogBuffers structure around memory mapped file
@@ -40,7 +41,7 @@ func Wrap(fileName string) *LogBuffers {
 
 	checkTermLength(termLength)
 
-	if logLength < Descriptor.maxSingleMappingSize {
+	if logLength < maxSingleMappingSize {
 		mmap, err := memmap.MapExisting(fileName, 0, 0)
 		if err != nil {
 			panic(err)
@@ -82,7 +83,13 @@ func Wrap(fileName string) *LogBuffers {
 		buffers.buffers[PartitionCount].Wrap(metaDataBasePtr, Descriptor.logMetaDataLength)
 	}
 
+	buffers.meta.Wrap(&buffers.buffers[PartitionCount], 0)
+
 	return buffers
+}
+
+func (logBuffers *LogBuffers) Meta() *LogBufferMetaData {
+	return &logBuffers.meta
 }
 
 func (logBuffers *LogBuffers) Buffer(index int) *atomic.Buffer {

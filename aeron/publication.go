@@ -38,7 +38,6 @@ const (
 // Publication is a sender structure
 type Publication struct {
 	conductor           *ClientConductor
-	logMetaDataBuffer   *atomic.Buffer
 	channel             string
 	registrationID      int64
 	streamID            int32
@@ -49,6 +48,7 @@ type Publication struct {
 	publicationLimit    Position
 
 	isClosed atomic.Bool
+	metaData *logbuffer.LogBufferMetaData
 
 	appenders [logbuffer.PartitionCount]*term.Appender
 }
@@ -56,14 +56,16 @@ type Publication struct {
 // NewPublication is a factory method create new publications
 func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub := new(Publication)
-	pub.logMetaDataBuffer = logBuffers.Buffer(logbuffer.LogMetaDataSectionIndex)
-	pub.initialTermID = logbuffer.InitialTermID(pub.logMetaDataBuffer)
-	pub.maxPayloadLength = logbuffer.MtuLength(pub.logMetaDataBuffer) - logbuffer.DataFrameHeader.Length
+	pub.metaData = logBuffers.Meta()
+	pub.initialTermID = pub.metaData.InitTermID.Get()
+	pub.maxPayloadLength = pub.metaData.MTULen.Get() - logbuffer.DataFrameHeader.Length
+
 	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(logBuffers.Buffer(0).Capacity()))
+
 	pub.isClosed.Set(false)
 
 	for i := 0; i < logbuffer.PartitionCount; i++ {
-		appender := term.MakeAppender(logBuffers.Buffer(i), pub.logMetaDataBuffer, i)
+		appender := term.MakeAppender(logBuffers.Buffer(i), logBuffers.Buffer(logbuffer.LogMetaDataSectionIndex), i)
 		logger.Debugf("TermAppender[%d]: %v", i, appender)
 		pub.appenders[i] = appender
 	}
@@ -73,7 +75,7 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 
 // IsConnected returns whether this publication is connected to the driver (not whether it has any Subscriptions)
 func (pub *Publication) IsConnected() bool {
-	return !pub.IsClosed() && pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer))
+	return !pub.IsClosed() && pub.conductor.isPublicationConnected(pub.metaData.TimeOfLastStatusMsg.Get())
 }
 
 // IsClosed returns whether this Publication has been closed
@@ -97,7 +99,7 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 
 	if !pub.IsClosed() {
 		limit := pub.publicationLimit.get()
-		partitionIndex := logbuffer.ActivePartitionIndex(pub.logMetaDataBuffer)
+		partitionIndex := pub.metaData.ActivePartitionIx.Get()
 		termAppender := pub.appenders[partitionIndex]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
@@ -125,10 +127,10 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 					nextIndex := logbuffer.NextPartitionIndex(partitionIndex)
 
 					pub.appenders[nextIndex].SetTailTermID(appendResult.TermID() + 1)
-					logbuffer.SetActivePartitionIndex(pub.logMetaDataBuffer, nextIndex)
+					pub.metaData.ActivePartitionIx.Set(nextIndex)
 				}
 			}
-		} else if pub.conductor.isPublicationConnected(logbuffer.TimeOfLastStatusMessage(pub.logMetaDataBuffer)) {
+		} else if pub.conductor.isPublicationConnected(pub.metaData.TimeOfLastStatusMsg.Get()) {
 			newPosition = BackPressured
 		} else {
 			newPosition = NotConnected
