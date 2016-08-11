@@ -28,7 +28,7 @@ const (
 
 func TestMmapBasics(t *testing.T) {
 	t.Log("Beginning test")
-	mmap, err := newFile(MMAP, 0, 8000)
+	mmap, err := NewFile(MMAP, 0, 8000)
 	defer mmap.Close()
 	// t.Logf("mmap: %v, len:%d, err:%v", mmap.GetMemoryPtr(), mmap.GetMemorySize(), err)
 	fmt.Printf("mmap: %v, len:%d, err:%v\n", mmap.GetMemoryPtr(), mmap.GetMemorySize(), err)

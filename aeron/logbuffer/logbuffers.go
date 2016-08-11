@@ -25,11 +25,13 @@ import (
 
 var logger = logging.MustGetLogger("logbuffers")
 
+// LogBuffers is the struct providing access to the file or files representing the terms containing the ring buffer
 type LogBuffers struct {
 	mmapFiles []*memmap.File
 	buffers   [PartitionCount + 1]atomic.Buffer
 }
 
+// Wrap is the factory method wrapping the LogBuffers structure around memory mapped file
 func Wrap(fileName string) *LogBuffers {
 	buffers := new(LogBuffers)
 

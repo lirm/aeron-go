@@ -100,7 +100,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 	return mmap, nil
 }
 
-func newFile(filename string, offset int64, length int) (*File, error) {
+func NewFile(filename string, offset int64, length int) (*File, error) {
 	logger.Debugf("Will try to map new %s, %d, %d", filename, offset, length)
 
 	f, err := os.Create(filename)
