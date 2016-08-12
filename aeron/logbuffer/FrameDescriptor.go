@@ -33,6 +33,10 @@ func lengthOffset(frameOffset int32) int32 {
 	return frameOffset + DataFrameHeader.FrameLengthFieldOffset
 }
 
+func ComputeMaxMessageLength(capacity int32) int32 {
+	return capacity / 8
+}
+
 func typeOffset(frameOffset int32) int32 {
 	return frameOffset + DataFrameHeader.TypeFieldOffset
 }

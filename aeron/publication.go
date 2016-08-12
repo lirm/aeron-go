@@ -44,6 +44,7 @@ type Publication struct {
 	sessionID           int32
 	initialTermID       int32
 	maxPayloadLength    int32
+	maxMessageLength    int32
 	positionBitsToShift int32
 	publicationLimit    Position
 
@@ -59,7 +60,7 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub.metaData = logBuffers.Meta()
 	pub.initialTermID = pub.metaData.InitTermID.Get()
 	pub.maxPayloadLength = pub.metaData.MTULen.Get() - logbuffer.DataFrameHeader.Length
-
+	pub.maxMessageLength = logbuffer.ComputeMaxMessageLength(logBuffers.Buffer(0).Capacity())
 	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(logBuffers.Buffer(0).Capacity()))
 
 	pub.isClosed.Set(false)
@@ -141,7 +142,7 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 }
 
 func (pub *Publication) checkForMaxMessageLength(length int32) {
-	if length > pub.maxPayloadLength {
+	if length > pub.maxMessageLength {
 		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxPayloadLength, length))
 	}
 }
