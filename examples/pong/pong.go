@@ -37,12 +37,14 @@ func main() {
 
 	flag.Parse()
 
-	logging.SetLevel(logging.INFO, "aeron")
-	logging.SetLevel(logging.INFO, "memmap")
-	logging.SetLevel(logging.INFO, "driver")
-	logging.SetLevel(logging.INFO, "counters")
-	logging.SetLevel(logging.INFO, "logbuffers")
-	logging.SetLevel(logging.INFO, "buffer")
+	if !*examples.ExamplesConfig.LoggingOn {
+		logging.SetLevel(logging.INFO, "aeron")
+		logging.SetLevel(logging.INFO, "memmap")
+		logging.SetLevel(logging.INFO, "driver")
+		logging.SetLevel(logging.INFO, "counters")
+		logging.SetLevel(logging.INFO, "logbuffers")
+		logging.SetLevel(logging.INFO, "buffer")
+	}
 
 	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
 	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
