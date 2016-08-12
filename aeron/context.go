@@ -19,7 +19,7 @@ package aeron
 import (
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	"os/user"
+	"os"
 	"time"
 )
 
@@ -109,11 +109,5 @@ func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
 }
 
 func (ctx *Context) CncFileName() string {
-	user, err := user.Current()
-	uName := "unknown"
-	if err != nil {
-		logger.Warningf("Failed to get current user name: %v", err)
-	}
-	uName = user.Username
-	return ctx.aeronDir + "/aeron-" + uName + "/" + counters.CncFile
+	return ctx.aeronDir + "/aeron-" + os.Getenv("USER") + "/" + counters.CncFile
 }
