@@ -77,15 +77,18 @@ type Appender struct {
 	headerWriter headerWriter
 }
 
+// AppenderResult is a helper structure for a zero-copy tuple return. Can likely be done with Go's tuple return
 type AppenderResult struct {
 	termOffset int64
 	termID     int32
 }
 
+// TermOffset returns current term offset
 func (result *AppenderResult) TermOffset() int64 {
 	return result.termOffset
 }
 
+// TermID return current term ID
 func (result *AppenderResult) TermID() int32 {
 	return result.termID
 }

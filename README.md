@@ -1,6 +1,10 @@
-<!--[![Build Status](https://travis-ci.org/lirm/aeron-go.svg?branch=master)](https://travis-ci.org/lirm/aeron-go)-->
+[![Build Status](https://travis-ci.org/lirm/aeron-go.svg?branch=master)](https://travis-ci.org/lirm/aeron-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/lirm/aeron-go)](https://goreportcard.com/report/github.com/lirm/aeron-go)
 <!--[![Coverage Status](https://coveralls.io/repos/github/lirm/aeron-go/badge.svg?branch=master)](https://coveralls.io/github/lirm/aeron-go?branch=master)-->
+
+Disclaimer: this project was created with the purpose of my learning [Go](https://golang.org), so feedback
+on design and non-idiomatic usage is very welcome. As well as any other comments and suggestions (and pull
+requests).
 
 # aeron-go
 Implementation of [Aeron](https://github.com/real-logic/Aeron) messaging client in Go.
@@ -104,6 +108,3 @@ default:
 * Configuration reading
 * Error log buffer use
 * Error handling
-* Create Go-style benchmark test
-* Reduce type casting
-* Perf profiling
