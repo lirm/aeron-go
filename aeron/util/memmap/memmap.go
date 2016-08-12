@@ -100,6 +100,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 	return mmap, nil
 }
 
+// NewFile is a factory method to create a new memory mapped file with the specified capacity
 func NewFile(filename string, offset int64, length int) (*File, error) {
 	logger.Debugf("Will try to map new %s, %d, %d", filename, offset, length)
 

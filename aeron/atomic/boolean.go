@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	True  int32 = 1 // True value for atomic.Bool
-	False int32 = 0 // False value for atomic.Bool
+	// True value for atomic.Bool
+	True int32 = 1
+	// False value for atomic.Bool
+	False int32 = 0
 )
 
 // Bool is an atomic boolean implementation used by aeron-go

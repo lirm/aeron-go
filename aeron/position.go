@@ -21,14 +21,16 @@ import (
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
+// Position is a wrapper for a buffer location of a position counter
 type Position struct {
 	buffer *atomic.Buffer
 	id     int32
 	offset int32
 }
 
+// NewPosition is a factory method to create new Position wrappers
 func NewPosition(buffer *atomic.Buffer, id int32) Position {
-	pos := new(Position)
+	var pos Position
 
 	pos.buffer = buffer
 	pos.id = id
@@ -36,7 +38,7 @@ func NewPosition(buffer *atomic.Buffer, id int32) Position {
 
 	logger.Debugf("<+ Counter[%d]: %d", id, pos.buffer.GetInt64(pos.offset))
 
-	return *pos
+	return pos
 }
 
 func (pos *Position) get() int64 {

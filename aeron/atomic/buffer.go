@@ -25,6 +25,8 @@ import (
 	"unsafe"
 )
 
+// Buffer is the equivalent of AtomicBuffer used by Aeron Java and C++ implementations. It provides
+// atomic operations on a raw byte buffer wrapped by the structure.
 type Buffer struct {
 	bufferPtr unsafe.Pointer
 	length    int32
@@ -80,20 +82,25 @@ func MakeBuffer(args ...interface{}) *Buffer {
 	return buf.Wrap(bufPtr, bufLen)
 }
 
+// Wrap raw memory with this buffer instance
 func (buf *Buffer) Wrap(buffer unsafe.Pointer, length int32) *Buffer {
 	buf.bufferPtr = buffer
 	buf.length = length
 	return buf
 }
 
+// Ptr will return the raw memory pointer for the underlying buffer
 func (buf *Buffer) Ptr() unsafe.Pointer {
 	return buf.bufferPtr
 }
 
+// Capacity of the buffer, which is used for bound checking
 func (buf *Buffer) Capacity() int32 {
 	return buf.length
 }
 
+// Fill the buffer with the value of the argument byte. Generally used for initialization,
+// since it's somewhat expensive.
 func (buf *Buffer) Fill(b uint8) {
 	if buf.length == 0 {
 		return
@@ -266,6 +273,8 @@ func (buf *Buffer) PutBytesArray(index int32, arr *[]byte, srcint32 int32, lengt
 	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(unsafe.Pointer(&bArr[0]))+uintptr(srcint32), length)
 }
 
+// BoundsCheck is helper function to make sure buffer writes and reads to
+// not go out of bounds on stated buffer capacity
 func BoundsCheck(index int32, length int32, myLength int32) {
 	if (index + length) > myLength {
 		log.Fatal(fmt.Sprintf("Out of Bounds. int32: %d + %d Capacity: %d", index, length, myLength))
