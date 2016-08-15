@@ -54,8 +54,8 @@ func Wrap(fileName string) *LogBuffers {
 			buffers.buffers[i].Wrap(ptr, int32(termLength))
 		}
 
-		ptr := unsafe.Pointer(basePtr + uintptr(logLength-int64(Descriptor.logMetaDataLength)))
-		buffers.buffers[PartitionCount].Wrap(ptr, Descriptor.logMetaDataLength)
+		ptr := unsafe.Pointer(basePtr + uintptr(logLength-int64(logMetaDataLength)))
+		buffers.buffers[LogMetaDataSectionIndex].Wrap(ptr, logMetaDataLength)
 	} else {
 		buffers.mmapFiles = make([](*memmap.File), PartitionCount+1)
 		metaDataSectionOffset := termLength * int64(PartitionCount)
@@ -80,7 +80,7 @@ func Wrap(fileName string) *LogBuffers {
 			buffers.buffers[i].Wrap(basePtr, int32(termLength))
 		}
 		metaDataBasePtr := buffers.mmapFiles[0].GetMemoryPtr()
-		buffers.buffers[PartitionCount].Wrap(metaDataBasePtr, Descriptor.logMetaDataLength)
+		buffers.buffers[LogMetaDataSectionIndex].Wrap(metaDataBasePtr, logMetaDataLength)
 	}
 
 	buffers.meta.Wrap(&buffers.buffers[PartitionCount], 0)

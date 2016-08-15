@@ -72,7 +72,7 @@ func (header *headerWriter) write(termBuffer *atomic.Buffer, offset, length, ter
 
 // Appender type is the term writer
 type Appender struct {
-	termBuffer *atomic.Buffer
+	termBuffer   *atomic.Buffer
 	tailCounter  flyweight.Int64Field
 	headerWriter headerWriter
 }
@@ -100,7 +100,7 @@ func MakeAppender(logBuffers *logbuffer.LogBuffers, partitionIndex int) *Appende
 	appender.termBuffer = logBuffers.Buffer(partitionIndex)
 	appender.tailCounter = logBuffers.Meta().TailCounter[partitionIndex]
 
-	header :=  logBuffers.Meta().DefaultFrameHeader.Get()
+	header := logBuffers.Meta().DefaultFrameHeader.Get()
 	appender.headerWriter.fill(header)
 
 	return appender

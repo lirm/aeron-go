@@ -57,10 +57,10 @@ func TestStringFlyweight(t *testing.T) {
 type PaddedFly struct {
 	FWBase
 
-	l1 Int64Field
-	i1 Int32Field
-	pad Padding
-	i2 Int32Field
+	l1   Int64Field
+	i1   Int32Field
+	pad  Padding
+	i2   Int32Field
 	pad2 Padding
 }
 

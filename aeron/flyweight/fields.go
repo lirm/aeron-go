@@ -140,7 +140,7 @@ type Padding struct {
 // Wrap for padding takes size to pas this particular position to and alignment as the
 func (f *Padding) Wrap(buffer *atomic.Buffer, offset int, size int32, alignment int32) int {
 	maxl := int32(offset) + size
-	newLen := maxl - maxl % alignment
+	newLen := maxl - maxl%alignment
 
 	//fmt.Printf("aligned %d to %d. have %d\n", offset, length, newLen-int32(offset))
 	return f.raw.Wrap(buffer, offset, newLen-int32(offset))

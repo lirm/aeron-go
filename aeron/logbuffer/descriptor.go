@@ -31,8 +31,7 @@ const (
 
 	termMinLength        int32 = 64 * 1024
 	maxSingleMappingSize int64 = 0x7FFFFFFF
-
-	sizeofLogMetadata int32 = util.CacheLineLength * 2
+	logMetaDataLength    int32 = util.CacheLineLength * 7
 )
 
 /* LogBufferMetaData is the flyweight for LogBuffer meta data
@@ -81,9 +80,9 @@ type LogBufferMetaData struct {
 	flyweight.FWBase
 
 	TailCounter         []flyweight.Int64Field // 0, 8, 16
-	ActivePartitionIx   flyweight.Int32Field // 24
-	padding0            flyweight.Padding //28
-	TimeOfLastStatusMsg flyweight.Int64Field //128
+	ActivePartitionIx   flyweight.Int32Field   // 24
+	padding0            flyweight.Padding      //28
+	TimeOfLastStatusMsg flyweight.Int64Field   //128
 	padding1            flyweight.Padding
 	RegID               flyweight.Int64Field // 256
 	InitTermID          flyweight.Int32Field
@@ -102,36 +101,18 @@ func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	pos += m.TailCounter[2].Wrap(buf, pos)
 	pos += m.ActivePartitionIx.Wrap(buf, pos)
 	pos += m.padding0.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
-	//fmt.Printf(" -> pos %d\n", pos)
 	pos += m.TimeOfLastStatusMsg.Wrap(buf, pos)
 	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
-	//fmt.Printf(" -> pos %d\n", pos)
 	pos += m.RegID.Wrap(buf, pos)
 	pos += m.InitTermID.Wrap(buf, pos)
 	pos += m.DefaultFrameHdrLen.Wrap(buf, pos)
 	pos += m.MTULen.Wrap(buf, pos)
-	//fmt.Printf(" -> pos %d\n", pos)
 	pos += m.padding2.Wrap(buf, pos, util.CacheLineLength, util.CacheLineLength)
-	//fmt.Printf(" -> pos %d\n", pos)
 	pos += m.DefaultFrameHeader.Wrap(buf, pos, DataFrameHeader.Length)
-	//fmt.Printf(" -> pos %d\n", pos)
 	pos += m.padding3.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
-	//fmt.Printf(" -> pos %d\n", pos)
 
 	m.SetSize(pos - offset)
 	return m
-}
-
-var Descriptor = struct {
-	TermTailCounterOffset int32
-
-	logDefaultFrameHeaderOffset uintptr
-	logMetaDataLength           int32
-}{
-	0,
-
-	uintptr(util.CacheLineLength * 5),
-	util.CacheLineLength * 7,
 }
 
 func checkTermLength(termLength int64) {
@@ -146,25 +127,10 @@ func checkTermLength(termLength int64) {
 	}
 }
 
-func ComputeTermBeginPosition(activeTermID, positionBitsToShift, initialTermID int32) int64 {
-	termCount := int64(activeTermID - initialTermID)
-
-	return termCount << uint32(positionBitsToShift)
-}
-
 func computeTermLength(logLength int64) int64 {
-	return (logLength - int64(Descriptor.logMetaDataLength)) / int64(PartitionCount)
-}
-
-func IndexByPosition(position int64, positionBitsToShift uint8) int32 {
-	term := uint64(position) >> positionBitsToShift
-	return util.FastMod3(term)
+	return (logLength - int64(logMetaDataLength)) / int64(PartitionCount)
 }
 
 func TermID(rawTail int64) int32 {
 	return int32(rawTail >> 32)
-}
-
-func NextPartitionIndex(currentIndex int32) int32 {
-	return util.FastMod3(uint64(currentIndex) + 1)
 }

@@ -18,10 +18,10 @@ package logbuffer
 
 import (
 	"fmt"
+	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
 	"testing"
-	"github.com/lirm/aeron-go/aeron/util"
 )
 
 func prepareFile(t *testing.T) *LogBuffers {
@@ -149,7 +149,7 @@ func TestActivePartitionIndex(t *testing.T) {
 	t.Logf("tailCounter2: %d", meta.TailCounter[2].Get())
 	t.Logf("defaultFrameHdrLen: %d", meta.DefaultFrameHdrLen.Get())
 
-	if meta.Size() != int(util.CacheLineLength * 7) {
-		t.Errorf("Actual size: %d vs %d", meta.Size(), util.CacheLineLength * 7)
+	if meta.Size() != int(util.CacheLineLength*7) {
+		t.Errorf("Actual size: %d vs %d", meta.Size(), util.CacheLineLength*7)
 	}
 }

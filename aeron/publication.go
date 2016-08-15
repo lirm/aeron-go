@@ -104,7 +104,7 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 		termAppender := pub.appenders[partitionIndex]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
-		position := logbuffer.ComputeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
+		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
 
 		//logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
 		if position < limit {
@@ -125,7 +125,7 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			} else {
 				newPosition = AdminAction
 				if appendResult.TermOffset() == term.AppenderTripped {
-					nextIndex := logbuffer.NextPartitionIndex(partitionIndex)
+					nextIndex := nextPartitionIndex(partitionIndex)
 
 					pub.appenders[nextIndex].SetTailTermID(appendResult.TermID() + 1)
 					pub.metaData.ActivePartitionIx.Set(nextIndex)
@@ -145,4 +145,14 @@ func (pub *Publication) checkForMaxMessageLength(length int32) {
 	if length > pub.maxMessageLength {
 		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxPayloadLength, length))
 	}
+}
+
+func computeTermBeginPosition(activeTermID, positionBitsToShift, initialTermID int32) int64 {
+	termCount := int64(activeTermID - initialTermID)
+
+	return termCount << uint32(positionBitsToShift)
+}
+
+func nextPartitionIndex(currentIndex int32) int32 {
+	return util.FastMod3(uint64(currentIndex) + 1)
 }

@@ -109,7 +109,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	if !image.IsClosed() {
 		position := image.subscriberPosition.get()
 		termOffset := int32(position) & image.termLengthMask
-		index := logbuffer.IndexByPosition(position, image.positionBitsToShift)
+		index := indexByPosition(position, image.positionBitsToShift)
 		termBuffer := image.termBuffers[index]
 
 		var offset int32
@@ -131,4 +131,9 @@ func (image Image) Close() error {
 		err = image.logBuffers.Close()
 	}
 	return err
+}
+
+func indexByPosition(position int64, positionBitsToShift uint8) int32 {
+	term := uint64(position) >> positionBitsToShift
+	return util.FastMod3(term)
 }
