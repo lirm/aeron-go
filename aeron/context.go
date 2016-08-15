@@ -25,7 +25,7 @@ import (
 
 // Context configuration options are located here https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
 type Context struct {
-	aeronDir      string // aeron.dir
+	aeronDir      string
 	mediaDriverTo time.Duration
 
 	errorHandler func(error)
@@ -46,7 +46,7 @@ type Context struct {
 func NewContext() *Context {
 	ctx := new(Context)
 
-	ctx.aeronDir = "/tmp"
+	ctx.aeronDir = DefaultAeronDir
 
 	ctx.errorHandler = func(err error) { logger.Error(err) }
 
