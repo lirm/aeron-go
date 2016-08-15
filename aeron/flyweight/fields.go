@@ -19,6 +19,7 @@ package flyweight
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/util"
+	syncatomic "sync/atomic"
 	"unsafe"
 )
 
@@ -63,6 +64,11 @@ func (fld *Int64Field) Get() int64 {
 
 func (fld *Int64Field) Set(value int64) {
 	*(*int64)(fld.offset) = value
+}
+
+func (fld *Int64Field) GetAndAddInt64(value int64) int64 {
+	n := syncatomic.AddInt64((*int64)(fld.offset), value)
+	return n - value
 }
 
 type StringField struct {
@@ -131,9 +137,12 @@ type Padding struct {
 	raw RawDataField
 }
 
-// Wrap for padding takes alignment as the third argument
-func (f *Padding) Wrap(buffer *atomic.Buffer, offset int, length int32) int {
-	newLen := util.AlignInt32(int32(offset), length)
+// Wrap for padding takes size to pas this particular position to and alignment as the
+func (f *Padding) Wrap(buffer *atomic.Buffer, offset int, size int32, alignment int32) int {
+	maxl := int32(offset) + size
+	newLen := maxl - maxl % alignment
+
+	//fmt.Printf("aligned %d to %d. have %d\n", offset, length, newLen-int32(offset))
 	return f.raw.Wrap(buffer, offset, newLen-int32(offset))
 }
 

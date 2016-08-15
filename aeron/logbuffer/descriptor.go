@@ -35,7 +35,7 @@ const (
 	sizeofLogMetadata int32 = util.CacheLineLength * 2
 )
 
-/**
+/* LogBufferMetaData is the flyweight for LogBuffer meta data
  * <pre>
  *   0                   1                   2                   3
  *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -77,40 +77,46 @@ const (
  *  +---------------------------------------------------------------+
  * </pre>
  */
-
 type LogBufferMetaData struct {
 	flyweight.FWBase
 
-	TailCounter0        flyweight.Int64Field
-	TailCounter1        flyweight.Int64Field
-	TailCounter2        flyweight.Int64Field
-	ActivePartitionIx   flyweight.Int32Field
-	padding0            flyweight.Padding
-	TimeOfLastStatusMsg flyweight.Int64Field
+	TailCounter         []flyweight.Int64Field // 0, 8, 16
+	ActivePartitionIx   flyweight.Int32Field // 24
+	padding0            flyweight.Padding //28
+	TimeOfLastStatusMsg flyweight.Int64Field //128
 	padding1            flyweight.Padding
-	RegID               flyweight.Int64Field
+	RegID               flyweight.Int64Field // 256
 	InitTermID          flyweight.Int32Field
 	DefaultFrameHdrLen  flyweight.Int32Field
 	MTULen              flyweight.Int32Field
 	padding2            flyweight.Padding
-	DefaultFrameHeader  flyweight.RawDataField
+	DefaultFrameHeader  flyweight.RawDataField // 384
+	padding3            flyweight.Padding
 }
 
 func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
-	pos += m.TailCounter0.Wrap(buf, pos)
-	pos += m.TailCounter1.Wrap(buf, pos)
-	pos += m.TailCounter2.Wrap(buf, pos)
+	m.TailCounter = make([]flyweight.Int64Field, 3)
+	pos += m.TailCounter[0].Wrap(buf, pos)
+	pos += m.TailCounter[1].Wrap(buf, pos)
+	pos += m.TailCounter[2].Wrap(buf, pos)
 	pos += m.ActivePartitionIx.Wrap(buf, pos)
-	pos += m.padding0.Wrap(buf, pos, util.CacheLineLength*2)
+	pos += m.padding0.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
+	//fmt.Printf(" -> pos %d\n", pos)
 	pos += m.TimeOfLastStatusMsg.Wrap(buf, pos)
-	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2)
+	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
+	//fmt.Printf(" -> pos %d\n", pos)
 	pos += m.RegID.Wrap(buf, pos)
 	pos += m.InitTermID.Wrap(buf, pos)
 	pos += m.DefaultFrameHdrLen.Wrap(buf, pos)
 	pos += m.MTULen.Wrap(buf, pos)
-	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2)
-	pos += m.DefaultFrameHeader.Wrap(buf, pos, m.DefaultFrameHdrLen.Get())
+	//fmt.Printf(" -> pos %d\n", pos)
+	pos += m.padding2.Wrap(buf, pos, util.CacheLineLength, util.CacheLineLength)
+	//fmt.Printf(" -> pos %d\n", pos)
+	pos += m.DefaultFrameHeader.Wrap(buf, pos, DataFrameHeader.Length)
+	//fmt.Printf(" -> pos %d\n", pos)
+	pos += m.padding3.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
+	//fmt.Printf(" -> pos %d\n", pos)
 
 	m.SetSize(pos - offset)
 	return m
@@ -119,22 +125,10 @@ func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 var Descriptor = struct {
 	TermTailCounterOffset int32
 
-	logActivePartitionIndexOffset    int32
-	logTimeOfLastStatusMessageOffset int32
-	logInitialTermIDOffset           int32
-	logDefaultFrameHeaderLenOffset   int32
-	logMtuLengthOffset               int32
-
 	logDefaultFrameHeaderOffset uintptr
 	logMetaDataLength           int32
 }{
 	0,
-
-	util.SizeOfInt64 * int32(PartitionCount),
-	util.CacheLineLength * 2,
-	util.CacheLineLength*4 + 8,
-	util.CacheLineLength*4 + 12,
-	util.CacheLineLength*4 + 16,
 
 	uintptr(util.CacheLineLength * 5),
 	util.CacheLineLength * 7,
@@ -165,26 +159,6 @@ func computeTermLength(logLength int64) int64 {
 func IndexByPosition(position int64, positionBitsToShift uint8) int32 {
 	term := uint64(position) >> positionBitsToShift
 	return util.FastMod3(term)
-}
-
-func InitialTermID(logMetaDataBuffer *atomic.Buffer) int32 {
-	return logMetaDataBuffer.GetInt32(Descriptor.logInitialTermIDOffset)
-}
-
-func MtuLength(logMetaDataBuffer *atomic.Buffer) int32 {
-	return logMetaDataBuffer.GetInt32(Descriptor.logMtuLengthOffset)
-}
-
-func ActivePartitionIndex(logMetaDataBuffer *atomic.Buffer) int32 {
-	return logMetaDataBuffer.GetInt32Volatile(Descriptor.logActivePartitionIndexOffset)
-}
-
-func SetActivePartitionIndex(logMetaDataBuffer *atomic.Buffer, index int32) {
-	logMetaDataBuffer.PutInt32Ordered(Descriptor.logActivePartitionIndexOffset, index)
-}
-
-func TimeOfLastStatusMessage(logMetaDataBuffer *atomic.Buffer) int64 {
-	return logMetaDataBuffer.GetInt64Volatile(Descriptor.logTimeOfLastStatusMessageOffset)
 }
 
 func TermID(rawTail int64) int32 {

@@ -18,6 +18,7 @@ package term
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/flyweight"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 	"math"
@@ -71,9 +72,8 @@ func (header *headerWriter) write(termBuffer *atomic.Buffer, offset, length, ter
 
 // Appender type is the term writer
 type Appender struct {
-	termBuffer   *atomic.Buffer
-	tailBuffer   *atomic.Buffer
-	tailOffset   int32
+	termBuffer *atomic.Buffer
+	tailCounter  flyweight.Int64Field
 	headerWriter headerWriter
 }
 
@@ -94,13 +94,13 @@ func (result *AppenderResult) TermID() int32 {
 }
 
 // MakeAppender is the factory function for term Appenders
-func MakeAppender(termBuffer *atomic.Buffer, metaDataBuffer *atomic.Buffer, partitionIndex int) *Appender {
-	appender := new(Appender)
-	appender.termBuffer = termBuffer
-	appender.tailBuffer = metaDataBuffer
-	appender.tailOffset = logbuffer.Descriptor.TermTailCounterOffset + (int32(partitionIndex) * util.SizeOfInt64)
+func MakeAppender(logBuffers *logbuffer.LogBuffers, partitionIndex int) *Appender {
 
-	header := logbuffer.DefaultFrameHeader(metaDataBuffer)
+	appender := new(Appender)
+	appender.termBuffer = logBuffers.Buffer(partitionIndex)
+	appender.tailCounter = logBuffers.Meta().TailCounter[partitionIndex]
+
+	header :=  logBuffers.Meta().DefaultFrameHeader.Get()
 	appender.headerWriter.fill(header)
 
 	return appender
@@ -108,11 +108,11 @@ func MakeAppender(termBuffer *atomic.Buffer, metaDataBuffer *atomic.Buffer, part
 
 // RawTail is the accessor to the raw value of the tail offset used by Publication
 func (appender *Appender) RawTail() int64 {
-	return appender.tailBuffer.GetInt64Volatile(appender.tailOffset)
+	return appender.tailCounter.Get()
 }
 
 func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
-	return appender.tailBuffer.GetAndAddInt64(appender.tailOffset, int64(alignedLength))
+	return appender.tailCounter.GetAndAddInt64(int64(alignedLength))
 }
 
 // Claim is the interface for using Buffer Claims for zero copy sends
@@ -239,5 +239,5 @@ func handleEndOfLogCondition(termID int32, termBuffer *atomic.Buffer, termOffset
 }
 
 func (appender *Appender) SetTailTermID(termID int32) {
-	appender.tailBuffer.PutInt64(appender.tailOffset, int64(termID)<<32)
+	appender.tailCounter.Set(int64(termID) << 32)
 }

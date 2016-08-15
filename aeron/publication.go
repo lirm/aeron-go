@@ -66,7 +66,7 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub.isClosed.Set(false)
 
 	for i := 0; i < logbuffer.PartitionCount; i++ {
-		appender := term.MakeAppender(logBuffers.Buffer(i), logBuffers.Buffer(logbuffer.LogMetaDataSectionIndex), i)
+		appender := term.MakeAppender(logBuffers, i)
 		logger.Debugf("TermAppender[%d]: %v", i, appender)
 		pub.appenders[i] = appender
 	}

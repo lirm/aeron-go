@@ -61,9 +61,3 @@ func SetFrameType(logBuffer *atomic.Buffer, frameOffset int32, typ uint16) {
 func FrameFlags(logBuffer *atomic.Buffer, frameOffset int32, flags uint8) {
 	logBuffer.PutUInt8(flagsOffset(frameOffset), flags)
 }
-
-func DefaultFrameHeader(logMetaDataBuffer *atomic.Buffer) *atomic.Buffer {
-	headerPtr := uintptr(logMetaDataBuffer.Ptr()) + Descriptor.logDefaultFrameHeaderOffset
-
-	return atomic.MakeBuffer(headerPtr, DataFrameHeader.Length)
-}

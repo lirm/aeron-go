@@ -21,6 +21,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
 	"testing"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 func prepareFile(t *testing.T) *LogBuffers {
@@ -62,7 +63,7 @@ func TestWrapFail(t *testing.T) {
 		}
 	}()
 
-	fname := "logbuffers.dat"
+	fname := "logbuffers.bin"
 	mmap, err := memmap.NewFile(fname, 0, 16*1024*1024-1)
 	if err != nil {
 		t.Error(err.Error())
@@ -137,16 +138,18 @@ func TestActivePartitionIndex(t *testing.T) {
 		}
 	}
 
-	metaBuffer := lb.Buffer(LogMetaDataSectionIndex)
-	var meta LogBufferMetaData
-	meta.Wrap(metaBuffer, 0)
+	meta := lb.Meta()
 
 	t.Logf("meta fly size: %d", meta.Size())
 	t.Logf("active partition index: %d", meta.ActivePartitionIx.Get())
 	t.Logf("initTermID: %d", meta.InitTermID.Get())
 	t.Logf("regID: %d", meta.RegID.Get())
-	t.Logf("tailCounter0: %d", meta.TailCounter0.Get())
-	t.Logf("tailCounter1: %d", meta.TailCounter1.Get())
-	t.Logf("tailCounter2: %d", meta.TailCounter2.Get())
+	t.Logf("tailCounter0: %d", meta.TailCounter[0].Get())
+	t.Logf("tailCounter1: %d", meta.TailCounter[1].Get())
+	t.Logf("tailCounter2: %d", meta.TailCounter[2].Get())
 	t.Logf("defaultFrameHdrLen: %d", meta.DefaultFrameHdrLen.Get())
+
+	if meta.Size() != int(util.CacheLineLength * 7) {
+		t.Errorf("Actual size: %d vs %d", meta.Size(), util.CacheLineLength * 7)
+	}
 }
