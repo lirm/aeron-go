@@ -16,7 +16,10 @@ limitations under the License.
 
 package examples
 
-import "flag"
+import (
+	"github.com/lirm/aeron-go/aeron"
+	"flag"
+)
 
 var ExamplesConfig = struct {
 	AeronPrefix     *string
@@ -27,7 +30,7 @@ var ExamplesConfig = struct {
 	Messages        *int
 	LoggingOn       *bool
 }{
-	flag.String("p", "/tmp", "root directory for aeron driver file"),
+	flag.String("p", aeron.DefaultAeronDir, "root directory for aeron driver file"),
 	flag.Bool("prof", false, "enable CPU profiling"),
 	flag.Int64("to", 10000, "driver liveliness timeout in ms"),
 	flag.Int("sid", 10, "default streamId to use"),
