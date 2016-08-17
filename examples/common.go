@@ -17,8 +17,8 @@ limitations under the License.
 package examples
 
 import (
-	"github.com/lirm/aeron-go/aeron"
 	"flag"
+	"github.com/lirm/aeron-go/aeron"
 )
 
 var ExamplesConfig = struct {
