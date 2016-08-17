@@ -24,7 +24,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"io"
 	"log"
 	"runtime"
 	"sync"
@@ -95,7 +94,7 @@ func (sub *SubscriptionStateDefn) Init(ch string, regID int64, sID int32, now in
 
 type lingerResourse struct {
 	lastTime int64
-	resource io.Closer
+	resource *Image
 }
 
 type ClientConductor struct {
@@ -388,12 +387,7 @@ func (cc *ClientConductor) releaseSubscription(registrationID int64, images []*I
 				if cc.onUnavailableImageHandler != nil {
 					cc.onUnavailableImageHandler(image)
 				}
-				err := image.Close()
-				if err != nil {
-					logger.Warningf("Failed to close subscription: %d", registrationID)
-					cc.errorHandler(err)
-				}
-				cc.lingeringResources <- lingerResourse{now, *image}
+				cc.lingeringResources <- lingerResourse{now, image}
 			}
 
 			cc.pendingCloses[corrID] = ch
@@ -479,9 +473,12 @@ func (cc *ClientConductor) OnUnavailableImage(streamID int32, correlationID int6
 		if sub.streamID == streamID {
 			if sub.subscription != nil {
 				image := sub.subscription.removeImage(correlationID)
+				if cc.onUnavailableImageHandler != nil {
+					cc.onUnavailableImageHandler(image)
+				}
 				// FIXME Howzzat?!
 				if nil != image {
-					cc.lingeringResources <- lingerResourse{time.Now().UnixNano(), *image}
+					cc.lingeringResources <- lingerResourse{time.Now().UnixNano(), image}
 				}
 			}
 		}

@@ -124,7 +124,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	return result
 }
 
-func (image Image) Close() error {
+func (image *Image) Close() error {
 	var err error
 	if image.isClosed.CompareAndSet(false, true) {
 		logger.Debugf("Closing %v", image)
