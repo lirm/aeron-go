@@ -24,6 +24,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/op/go-logging"
 	"log"
 	"runtime"
 	"sync"
@@ -375,7 +376,10 @@ func (cc *ClientConductor) releaseSubscription(registrationID int64, images []*I
 
 	for i, sub := range cc.subs {
 		if sub.registrationID == registrationID {
-			logger.Debugf("Removing subscription: %d; %v", registrationID, images)
+			if logger.IsEnabledFor(logging.DEBUG) {
+				logger.Debugf("Removing subscription: %d; %v", registrationID, images)
+			}
+
 			corrID := cc.driverProxy.RemoveSubscription(registrationID)
 
 			cc.subs[i] = cc.subs[len(cc.subs)-1]
@@ -475,10 +479,8 @@ func (cc *ClientConductor) OnUnavailableImage(streamID int32, correlationID int6
 				if cc.onUnavailableImageHandler != nil {
 					cc.onUnavailableImageHandler(image)
 				}
-				// FIXME Howzzat?!
-				if nil != image {
-					cc.lingeringResources <- lingerResourse{time.Now().UnixNano(), image}
-				}
+				cc.lingeringResources <- lingerResourse{time.Now().UnixNano(), image}
+				runtime.KeepAlive(image)
 			}
 		}
 	}

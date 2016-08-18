@@ -22,6 +22,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -106,7 +107,9 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 		termOffset := rawTail & 0xFFFFFFFF
 		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
 
-		//logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
+		if logger.IsEnabledFor(logging.DEBUG) {
+			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
+		}
 		if position < limit {
 			var appendResult term.AppenderResult
 			resValSupplier := term.DefaultReservedValueSupplier
