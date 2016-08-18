@@ -93,7 +93,7 @@ func main() {
 			if ret >= 0 {
 				break
 			}
-			logger.Infof("Sent message of %d bytes at %d", length, ret)
+			logger.Infof("Failed to send message of %d bytes due to %d", length, ret)
 		}
 	}
 
