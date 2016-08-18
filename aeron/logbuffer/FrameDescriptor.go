@@ -41,12 +41,12 @@ func typeOffset(frameOffset int32) int32 {
 	return frameOffset + DataFrameHeader.TypeFieldOffset
 }
 
-func FrameLengthVolatile(logBuffer *atomic.Buffer, frameOffset int32) int32 {
+func GetFrameLength(logBuffer *atomic.Buffer, frameOffset int32) int32 {
 	offset := lengthOffset(frameOffset)
 	return logBuffer.GetInt32Volatile(offset)
 }
 
-func FrameLengthOrdered(logBuffer *atomic.Buffer, frameOffset int32, frameLength int32) {
+func SetFrameLength(logBuffer *atomic.Buffer, frameOffset int32, frameLength int32) {
 	logBuffer.PutInt32Ordered(lengthOffset(frameOffset), frameLength)
 }
 

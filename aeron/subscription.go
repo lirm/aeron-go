@@ -33,6 +33,7 @@ type Subscription struct {
 	isClosed atomic.Bool
 }
 
+// NewSubscription is a factory method to create new subscription to be added to the media driver
 func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32) *Subscription {
 	sub := new(Subscription)
 	sub.images = NewImageList()
@@ -46,10 +47,13 @@ func NewSubscription(conductor *ClientConductor, channel string, registrationID 
 	return sub
 }
 
+// IsClosed returns whether this subscription has been closed.
 func (sub *Subscription) IsClosed() bool {
 	return sub.isClosed.Get()
 }
 
+// Close will release all images in this subscription, send command to the driver and block waiting for response from
+// the media driver. Images will be lingered by the ClientConductor.
 func (sub *Subscription) Close() error {
 	if sub.isClosed.CompareAndSet(false, true) {
 		images := sub.images.Empty()
@@ -59,6 +63,7 @@ func (sub *Subscription) Close() error {
 	return nil
 }
 
+// Poll is the primary receive mechanism on subscription.
 func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	img := sub.images.Get()
@@ -115,7 +120,6 @@ func (sub *Subscription) removeImage(correlationID int64) *Image {
 			img[len(img)-1] = nil
 			img = img[:len(img)-1]
 
-			// FIXME CAS to make sure it's the same list
 			sub.images.Set(img)
 
 			return image
@@ -124,11 +128,14 @@ func (sub *Subscription) removeImage(correlationID int64) *Image {
 	return nil
 }
 
+// HasImages is a helper method checking whether this subscription has any images associated with it.
 func (sub *Subscription) HasImages() bool {
 	images := sub.images.Get()
 	return len(images) > 0
 }
 
+// IsConnectedTo is a helper function used primarily by tests, which is used within the same process to verify that
+// subscription is connected to a specific publication.
 func IsConnectedTo(sub *Subscription, pub *Publication) bool {
 	img := sub.images.Get()
 	if sub.channel == pub.channel && sub.streamID == pub.streamID {

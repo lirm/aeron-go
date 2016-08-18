@@ -33,9 +33,21 @@ func (hdr *Header) Wrap(ptr unsafe.Pointer, length int32) *Header {
 	return hdr
 }
 
+func (hdr *Header) Offset() int32 {
+	return hdr.offset
+}
+
+func (hdr *Header) FrameLength() int32 {
+	return GetFrameLength(&hdr.buffer, lengthOffset(hdr.offset))
+}
+
 func (hdr *Header) SetOffset(offset int32) *Header {
 	hdr.offset = offset
 	return hdr
+}
+
+func (hdr *Header) TermId() int32 {
+	return hdr.initialTermID
 }
 
 func (hdr *Header) SetInitialTermID(initialTermID int32) *Header {

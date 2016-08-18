@@ -25,13 +25,14 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
 	"github.com/op/go-logging"
-	"log"
 	"os"
 	"os/signal"
 	"runtime/pprof"
 	"syscall"
 	"time"
 )
+
+var logger = logging.MustGetLogger("examples")
 
 func main() {
 
@@ -44,6 +45,7 @@ func main() {
 		logging.SetLevel(logging.INFO, "counters")
 		logging.SetLevel(logging.INFO, "logbuffers")
 		logging.SetLevel(logging.INFO, "buffer")
+		logging.SetLevel(logging.INFO, "examples")
 	}
 
 	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
@@ -53,23 +55,23 @@ func main() {
 
 	subscription := <-a.AddSubscription(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamID))
 	defer subscription.Close()
-	log.Printf("Subscription found %v", subscription)
+	logger.Infof("Subscription found %v", subscription)
 
 	publication := <-a.AddPublication(*examples.PingPongConfig.PongChannel, int32(*examples.PingPongConfig.PongStreamID))
 	defer publication.Close()
-	log.Printf("Publication found %v", publication)
+	logger.Infof("Publication found %v", publication)
 
-	log.Printf("%v", examples.ExamplesConfig)
+	logger.Infof("%v", examples.ExamplesConfig)
 
 	if *examples.ExamplesConfig.ProfilerEnabled {
 		fname := fmt.Sprintf("pong-%d.pprof", time.Now().Unix())
-		log.Printf("Profiling enabled. Will use: %s", fname)
+		logger.Infof("Profiling enabled. Will use: %s", fname)
 		f, err := os.Create(fname)
 		if err == nil {
 			pprof.StartCPUProfile(f)
 			defer pprof.StopCPUProfile()
 		} else {
-			log.Printf("Failed to create profile file with %v", err)
+			logger.Infof("Failed to create profile file with %v", err)
 		}
 	}
 
@@ -82,14 +84,18 @@ func main() {
 	}()
 
 	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-		for publication.Offer(buffer, offset, length, nil) < 0 {
+		if logger.IsEnabledFor(logging.DEBUG) {
+			logger.Debugf("Received message at offset %d, length %d, position %d, termId %d, frame len %d",
+				offset, length, header.Offset(), header.TermId(), header.FrameLength())
+		}
+		for true {
+			ret := publication.Offer(buffer, offset, length, nil)
+			if ret >= 0 {
+				break
+			}
+			logger.Infof("Sent message of %d bytes at %d", length, ret)
 		}
 	}
-
-	//logging.SetLevel(logging.INFO, "aeron")
-	//logging.SetLevel(logging.INFO, "memmap")
-	//logging.SetLevel(logging.INFO, "driver")
-	//logging.SetLevel(logging.INFO, "counters")
 
 	go func() {
 		idleStrategy := idlestrategy.Busy{}
@@ -100,5 +106,5 @@ func main() {
 	}()
 
 	<-done
-	log.Printf("Terminating")
+	logger.Infof("Terminating")
 }

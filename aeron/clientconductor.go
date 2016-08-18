@@ -160,13 +160,13 @@ func (cc *ClientConductor) Close() error {
 
 		for _, pub := range cc.pubs {
 			err = pub.publication.Close()
-			 runtime.KeepAlive(pub.publication)
+			runtime.KeepAlive(pub.publication)
 		}
 		cc.pubs = nil
 
 		for _, sub := range cc.subs {
 			err = sub.subscription.Close()
-			 runtime.KeepAlive(sub.subscription)
+			runtime.KeepAlive(sub.subscription)
 		}
 		cc.subs = nil
 	}
@@ -340,10 +340,11 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) *Subscription 
 			switch sub.status {
 			case RegistrationStatus.AwaitingMediaDriver:
 				if now := time.Now().UnixNano(); now > (sub.timeOfRegistration + cc.driverTimeoutNs) {
-					logger.Errorf("No response from driver. started: %d, now: %d, to: %d",
+					errStr := fmt.Sprintf("No response from driver. started: %d, now: %d, to: %d",
 						sub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
 						cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
-					log.Fatalf("No response on %v of %v", sub, cc.subs)
+					cc.errorHandler(errors.New(errStr))
+					log.Fatalf(errStr)
 				}
 			case RegistrationStatus.ErroredMediaDriver:
 				errStr := fmt.Sprintf("Error on %d: %d: %s", registrationID, sub.errorCode, sub.errorMessage)

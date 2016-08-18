@@ -34,7 +34,7 @@ func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, 
 
 	var fragmentsRead int
 	for fragmentsRead < fragmentsLimit {
-		frameLength := logbuffer.FrameLengthVolatile(termBuffer, termOffset)
+		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
 		if frameLength <= 0 {
 			break
 		}

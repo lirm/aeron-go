@@ -163,7 +163,7 @@ func (appender *Appender) AppendUnfragmentedMessage(result *AppenderResult,
 			appender.termBuffer.PutInt64(offset+logbuffer.DataFrameHeader.ReservedValueFieldOffset, reservedValue)
 		}
 
-		logbuffer.FrameLengthOrdered(appender.termBuffer, offset, frameLength)
+		logbuffer.SetFrameLength(appender.termBuffer, offset, frameLength)
 	}
 }
 
@@ -211,7 +211,7 @@ func (appender *Appender) AppendFragmentedMessage(result *AppenderResult,
 			reservedValue := reservedValueSupplier(appender.termBuffer, offset, frameLength)
 			appender.termBuffer.PutInt64(offset+logbuffer.DataFrameHeader.ReservedValueFieldOffset, reservedValue)
 
-			logbuffer.FrameLengthOrdered(appender.termBuffer, offset, frameLength)
+			logbuffer.SetFrameLength(appender.termBuffer, offset, frameLength)
 
 			flags = 0
 			offset += alignedLength
@@ -231,7 +231,7 @@ func handleEndOfLogCondition(termID int32, termBuffer *atomic.Buffer, termOffset
 			paddingLength := termLength - termOffset
 			header.write(termBuffer, termOffset, paddingLength, termID)
 			logbuffer.SetFrameType(termBuffer, termOffset, logbuffer.DataFrameHeader.TypePad)
-			logbuffer.FrameLengthOrdered(termBuffer, termOffset, paddingLength)
+			logbuffer.SetFrameLength(termBuffer, termOffset, paddingLength)
 		}
 	}
 

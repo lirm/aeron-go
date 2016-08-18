@@ -25,11 +25,12 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
 	"github.com/op/go-logging"
-	"log"
 	"os"
 	"runtime/pprof"
 	"time"
 )
+
+var logger = logging.MustGetLogger("examples")
 
 func main() {
 
@@ -42,6 +43,7 @@ func main() {
 		logging.SetLevel(logging.INFO, "counters")
 		logging.SetLevel(logging.INFO, "logbuffers")
 		logging.SetLevel(logging.INFO, "buffer")
+		logging.SetLevel(logging.INFO, "examples")
 	}
 
 	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
@@ -51,21 +53,21 @@ func main() {
 
 	subscription := <-a.AddSubscription(*examples.PingPongConfig.PongChannel, int32(*examples.PingPongConfig.PongStreamID))
 	defer subscription.Close()
-	log.Printf("Subscription found %v", subscription)
+	logger.Infof("Subscription found %v", subscription)
 
 	publication := <-a.AddPublication(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamID))
 	defer publication.Close()
-	log.Printf("Publication found %v", publication)
+	logger.Infof("Publication found %v", publication)
 
 	if *examples.ExamplesConfig.ProfilerEnabled {
 		fname := fmt.Sprintf("ping-%d.pprof", time.Now().Unix())
-		log.Printf("Profiling enabled. Will use: %s", fname)
+		logger.Infof("Profiling enabled. Will use: %s", fname)
 		f, err := os.Create(fname)
 		if err == nil {
 			pprof.StartCPUProfile(f)
 			defer pprof.StopCPUProfile()
 		} else {
-			log.Printf("Failed to create profile file with %v", err)
+			logger.Errorf("Failed to create profile file with %v", err)
 		}
 	}
 
@@ -76,25 +78,42 @@ func main() {
 		now := time.Now().UnixNano()
 
 		hist.RecordValue(now - sent)
+
+		if logger.IsEnabledFor(logging.DEBUG) {
+			logger.Debugf("Received message at offset %d, length %d, position %d, termId %d, frame len %d",
+				offset, length, header.Offset(), header.TermId(), header.FrameLength())
+		}
 	}
 
 	srcBuffer := atomic.MakeBuffer(make([]byte, 256))
 
 	warmupIt := 1000
-	log.Printf("Sending %d messages of %d bytes for warmup", warmupIt, srcBuffer.Capacity())
+	logger.Infof("Sending %d messages of %d bytes for warmup", warmupIt, srcBuffer.Capacity())
 	for i := 0; i < warmupIt; i++ {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
 		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
+			if logger.IsEnabledFor(logging.DEBUG) {
+				logger.Debugf("Failed offer")
+			}
 		}
 
-		for subscription.Poll(handler, 10) <= 0 {
+		for true {
+			ret := subscription.Poll(handler, 10)
+			if logger.IsEnabledFor(logging.DEBUG) {
+				if ret < 0 {
+					logger.Debugf("Poll returned %d", ret)
+				}
+			}
+			if ret > 0 {
+				break
+			}
 		}
 	}
 	hist.Reset()
 
-	log.Printf("Sending %d messages of %d bytes", *examples.ExamplesConfig.Messages, srcBuffer.Capacity())
+	logger.Infof("Sending %d messages of %d bytes", *examples.ExamplesConfig.Messages, srcBuffer.Capacity())
 	for i := 0; i < *examples.ExamplesConfig.Messages; i++ {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
@@ -108,8 +127,8 @@ func main() {
 
 	qq := []float64{50.0, 75.0, 90.0, 99.0, 99.5, 99.9, 99.99, 99.999, 99.9999}
 	for _, q := range qq {
-		fmt.Printf("%8.9v  %8.3v us\n", q, float64(hist.ValueAtQuantile(q))/1000.0)
+		logger.Infof("%8.9v  %8.3v us\n", q, float64(hist.ValueAtQuantile(q))/1000.0)
 	}
 
-	fmt.Printf("Mean: %8.3v; StdDev: %8.3v\n", hist.Mean()/1000, hist.StdDev()/1000)
+	logger.Infof("Mean: %8.3v; StdDev: %8.3v\n", hist.Mean()/1000, hist.StdDev()/1000)
 }
