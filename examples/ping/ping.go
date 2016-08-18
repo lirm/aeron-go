@@ -79,6 +79,22 @@ func main() {
 	}
 
 	srcBuffer := atomic.MakeBuffer(make([]byte, 256))
+
+	warmupIt := 1000
+	log.Printf("Sending %d messages of %d bytes for warmup", warmupIt, srcBuffer.Capacity())
+	for i := 0; i < warmupIt; i++ {
+		now := time.Now().UnixNano()
+		srcBuffer.PutInt64(0, now)
+
+		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
+		}
+
+		for subscription.Poll(handler, 10) <= 0 {
+		}
+	}
+	hist.Reset()
+
+	log.Printf("Sending %d messages of %d bytes", *examples.ExamplesConfig.Messages, srcBuffer.Capacity())
 	for i := 0; i < *examples.ExamplesConfig.Messages; i++ {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
