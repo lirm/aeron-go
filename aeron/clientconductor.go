@@ -160,15 +160,13 @@ func (cc *ClientConductor) Close() error {
 
 		for _, pub := range cc.pubs {
 			err = pub.publication.Close()
-			// In Go 1.7 should have the following line
-			// runtime.KeepAlive(pub.publication)
+			 runtime.KeepAlive(pub.publication)
 		}
 		cc.pubs = nil
 
 		for _, sub := range cc.subs {
 			err = sub.subscription.Close()
-			// In Go 1.7 should have the following line
-			// runtime.KeepAlive(sub.subscription)
+			 runtime.KeepAlive(sub.subscription)
 		}
 		cc.subs = nil
 	}
