@@ -87,7 +87,8 @@ func (pub *Publication) IsClosed() bool {
 
 // Close will close this publication with the driver. This is a blocking call.
 func (pub *Publication) Close() error {
-	if pub.isClosed.CompareAndSet(false, true) {
+	// FIXME Why can pub be nil?!
+	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
 		<-pub.conductor.releasePublication(pub.registrationID)
 	}
 

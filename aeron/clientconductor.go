@@ -157,19 +157,25 @@ func (cc *ClientConductor) Close() error {
 
 	var err error
 	if cc.running.CompareAndSet(true, false) {
-		// TODO accumulate errors
-
 		for _, pub := range cc.pubs {
 			err = pub.publication.Close()
 			runtime.KeepAlive(pub.publication)
+			if err != nil {
+				cc.errorHandler(err)
+			}
 		}
+		runtime.KeepAlive(cc.pubs)
 		cc.pubs = nil
 
 		for _, sub := range cc.subs {
 			err = sub.subscription.Close()
 			runtime.KeepAlive(sub.subscription)
+			if err != nil {
+				cc.errorHandler(err)
+			}
 		}
 		cc.subs = nil
+
 	}
 
 	return err
@@ -361,7 +367,7 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) *Subscription 
 	return subscription
 }
 
-func (cc *ClientConductor) releaseSubscription(registrationID int64, images []*Image) chan bool {
+func (cc *ClientConductor) releaseSubscription(registrationID int64, images []Image) chan bool {
 	logger.Debugf("ReleaseSubscription: registrationId=%d", registrationID)
 
 	cc.verifyDriverIsActive()
@@ -388,9 +394,9 @@ func (cc *ClientConductor) releaseSubscription(registrationID int64, images []*I
 
 			for _, image := range images {
 				if cc.onUnavailableImageHandler != nil {
-					cc.onUnavailableImageHandler(image)
+					cc.onUnavailableImageHandler(&image)
 				}
-				cc.lingeringResources <- lingerResourse{now, image}
+				cc.lingeringResources <- lingerResourse{now, &image}
 			}
 
 			cc.pendingCloses[corrID] = ch

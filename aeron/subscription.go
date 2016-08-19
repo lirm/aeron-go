@@ -100,11 +100,11 @@ func (sub *Subscription) hasImage(sessionID int32) bool {
 	return false
 }
 
-func (sub *Subscription) addImage(image *Image) *[]*Image {
+func (sub *Subscription) addImage(image *Image) *[]Image {
 
 	images := sub.images.Get()
 
-	sub.images.Set(append(images, image))
+	sub.images.Set(append(images, *image))
 
 	return &images
 }
@@ -117,12 +117,11 @@ func (sub *Subscription) removeImage(correlationID int64) *Image {
 			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationID)
 
 			img[ix] = img[len(img)-1]
-			img[len(img)-1] = nil
 			img = img[:len(img)-1]
 
 			sub.images.Set(img)
 
-			return image
+			return &image
 		}
 	}
 	return nil
