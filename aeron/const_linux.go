@@ -18,6 +18,5 @@ limitations under the License.
 
 package aeron
 
-const (
-	DefaultAeronDir string = "/dev/shm"
-)
+// DefaultAeronDir is the location of media driver files
+var DefaultAeronDir string = "/dev/shm"
