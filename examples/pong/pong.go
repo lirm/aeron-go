@@ -93,7 +93,9 @@ func main() {
 			if ret >= 0 {
 				break
 			}
-			logger.Infof("Failed to send message of %d bytes due to %d", length, ret)
+			if logger.IsEnabledFor(logging.DEBUG) {
+				logger.Debugf("Failed to send message of %d bytes due to %d", length, ret)
+			}
 		}
 	}
 

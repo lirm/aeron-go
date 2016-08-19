@@ -28,6 +28,7 @@ var ExamplesConfig = struct {
 	StreamID        *int
 	Channel         *string
 	Messages        *int
+	Size            *int
 	LoggingOn       *bool
 }{
 	flag.String("p", aeron.DefaultAeronDir, "root directory for aeron driver file"),
@@ -36,6 +37,7 @@ var ExamplesConfig = struct {
 	flag.Int("sid", 10, "default streamId to use"),
 	flag.String("chan", "aeron:udp?endpoint=localhost:40123", "default channel to subscribe to"),
 	flag.Int("m", 1000000, "number of messages to send"),
+	flag.Int("len", 256, "messages size"),
 	flag.Bool("l", false, "enable logging"),
 }
 
