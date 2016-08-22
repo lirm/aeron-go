@@ -116,7 +116,7 @@ func TestLogBuffers_BufferFail(t *testing.T) {
 	t.Fail()
 }
 
-func TestActivePartitionIndex(t *testing.T) {
+func TestLogBuffers_Meta(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
 			errStr := fmt.Sprintf("Panic: %v", err)
@@ -141,6 +141,7 @@ func TestActivePartitionIndex(t *testing.T) {
 	meta := lb.Meta()
 
 	t.Logf("meta fly size: %d", meta.Size())
+
 	t.Logf("active partition index: %d", meta.ActivePartitionIx.Get())
 	t.Logf("initTermID: %d", meta.InitTermID.Get())
 	t.Logf("regID: %d", meta.RegID.Get())

@@ -88,14 +88,18 @@ func Wrap(fileName string) *LogBuffers {
 	return buffers
 }
 
+// Meta return log buffer meta data flyweight
 func (logBuffers *LogBuffers) Meta() *LogBufferMetaData {
 	return &logBuffers.meta
 }
 
+// Buffer returns a buffer backing a specific term based on index. PartitionLength+1 is the size of the buffer array,
+// and the last buffer is the metadata buffer, which can be accessed through a convenience wrapped via Meta() method.
 func (logBuffers *LogBuffers) Buffer(index int) *atomic.Buffer {
 	return &logBuffers.buffers[index]
 }
 
+// Close will try to unmap all backing memory maps
 func (logBuffers *LogBuffers) Close() error {
 	logger.Debug("Closing logBuffers")
 	// TODO accumulate errors

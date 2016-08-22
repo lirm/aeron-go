@@ -40,14 +40,14 @@ const (
 type Publication struct {
 	conductor           *ClientConductor
 	channel             string
-	registrationID      int64
+	regID               int64
 	streamID            int32
 	sessionID           int32
 	initialTermID       int32
 	maxPayloadLength    int32
 	maxMessageLength    int32
 	positionBitsToShift int32
-	publicationLimit    Position
+	pubLimit            Position
 
 	isClosed atomic.Bool
 	metaData *logbuffer.LogBufferMetaData
@@ -89,7 +89,7 @@ func (pub *Publication) IsClosed() bool {
 func (pub *Publication) Close() error {
 	// FIXME Why can pub be nil?!
 	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
-		<-pub.conductor.releasePublication(pub.registrationID)
+		<-pub.conductor.releasePublication(pub.regID)
 	}
 
 	return nil
@@ -101,7 +101,7 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 	newPosition := PublicationClosed
 
 	if !pub.IsClosed() {
-		limit := pub.publicationLimit.get()
+		limit := pub.pubLimit.get()
 		partitionIndex := pub.metaData.ActivePartitionIx.Get()
 		termAppender := pub.appenders[partitionIndex]
 		rawTail := termAppender.RawTail()
@@ -109,7 +109,7 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
 
 		if logger.IsEnabledFor(logging.DEBUG) {
-			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.publicationLimit)
+			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
 		}
 		if position < limit {
 			var appendResult term.AppenderResult

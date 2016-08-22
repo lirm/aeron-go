@@ -47,7 +47,7 @@ const (
 )
 
 type PublicationStateDefn struct {
-	registrationID     int64
+	regID              int64
 	timeOfRegistration int64
 	streamID           int32
 	sessionID          int32
@@ -60,9 +60,9 @@ type PublicationStateDefn struct {
 	publication        *Publication
 }
 
-func (pub *PublicationStateDefn) Init(channel string, registrationID int64, streamID int32, now int64) *PublicationStateDefn {
+func (pub *PublicationStateDefn) Init(channel string, regID int64, streamID int32, now int64) *PublicationStateDefn {
 	pub.channel = channel
-	pub.registrationID = registrationID
+	pub.regID = regID
 	pub.streamID = streamID
 	pub.sessionID = -1
 	pub.posLimitCounterID = -1
@@ -73,7 +73,7 @@ func (pub *PublicationStateDefn) Init(channel string, registrationID int64, stre
 }
 
 type SubscriptionStateDefn struct {
-	registrationID     int64
+	regID              int64
 	timeOfRegistration int64
 	streamID           int32
 	errorCode          int32
@@ -85,7 +85,7 @@ type SubscriptionStateDefn struct {
 
 func (sub *SubscriptionStateDefn) Init(ch string, regID int64, sID int32, now int64) *SubscriptionStateDefn {
 	sub.channel = ch
-	sub.registrationID = regID
+	sub.regID = regID
 	sub.streamID = sID
 	sub.timeOfRegistration = now
 	sub.status = RegistrationStatus.AwaitingMediaDriver
@@ -135,8 +135,8 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	interServiceTimeout time.Duration, driverTimeout time.Duration, pubConnectionTimeout time.Duration,
 	lingerTo time.Duration) *ClientConductor {
 
-	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTimeout, driverTimeout,
-		pubConnectionTimeout)
+	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTimeout,
+		driverTimeout, pubConnectionTimeout)
 
 	cc.driverProxy = driverProxy
 	cc.running.Set(true)
@@ -226,30 +226,30 @@ func (cc *ClientConductor) AddPublication(channel string, streamID int32) int64 
 
 	for _, pub := range cc.pubs {
 		if pub.streamID == streamID && pub.channel == channel {
-			return pub.registrationID
+			return pub.regID
 		}
 	}
 
 	now := time.Now().UnixNano()
 
-	registrationID := cc.driverProxy.AddPublication(channel, streamID)
+	regID := cc.driverProxy.AddPublication(channel, streamID)
 
 	pubState := new(PublicationStateDefn)
-	pubState.Init(channel, registrationID, streamID, now)
+	pubState.Init(channel, regID, streamID, now)
 
 	cc.pubs = append(cc.pubs, pubState)
 
-	return registrationID
+	return regID
 }
 
-func (cc *ClientConductor) FindPublication(registrationID int64) *Publication {
+func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	var publication *Publication
 	for _, pub := range cc.pubs {
-		if pub.registrationID == registrationID {
+		if pub.regID == regID {
 			if pub.publication != nil {
 				publication = pub.publication
 			} else {
@@ -265,14 +265,14 @@ func (cc *ClientConductor) FindPublication(registrationID int64) *Publication {
 					publication = NewPublication(pub.buffers)
 					publication.conductor = cc
 					publication.channel = pub.channel
-					publication.registrationID = registrationID
+					publication.regID = regID
 					publication.streamID = pub.streamID
 					publication.sessionID = pub.sessionID
-					publication.publicationLimit = NewPosition(cc.counterValuesBuffer,
+					publication.pubLimit = NewPosition(cc.counterValuesBuffer,
 						pub.posLimitCounterID)
 
 				case RegistrationStatus.ErroredMediaDriver:
-					log.Fatalf("Error on %d: %d: %s", registrationID, pub.errorCode, pub.errorMessage)
+					log.Fatalf("Error on %d: %d: %s", regID, pub.errorCode, pub.errorMessage)
 				}
 			}
 			break
@@ -282,8 +282,8 @@ func (cc *ClientConductor) FindPublication(registrationID int64) *Publication {
 	return publication
 }
 
-func (cc *ClientConductor) releasePublication(registrationID int64) chan bool {
-	logger.Debugf("ReleasePublication: registrationId=%d", registrationID)
+func (cc *ClientConductor) releasePublication(regID int64) chan bool {
+	logger.Debugf("ReleasePublication: regID=%d", regID)
 
 	cc.verifyDriverIsActive()
 
@@ -294,8 +294,8 @@ func (cc *ClientConductor) releasePublication(registrationID int64) chan bool {
 	found := false
 
 	for i, pub := range cc.pubs {
-		if pub.registrationID == registrationID {
-			corrID := cc.driverProxy.RemovePublication(registrationID)
+		if pub.regID == regID {
+			corrID := cc.driverProxy.RemovePublication(regID)
 
 			cc.pubs[i] = cc.pubs[len(cc.pubs)-1]
 			cc.pubs[len(cc.pubs)-1] = nil
@@ -325,24 +325,24 @@ func (cc *ClientConductor) AddSubscription(channel string, streamID int32) int64
 
 	now := time.Now().UnixNano()
 
-	registrationID := cc.driverProxy.AddSubscription(channel, streamID)
+	regID := cc.driverProxy.AddSubscription(channel, streamID)
 
 	subState := new(SubscriptionStateDefn)
-	subState.Init(channel, registrationID, streamID, now)
+	subState.Init(channel, regID, streamID, now)
 
 	cc.subs = append(cc.subs, subState)
 
-	return registrationID
+	return regID
 }
 
-func (cc *ClientConductor) FindSubscription(registrationID int64) *Subscription {
+func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	var subscription *Subscription
 	for _, sub := range cc.subs {
-		if sub.registrationID == registrationID {
+		if sub.regID == regID {
 
 			switch sub.status {
 			case RegistrationStatus.AwaitingMediaDriver:
@@ -354,7 +354,7 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) *Subscription 
 					log.Fatalf(errStr)
 				}
 			case RegistrationStatus.ErroredMediaDriver:
-				errStr := fmt.Sprintf("Error on %d: %d: %s", registrationID, sub.errorCode, sub.errorMessage)
+				errStr := fmt.Sprintf("Error on %d: %d: %s", regID, sub.errorCode, sub.errorMessage)
 				cc.errorHandler(errors.New(errStr))
 				log.Fatalf(errStr)
 			}
@@ -367,8 +367,8 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) *Subscription 
 	return subscription
 }
 
-func (cc *ClientConductor) releaseSubscription(registrationID int64, images []Image) chan bool {
-	logger.Debugf("ReleaseSubscription: registrationId=%d", registrationID)
+func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) chan bool {
+	logger.Debugf("ReleaseSubscription: regID=%d", regID)
 
 	cc.verifyDriverIsActive()
 
@@ -381,12 +381,12 @@ func (cc *ClientConductor) releaseSubscription(registrationID int64, images []Im
 	found := false
 
 	for i, sub := range cc.subs {
-		if sub.registrationID == registrationID {
+		if sub.regID == regID {
 			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("Removing subscription: %d; %v", registrationID, images)
+				logger.Debugf("Removing subscription: %d; %v", regID, images)
 			}
 
-			corrID := cc.driverProxy.RemoveSubscription(registrationID)
+			corrID := cc.driverProxy.RemoveSubscription(regID)
 
 			cc.subs[i] = cc.subs[len(cc.subs)-1]
 			cc.subs[len(cc.subs)-1] = nil
@@ -412,35 +412,34 @@ func (cc *ClientConductor) releaseSubscription(registrationID int64, images []Im
 	return ch
 }
 
-func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, positionLimitCounterID int32,
-	logFileName string, registrationID int64) {
-	logger.Debugf("OnNewPublication: streamId=%d, sessionId=%d, positionLimitCounterId=%d, logFileName=%s, registrationId=%d",
-		streamID, sessionID, positionLimitCounterID, logFileName, registrationID)
+func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
+	logFileName string, regID int64) {
+	logger.Debugf("OnNewPublication: streamId=%d, sessionId=%d, posLimitCounterID=%d, logFileName=%s, regID=%d",
+		streamID, sessionID, posLimitCounterID, logFileName, regID)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	for _, pubDef := range cc.pubs {
-		if pubDef.registrationID == registrationID {
+		if pubDef.regID == regID {
 			pubDef.status = RegistrationStatus.RegisteredMediaDriver
 			pubDef.sessionID = sessionID
-			pubDef.posLimitCounterID = positionLimitCounterID
+			pubDef.posLimitCounterID = posLimitCounterID
 			pubDef.buffers = logbuffer.Wrap(logFileName)
 
 			logger.Debugf("Updated publication: %v", pubDef)
 
 			if cc.onNewPublicationHandler != nil {
-				cc.onNewPublicationHandler(pubDef.channel, streamID, sessionID, registrationID)
+				cc.onNewPublicationHandler(pubDef.channel, streamID, sessionID, regID)
 			}
 		}
 	}
 }
 
 func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, logFilename string,
-	sourceIdentity string, subscriberPositionCount int, subscriberPositions []driver.SubscriberPosition,
-	correlationID int64) {
-	logger.Debugf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subscriberPositions=%v, correlationId=%d",
-		streamID, sessionID, logFilename, sourceIdentity, subscriberPositions, correlationID)
+	sourceIdentity string, subsPosCount int, subsPositions []driver.SubscriberPosition, corrID int64) {
+	logger.Debugf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subscriberPositions=%v, corrID=%d",
+		streamID, sessionID, logFilename, sourceIdentity, subsPositions, corrID)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
@@ -448,11 +447,11 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 	for _, sub := range cc.subs {
 		if sub.streamID == streamID && sub.subscription != nil {
 			if !sub.subscription.hasImage(sessionID) {
-				for _, subPos := range subscriberPositions {
-					if sub.registrationID == subPos.RegistrationID() {
+				for _, subPos := range subsPositions {
+					if sub.regID == subPos.RegistrationID() {
 
-						image := NewImage(sessionID, correlationID, logbuffer.Wrap(logFilename))
-						image.subscriptionRegistrationID = sub.registrationID
+						image := NewImage(sessionID, corrID, logbuffer.Wrap(logFilename))
+						image.subscriptionRegistrationID = sub.regID
 						image.sourceIdentity = sourceIdentity
 						image.subscriberPosition = NewPosition(cc.counterValuesBuffer,
 							subPos.IndicatorID())
@@ -472,8 +471,8 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 	}
 }
 
-func (cc *ClientConductor) OnUnavailableImage(streamID int32, correlationID int64) {
-	logger.Debugf("OnUnavailableImage: streamId=%d, correlationId=%d", streamID, correlationID)
+func (cc *ClientConductor) OnUnavailableImage(streamID int32, corrID int64) {
+	logger.Debugf("OnUnavailableImage: streamID=%d, corrID=%d", streamID, corrID)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
@@ -481,7 +480,7 @@ func (cc *ClientConductor) OnUnavailableImage(streamID int32, correlationID int6
 	for _, sub := range cc.subs {
 		if sub.streamID == streamID {
 			if sub.subscription != nil {
-				image := sub.subscription.removeImage(correlationID)
+				image := sub.subscription.removeImage(corrID)
 				if cc.onUnavailableImageHandler != nil {
 					cc.onUnavailableImageHandler(image)
 				}
@@ -499,7 +498,7 @@ func (cc *ClientConductor) OnOperationSuccess(corrID int64) {
 	defer cc.adminLock.Unlock()
 
 	for _, sub := range cc.subs {
-		if sub.registrationID == corrID && sub.status == RegistrationStatus.AwaitingMediaDriver {
+		if sub.regID == corrID && sub.status == RegistrationStatus.AwaitingMediaDriver {
 			sub.status = RegistrationStatus.RegisteredMediaDriver
 			sub.subscription = NewSubscription(cc, sub.channel, corrID, sub.streamID)
 
@@ -516,14 +515,14 @@ func (cc *ClientConductor) OnOperationSuccess(corrID int64) {
 	}
 }
 
-func (cc *ClientConductor) OnErrorResponse(correlationID int64, errorCode int32, errorMessage string) {
-	logger.Debugf("OnErrorResponse: correlationId=%d, errorCode=%d, errorMessage=%s", correlationID, errorCode, errorMessage)
+func (cc *ClientConductor) OnErrorResponse(corrID int64, errorCode int32, errorMessage string) {
+	logger.Debugf("OnErrorResponse: correlationID=%d, errorCode=%d, errorMessage=%s", corrID, errorCode, errorMessage)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	for _, pubDef := range cc.pubs {
-		if pubDef.registrationID == correlationID {
+		if pubDef.regID == corrID {
 			pubDef.status = RegistrationStatus.ErroredMediaDriver
 			pubDef.errorCode = errorCode
 			pubDef.errorMessage = errorMessage
@@ -532,7 +531,7 @@ func (cc *ClientConductor) OnErrorResponse(correlationID int64, errorCode int32,
 	}
 
 	for _, subDef := range cc.pubs {
-		if subDef.registrationID == correlationID {
+		if subDef.regID == corrID {
 			subDef.status = RegistrationStatus.ErroredMediaDriver
 			subDef.errorCode = errorCode
 			subDef.errorMessage = errorMessage
