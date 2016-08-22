@@ -17,34 +17,65 @@ limitations under the License.
 package aeron
 
 import (
-	//"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
+	"os"
 	"testing"
+	"time"
 )
+
+var logBufferName = "logbuffers.bin"
 
 func prepareFile(t *testing.T) *logbuffer.LogBuffers {
 	logging.SetLevel(logging.INFO, "logbuffers")
 	logging.SetLevel(logging.INFO, "memmap")
 	logging.SetLevel(logging.INFO, "aeron")
-	fname := "logbuffers.bin"
-	mmap, err := memmap.NewFile(fname, 0, 256*1024)
+	mmap, err := memmap.NewFile(logBufferName, 0, 256*1024)
 	if err != nil {
 		t.Error(err.Error())
 		return nil
 	}
 	mmap.Close()
 
-	return logbuffer.Wrap(fname)
+	return logbuffer.Wrap(logBufferName)
 }
 
 func TestNewPublication(t *testing.T) {
+	counterFileName := "cnc.dat"
+	mmap, err := memmap.NewFile(counterFileName, 0, 256*1024)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	defer mmap.Close()
+	defer os.Remove(counterFileName)
+	defer os.Remove(logBufferName)
+
+	cncBuffer := atomic.MakeBuffer(mmap.GetMemoryPtr(), mmap.GetMemorySize())
+	var meta counters.MetaDataFlyweight
+	meta.Wrap(cncBuffer, 0)
+	meta.CncVersion.Set(counters.CurrentCncVersion)
+
+	var proxy driver.Proxy
+	var rb rb.ManyToOne
+	rb.Init(meta.ToDriverBuf.Get())
+	proxy.Init(&rb)
+
+	var cc ClientConductor
+	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
+	defer cc.Close()
+
 	lb := prepareFile(t)
+
+	lb.Meta().MTULen.Set(8192)
 
 	pub := NewPublication(lb)
 
-	//pub.conductor = cc
+	pub.conductor = &cc
 	pub.channel = "aeron:ipc"
 	pub.regID = 1
 	pub.streamID = 10
@@ -54,15 +85,33 @@ func TestNewPublication(t *testing.T) {
 		t.Logf("meta: %v", metaBuffer)
 	}
 
-	pub.pubLimit = NewPosition(metaBuffer, 0)
+	counter := atomic.MakeBuffer(make([]byte, 256))
+	pub.pubLimit = NewPosition(counter, 0)
 	t.Logf("pub: %v", pub.pubLimit)
 	if pub.pubLimit.get() != 0 {
 		t.Fail()
 	}
 
-	//srcBuffer := atomic.MakeBuffer(make([]byte, 256))
+	srcBuffer := atomic.MakeBuffer(make([]byte, 256))
 
-	// FIXME how can we make it work without creating the whole ClientConductor
-	//pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
-	//t.Logf("new pos: %d", pos)
+	milliEpoch := (time.Nanosecond * time.Duration(time.Now().UnixNano())) / time.Millisecond
+	pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	t.Logf("new pos: %d", pos)
+	if pos != NotConnected {
+		t.Errorf("Expected publication to not be connected: %d", pos)
+	}
+
+	pub.metaData.TimeOfLastStatusMsg.Set(milliEpoch.Nanoseconds())
+	pos = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	t.Logf("new pos: %d", pos)
+	if pos != BackPressured {
+		t.Errorf("Expected publication to be back pressured: %d", pos)
+	}
+
+	pub.pubLimit.set(1024)
+	pos = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	t.Logf("new pos: %d", pos)
+	if pos != int64(srcBuffer.Capacity()+logbuffer.DataFrameHeader.Length) {
+		t.Errorf("Expected publication to advance to position %d", srcBuffer.Capacity()+logbuffer.DataFrameHeader.Length)
+	}
 }

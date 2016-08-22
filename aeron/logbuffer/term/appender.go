@@ -111,6 +111,11 @@ func (appender *Appender) RawTail() int64 {
 	return appender.tailCounter.Get()
 }
 
+// SetRawTail sets the raw value of the tail. It should not be used outside of testing
+func (appender *Appender) SetRawTail(v int64) {
+	appender.tailCounter.Set(v)
+}
+
 func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
 	return appender.tailCounter.GetAndAddInt64(int64(alignedLength))
 }

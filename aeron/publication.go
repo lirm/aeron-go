@@ -117,11 +117,18 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			if nil != reservedValueSupplier {
 				resValSupplier = reservedValueSupplier
 			}
+			if logger.IsEnabledFor(logging.DEBUG) {
+				logger.Debugf("Size check %d <= %d", length, pub.maxPayloadLength)
+			}
 			if length <= pub.maxPayloadLength {
 				termAppender.AppendUnfragmentedMessage(&appendResult, buffer, offset, length, resValSupplier)
 			} else {
 				pub.checkForMaxMessageLength(length)
 				termAppender.AppendFragmentedMessage(&appendResult, buffer, offset, length, pub.maxPayloadLength, resValSupplier)
+			}
+
+			if logger.IsEnabledFor(logging.DEBUG) {
+				logger.Debugf("New term offset: %d", appendResult.TermOffset())
 			}
 
 			if appendResult.TermOffset() > 0 {
