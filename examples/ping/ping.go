@@ -25,6 +25,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
 	"github.com/op/go-logging"
+	"io"
 	"os"
 	"runtime/pprof"
 	"time"
@@ -125,10 +126,27 @@ func main() {
 		}
 	}
 
-	qq := []float64{50.0, 75.0, 90.0, 99.0, 99.5, 99.9, 99.99, 99.999, 99.9999}
-	for _, q := range qq {
-		logger.Infof("%8.9v  %8.3v us\n", q, float64(hist.ValueAtQuantile(q))/1000.0)
+	OutputPercentileDistribution(os.Stdout, hist, 1000.0)
+}
+
+func OutputPercentileDistribution(out io.Writer, h *hdrhistogram.Histogram, scalingFactor float64) {
+
+	fmt.Print("Value     Percentile TotalCount 1/(1-Percentile)\n\n")
+
+	//Value     Percentile TotalCount 1/(1-Percentile)
+	for _, b := range h.CumulativeDistribution() {
+		pct := b.Quantile / 100.0
+		io.WriteString(out, fmt.Sprintf("%12.3f %2.12f  %10d  %14.2f\n",
+			float64(b.ValueAt)/scalingFactor,
+			pct,
+			b.Count,
+			1/(1-pct)))
 	}
 
-	logger.Infof("Mean: %8.3v; StdDev: %8.3v\n", hist.Mean()/1000, hist.StdDev()/1000)
+	io.WriteString(out, fmt.Sprintf("#[Mean    = %12.3f, StdDeviation   = %12.3f]\n",
+		h.Mean()/scalingFactor,
+		h.StdDev()/scalingFactor))
+	io.WriteString(out, fmt.Sprintf("#[Max     = %12.3f, Total count    = %12d]\n",
+		float64(h.Max())/scalingFactor,
+		h.TotalCount()))
 }
