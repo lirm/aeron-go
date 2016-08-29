@@ -21,6 +21,8 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 )
 
+// Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and
+// stream ID combination.
 type Subscription struct {
 	conductor       *ClientConductor
 	channel         string

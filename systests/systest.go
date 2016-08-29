@@ -17,16 +17,20 @@ limitations under the License.
 package main
 
 import (
+	"time"
+
 	. "github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
-	"time"
 )
 
 const (
-	TestChannel  = "aeron:udp?endpoint=localhost:40123" // TestChannel is the default channel used for testing
-	TestStreamID = 10                                   // TestStreamID is the default stream ID used for testing
+	// TestChannel is the default channel used for testing
+	TestChannel = "aeron:udp?endpoint=localhost:40123"
+
+	// TestStreamID is the default stream ID used for testing
+	TestStreamID = 10
 )
 
 var logger = logging.MustGetLogger("systests")
@@ -102,6 +106,8 @@ func logtest(flag bool) {
 	}
 }
 
+// TestAeronBasics will check for a simple send/receive scenario.
+// As all systests this assumes a running media driver.
 func TestAeronBasics() {
 
 	logtest(false)
@@ -116,6 +122,8 @@ func TestAeronBasics() {
 	subAndSend(1, a, pub)
 }
 
+// TestAeronSendMultipleMessages tests sending and receive multiple messages in a row.
+// As all systests this assumes a running media driver.
 func TestAeronSendMultipleMessages() {
 
 	logtest(false)
@@ -140,6 +148,9 @@ func TestAeronSendMultipleMessages() {
 	receive(itCount, sub)
 }
 
+// TestAeronSendMultiplePublications tests sending on multiple publications with a sigle
+// subscription receiving. In IPC local mode this will end up with using the same Publication
+// but it's a scenario nonetheless. As all systests this assumes a running media driver.
 func TestAeronSendMultiplePublications() {
 
 	logtest(false)
@@ -196,6 +207,7 @@ func TestAeronSendMultiplePublications() {
 
 }
 
+// TestAeronResubscribe test using different subscriptions with the same publication
 func TestAeronResubscribe() {
 
 	logtest(false)
@@ -210,6 +222,7 @@ func TestAeronResubscribe() {
 	subAndSend(1, a, pub)
 }
 
+// TestResubStress tests sending and receiving when creating a new subscription for each cycle
 func TestResubStress() {
 	logtest(false)
 	logger.Debug("Started TestAeronResubscribe")
@@ -224,6 +237,7 @@ func TestResubStress() {
 	}
 }
 
+// TestAeronClose simply tests explicit call to Aeron.Close()
 func TestAeronClose() {
 
 	logtest(false)

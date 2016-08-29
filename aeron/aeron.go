@@ -99,6 +99,8 @@ func (aeron *Aeron) Close() error {
 	return err
 }
 
+// AddSubscription will add a new subscription to the driver.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
 func (aeron *Aeron) AddSubscription(channel string, streamID int32) chan *Subscription {
 	ch := make(chan *Subscription, 1)
 
@@ -118,6 +120,9 @@ func (aeron *Aeron) AddSubscription(channel string, streamID int32) chan *Subscr
 	return ch
 }
 
+// AddPublication will add a new publication to the driver. If such publication already exists within ClientConductor
+// the same instance will be returned.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
 func (aeron *Aeron) AddPublication(channel string, streamID int32) chan *Publication {
 	ch := make(chan *Publication, 1)
 
