@@ -99,12 +99,3 @@ default:
     }
 }
 ```
-
-
-# Outstanding items
-
-* Tests, tests, tests... 
-* Controlled poll
-* Configuration reading
-* Error log buffer use
-* Error handling
