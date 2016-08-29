@@ -57,6 +57,9 @@ func (buf *ManyToOne) Init(buffer *atomic.Buffer) *ManyToOne {
 	buf.buffer = buffer
 	buf.capacity = buffer.Capacity() - descriptor.trailerLength
 
+	if buf.capacity <= 0 {
+		panic("Undelying buffer capacity is infufficient")
+	}
 	util.IsPowerOfTwo(buf.capacity)
 
 	buf.maxMsgLength = buf.capacity / 8

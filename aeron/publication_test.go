@@ -59,10 +59,20 @@ func TestNewPublication(t *testing.T) {
 	var meta counters.MetaDataFlyweight
 	meta.Wrap(cncBuffer, 0)
 	meta.CncVersion.Set(counters.CurrentCncVersion)
+	meta.ToDriverBufLen.Set(1024)
 
+	// Rewrap to pick up the new length
+	meta.Wrap(cncBuffer, 0)
+
+	t.Logf("meta data: %v", meta)
 	var proxy driver.Proxy
 	var rb rb.ManyToOne
-	rb.Init(meta.ToDriverBuf.Get())
+	buf := meta.ToDriverBuf.Get()
+	if buf == nil {
+		t.FailNow()
+	}
+	t.Logf("RingBuffer backing atomic.Buffer: %v", buf)
+	rb.Init(buf)
 	proxy.Init(&rb)
 
 	var cc ClientConductor

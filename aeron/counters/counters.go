@@ -37,8 +37,8 @@ type MetaDataFlyweight struct {
 
 	CncVersion flyweight.Int32Field
 
-	toDriverBufLen   flyweight.Int32Field
-	toClientBufLen   flyweight.Int32Field
+	ToDriverBufLen   flyweight.Int32Field
+	ToClientBufLen   flyweight.Int32Field
 	metadataBuLen    flyweight.Int32Field
 	valuesBufLen     flyweight.Int32Field
 	ClientLivenessTo flyweight.Int64Field
@@ -54,8 +54,8 @@ type MetaDataFlyweight struct {
 func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.CncVersion.Wrap(buf, pos)
-	pos += m.toDriverBufLen.Wrap(buf, pos)
-	pos += m.toClientBufLen.Wrap(buf, pos)
+	pos += m.ToDriverBufLen.Wrap(buf, pos)
+	pos += m.ToClientBufLen.Wrap(buf, pos)
 	pos += m.metadataBuLen.Wrap(buf, pos)
 	pos += m.valuesBufLen.Wrap(buf, pos)
 	pos += m.ClientLivenessTo.Wrap(buf, pos)
@@ -63,8 +63,8 @@ func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 
 	pos = int(util.AlignInt32(int32(pos), util.CacheLineLength*2))
 
-	pos += m.ToDriverBuf.Wrap(buf, pos, m.toDriverBufLen.Get())
-	pos += m.ToClientsBuf.Wrap(buf, pos, m.toClientBufLen.Get())
+	pos += m.ToDriverBuf.Wrap(buf, pos, m.ToDriverBufLen.Get())
+	pos += m.ToClientsBuf.Wrap(buf, pos, m.ToClientBufLen.Get())
 	pos += m.MetaDataBuf.Wrap(buf, pos, m.metadataBuLen.Get())
 	pos += m.ValuesBuf.Wrap(buf, pos, m.valuesBufLen.Get())
 	pos += m.ErrorBuf.Wrap(buf, pos, m.errorLogLen.Get())
