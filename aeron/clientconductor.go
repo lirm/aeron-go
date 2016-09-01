@@ -46,7 +46,7 @@ const (
 	resourceTimeoutNS  int64 = 1000 * int64(time.Millisecond)
 )
 
-type PublicationStateDefn struct {
+type publicationStateDefn struct {
 	regID              int64
 	timeOfRegistration int64
 	streamID           int32
@@ -60,7 +60,7 @@ type PublicationStateDefn struct {
 	publication        *Publication
 }
 
-func (pub *PublicationStateDefn) Init(channel string, regID int64, streamID int32, now int64) *PublicationStateDefn {
+func (pub *publicationStateDefn) Init(channel string, regID int64, streamID int32, now int64) *publicationStateDefn {
 	pub.channel = channel
 	pub.regID = regID
 	pub.streamID = streamID
@@ -72,7 +72,7 @@ func (pub *PublicationStateDefn) Init(channel string, regID int64, streamID int3
 	return pub
 }
 
-type SubscriptionStateDefn struct {
+type subscriptionStateDefn struct {
 	regID              int64
 	timeOfRegistration int64
 	streamID           int32
@@ -83,7 +83,7 @@ type SubscriptionStateDefn struct {
 	subscription       *Subscription
 }
 
-func (sub *SubscriptionStateDefn) Init(ch string, regID int64, sID int32, now int64) *SubscriptionStateDefn {
+func (sub *subscriptionStateDefn) Init(ch string, regID int64, sID int32, now int64) *subscriptionStateDefn {
 	sub.channel = ch
 	sub.regID = regID
 	sub.streamID = sID
@@ -99,8 +99,8 @@ type lingerResourse struct {
 }
 
 type ClientConductor struct {
-	pubs []*PublicationStateDefn
-	subs []*SubscriptionStateDefn
+	pubs []*publicationStateDefn
+	subs []*subscriptionStateDefn
 
 	driverProxy *driver.Proxy
 
@@ -131,6 +131,7 @@ type ClientConductor struct {
 	resourceLingerTimeoutNs         int64
 }
 
+// Init is the primary initialization method for ClientConductor
 func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver,
 	interServiceTo, driverTo, pubConnectionTo, lingerTo time.Duration) *ClientConductor {
 
@@ -152,6 +153,8 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	return cc
 }
 
+// Close will terminate the Run() goroutine body and close all active publications and subscription. Run() can
+// be restarted in a another goroutine.
 func (cc *ClientConductor) Close() error {
 
 	var err error
@@ -195,6 +198,7 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 		}
 	}()
 
+	cc.running.Set(true)
 	for cc.running.Get() {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
 		workCount += cc.onHeartbeatCheckTimeouts()
@@ -229,7 +233,7 @@ func (cc *ClientConductor) AddPublication(channel string, streamID int32) int64 
 
 	regID := cc.driverProxy.AddPublication(channel, streamID)
 
-	pubState := new(PublicationStateDefn)
+	pubState := new(publicationStateDefn)
 	pubState.Init(channel, regID, streamID, now)
 
 	cc.pubs = append(cc.pubs, pubState)
@@ -322,7 +326,7 @@ func (cc *ClientConductor) AddSubscription(channel string, streamID int32) int64
 
 	regID := cc.driverProxy.AddSubscription(channel, streamID)
 
-	subState := new(SubscriptionStateDefn)
+	subState := new(subscriptionStateDefn)
 	subState.Init(channel, regID, streamID, now)
 
 	cc.subs = append(cc.subs, subState)
