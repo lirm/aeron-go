@@ -165,7 +165,10 @@ func (cc *ClientConductor) Close() error {
 			}
 		}
 		runtime.KeepAlive(cc.pubs)
+
+		cc.adminLock.Lock()
 		cc.pubs = nil
+		cc.adminLock.Unlock()
 
 		for _, sub := range cc.subs {
 			err = sub.subscription.Close()
@@ -174,8 +177,10 @@ func (cc *ClientConductor) Close() error {
 				cc.errorHandler(err)
 			}
 		}
-		cc.subs = nil
 
+		cc.adminLock.Lock()
+		cc.subs = nil
+		cc.adminLock.Unlock()
 	}
 
 	return err
@@ -207,6 +212,8 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 		workCount += cc.onHeartbeatCheckTimeouts()
 		idleStrategy.Idle(workCount)
 	}
+
+	logger.Warning("Shutting down ClientConductor")
 }
 
 func (cc *ClientConductor) verifyDriverIsActive() {
@@ -541,9 +548,6 @@ func (cc *ClientConductor) OnErrorResponse(corrID int64, errorCode int32, errorM
 
 func (cc *ClientConductor) onInterServiceTimeout(now int64) {
 	log.Printf("onInterServiceTimeout: now=%d", now)
-
-	cc.adminLock.Lock()
-	defer cc.adminLock.Unlock()
 
 	err := cc.Close()
 	if err != nil {

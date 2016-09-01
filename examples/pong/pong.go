@@ -52,6 +52,7 @@ func main() {
 	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
 
 	a := aeron.Connect(ctx)
+	defer a.Close()
 
 	subscription := <-a.AddSubscription(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamID))
 	defer subscription.Close()
