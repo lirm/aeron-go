@@ -132,19 +132,18 @@ type ClientConductor struct {
 }
 
 func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver,
-	interServiceTimeout time.Duration, driverTimeout time.Duration, pubConnectionTimeout time.Duration,
-	lingerTo time.Duration) *ClientConductor {
+	interServiceTo, driverTo, pubConnectionTo, lingerTo time.Duration) *ClientConductor {
 
-	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTimeout,
-		driverTimeout, pubConnectionTimeout)
+	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTo,
+		driverTo, pubConnectionTo)
 
 	cc.driverProxy = driverProxy
 	cc.running.Set(true)
 	cc.driverActive.Set(true)
 	cc.driverListenerAdapter = driver.NewAdapter(cc, bcast)
-	cc.interServiceTimeoutNs = interServiceTimeout.Nanoseconds()
-	cc.driverTimeoutNs = driverTimeout.Nanoseconds()
-	cc.publicationConnectionTimeoutNs = pubConnectionTimeout.Nanoseconds()
+	cc.interServiceTimeoutNs = interServiceTo.Nanoseconds()
+	cc.driverTimeoutNs = driverTo.Nanoseconds()
+	cc.publicationConnectionTimeoutNs = pubConnectionTo.Nanoseconds()
 	cc.resourceLingerTimeoutNs = lingerTo.Nanoseconds()
 
 	cc.pendingCloses = make(map[int64]chan bool)
