@@ -158,28 +158,17 @@ func (cc *ClientConductor) Close() error {
 	if cc.running.CompareAndSet(true, false) {
 		for _, pub := range cc.pubs {
 			err = pub.publication.Close()
-			runtime.KeepAlive(pub.publication)
 			if err != nil {
 				cc.errorHandler(err)
 			}
 		}
-		runtime.KeepAlive(cc.pubs)
-
-		cc.adminLock.Lock()
-		cc.pubs = nil
-		cc.adminLock.Unlock()
 
 		for _, sub := range cc.subs {
 			err = sub.subscription.Close()
-			runtime.KeepAlive(sub.subscription)
 			if err != nil {
 				cc.errorHandler(err)
 			}
 		}
-
-		cc.adminLock.Lock()
-		cc.subs = nil
-		cc.adminLock.Unlock()
 	}
 
 	return err
