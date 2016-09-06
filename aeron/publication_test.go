@@ -29,42 +29,52 @@ import (
 	"time"
 )
 
-var logBufferName = "logbuffers.bin"
-
-func prepareFile(t *testing.T) *logbuffer.LogBuffers {
+func prepareFile(t *testing.T) (string, *logbuffer.LogBuffers) {
 	logging.SetLevel(logging.INFO, "logbuffers")
 	logging.SetLevel(logging.INFO, "memmap")
 	logging.SetLevel(logging.INFO, "aeron")
+
+	logBufferName := "logbuffers.bin"
 	mmap, err := memmap.NewFile(logBufferName, 0, 256*1024)
 	if err != nil {
 		t.Error(err.Error())
-		return nil
+		return logBufferName, nil
 	}
 	mmap.Close()
 
-	return logbuffer.Wrap(logBufferName)
+	return logBufferName, logbuffer.Wrap(logBufferName)
 }
 
-func TestNewPublication(t *testing.T) {
+func prepareCnc(t *testing.T) (string, *counters.MetaDataFlyweight) {
+	logging.SetLevel(logging.INFO, "logbuffers")
+	logging.SetLevel(logging.INFO, "memmap")
+	logging.SetLevel(logging.INFO, "aeron")
+
 	counterFileName := "cnc.dat"
 	mmap, err := memmap.NewFile(counterFileName, 0, 256*1024)
 	if err != nil {
 		t.Error(err.Error())
 	}
-	defer mmap.Close()
-	defer os.Remove(counterFileName)
-	defer os.Remove(logBufferName)
 
 	cncBuffer := atomic.MakeBuffer(mmap.GetMemoryPtr(), mmap.GetMemorySize())
 	var meta counters.MetaDataFlyweight
 	meta.Wrap(cncBuffer, 0)
 	meta.CncVersion.Set(counters.CurrentCncVersion)
 	meta.ToDriverBufLen.Set(1024)
+	meta.ToClientBufLen.Set(1024)
 
 	// Rewrap to pick up the new length
 	meta.Wrap(cncBuffer, 0)
-
 	t.Logf("meta data: %v", meta)
+
+	return counterFileName, &meta
+}
+
+func TestNewPublication(t *testing.T) {
+
+	cncName, meta := prepareCnc(t)
+	defer os.Remove(cncName)
+
 	var proxy driver.Proxy
 	var rb rb.ManyToOne
 	buf := meta.ToDriverBuf.Get()
@@ -79,7 +89,8 @@ func TestNewPublication(t *testing.T) {
 	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
 	defer cc.Close()
 
-	lb := prepareFile(t)
+	lbName, lb := prepareFile(t)
+	defer os.Remove(lbName)
 
 	lb.Meta().MTULen.Set(8192)
 
@@ -124,4 +135,71 @@ func TestNewPublication(t *testing.T) {
 	if pos != int64(srcBuffer.Capacity()+logbuffer.DataFrameHeader.Length) {
 		t.Errorf("Expected publication to advance to position %d", srcBuffer.Capacity()+logbuffer.DataFrameHeader.Length)
 	}
+}
+
+func TestPublication_Offer(t *testing.T) {
+	cncName, meta := prepareCnc(t)
+	defer os.Remove(cncName)
+
+	var proxy driver.Proxy
+	var rb rb.ManyToOne
+	buf := meta.ToDriverBuf.Get()
+	if buf == nil {
+		t.FailNow()
+	}
+	t.Logf("RingBuffer backing atomic.Buffer: %v", buf)
+	rb.Init(buf)
+	proxy.Init(&rb)
+
+	var cc ClientConductor
+	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
+	defer cc.Close()
+
+	lbName, lb := prepareFile(t)
+	defer os.Remove(lbName)
+
+	lb.Meta().MTULen.Set(8192)
+
+	pub := NewPublication(lb)
+
+	pub.conductor = &cc
+	pub.channel = "aeron:ipc"
+	pub.regID = 1
+	pub.streamID = 10
+	pub.sessionID = 100
+	metaBuffer := lb.Buffer(logbuffer.PartitionCount)
+	if nil == metaBuffer {
+		t.Logf("meta: %v", metaBuffer)
+	}
+
+	counter := atomic.MakeBuffer(make([]byte, 256))
+	pub.pubLimit = NewPosition(counter, 0)
+	t.Logf("pub: %v", pub.pubLimit)
+	if pub.pubLimit.get() != 0 {
+		t.Fail()
+	}
+
+	srcBuffer := atomic.MakeBuffer(make([]byte, 256))
+	milliEpoch := (time.Nanosecond * time.Duration(time.Now().UnixNano())) / time.Millisecond
+	pub.metaData.TimeOfLastStatusMsg.Set(milliEpoch.Nanoseconds())
+
+	termBufLen := lb.Buffer(0).Capacity()
+	t.Logf("Term buffer length: %d", termBufLen)
+
+	frameLen := int64(srcBuffer.Capacity() + logbuffer.DataFrameHeader.Length)
+	pub.pubLimit.set(int64(termBufLen))
+	for i := int64(1); i <= int64(termBufLen)/frameLen; i++ {
+		pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+		t.Logf("new pos: %d", pos)
+		if pos != frameLen*i {
+			t.Errorf("Expected publication to advance to position %d (have %d)", frameLen*i, pos)
+		}
+	}
+
+	pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	t.Logf("new pos: %d", pos)
+	if pos != AdminAction {
+		t.Errorf("Expected publication to trigger AdminAction (%d)", pos)
+	}
+
 }
