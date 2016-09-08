@@ -23,11 +23,14 @@ import (
 	"unsafe"
 )
 
+// Field is the interface for a field in a flyweight wrapper. It expects a preallocated buffer and offset into it, as
+// arguments.
 type Field interface {
 	Wrap(buffer *atomic.Buffer, offset int)
 	Get() interface{}
 }
 
+// Int32Field is int32 field for flyweight
 type Int32Field struct {
 	offset unsafe.Pointer
 }
@@ -47,6 +50,7 @@ func (fld *Int32Field) Set(value int32) {
 	*(*int32)(fld.offset) = value
 }
 
+// Int64Field is int64 field for flyweight
 type Int64Field struct {
 	offset unsafe.Pointer
 }
@@ -71,6 +75,7 @@ func (fld *Int64Field) GetAndAddInt64(value int64) int64 {
 	return n - value
 }
 
+// StringField is string field for flyweight
 type StringField struct {
 	lenOffset  unsafe.Pointer
 	dataOffset unsafe.Pointer
@@ -140,10 +145,9 @@ type Padding struct {
 // Wrap for padding takes size to pas this particular position to and alignment as the
 func (f *Padding) Wrap(buffer *atomic.Buffer, offset int, size int32, alignment int32) int {
 	maxl := int32(offset) + size
-	newLen := maxl - maxl%alignment
+	newLen := maxl - maxl%alignment - int32(offset)
 
-	//fmt.Printf("aligned %d to %d. have %d\n", offset, length, newLen-int32(offset))
-	return f.raw.Wrap(buffer, offset, newLen-int32(offset))
+	return f.raw.Wrap(buffer, offset, newLen)
 }
 
 func (f *Padding) Get() *atomic.Buffer {
