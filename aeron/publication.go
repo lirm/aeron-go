@@ -152,9 +152,53 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 	return newPosition
 }
 
+func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) int64 {
+	newPosition := PublicationClosed
+
+	if !pub.IsClosed() {
+		pub.checkForMaxPayloadLength(length)
+
+		limit := pub.pubLimit.get()
+		partitionIndex := pub.metaData.ActivePartitionIx.Get()
+		termAppender := pub.appenders[partitionIndex]
+		rawTail := termAppender.RawTail()
+		termOffset := rawTail & 0xFFFFFFFF
+		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
+
+		if position < limit {
+			termOffset, termId := termAppender.Claim(length, bufferClaim)
+
+			if termOffset > 0 {
+				newPosition = (position - termOffset) + termOffset
+			} else {
+				newPosition = AdminAction
+				if termOffset == term.AppenderTripped {
+					nextIndex := nextPartitionIndex(partitionIndex)
+
+					pub.appenders[nextIndex].SetTailTermID(termId + 1)
+					pub.metaData.ActivePartitionIx.Set(nextIndex)
+				}
+			}
+
+		} else if pub.conductor.isPublicationConnected(pub.metaData.TimeOfLastStatusMsg.Get()) {
+			newPosition = BackPressured
+		} else {
+			newPosition = NotConnected
+		}
+
+	}
+	return newPosition
+}
+
 func (pub *Publication) checkForMaxMessageLength(length int32) {
 	if length > pub.maxMessageLength {
-		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxPayloadLength, length))
+		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxMessageLength, length))
+	}
+}
+
+func (pub *Publication) checkForMaxPayloadLength(length int32) {
+	if length > pub.maxPayloadLength {
+		panic(fmt.Sprintf("Encoded message exceeds maxPayloadLength of %d, length=%d", pub.maxPayloadLength, length))
 	}
 }
 
