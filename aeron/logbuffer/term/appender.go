@@ -38,7 +38,9 @@ const (
 )
 
 // DefaultReservedValueSupplier is the default reserved value provider
-var DefaultReservedValueSupplier ReservedValueSupplier = func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64 { return 0 }
+var DefaultReservedValueSupplier ReservedValueSupplier = func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64 {
+	return 0
+}
 
 // ReservedValueSupplier is the type definition for a provider of user supplied header data
 type ReservedValueSupplier func(termBuffer *atomic.Buffer, termOffset int32, length int32) int64
@@ -121,7 +123,7 @@ func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
 }
 
 // Claim is the interface for using Buffer Claims for zero copy sends
-func (appender *Appender) Claim(result *AppenderResult, length int32, claim *logbuffer.Claim) {
+func (appender *Appender) Claim(length int32, claim *logbuffer.Claim) (int64, int32) {
 
 	frameLength := length + logbuffer.DataFrameHeader.Length
 	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameAlignment)
@@ -130,16 +132,18 @@ func (appender *Appender) Claim(result *AppenderResult, length int32, claim *log
 
 	termLength := appender.termBuffer.Capacity()
 
-	result.termID = logbuffer.TermID(rawTail)
-	result.termOffset = termOffset + int64(alignedLength)
-	if result.termOffset > int64(termLength) {
-		result.termOffset = handleEndOfLogCondition(result.termID, appender.termBuffer, int32(termOffset),
+	termID := logbuffer.TermID(rawTail)
+	termOffset += int64(alignedLength)
+	if termOffset > int64(termLength) {
+		termOffset = handleEndOfLogCondition(termID, appender.termBuffer, int32(termOffset),
 			&appender.headerWriter, termLength)
 	} else {
 		offset := int32(termOffset)
-		appender.headerWriter.write(appender.termBuffer, offset, frameLength, result.termID)
+		appender.headerWriter.write(appender.termBuffer, offset, frameLength, termID)
 		claim.Wrap(appender.termBuffer, offset, frameLength)
 	}
+
+	return termOffset, termID
 }
 
 // AppendUnfragmentedMessage appends an unfragmented message in a single frame to the term

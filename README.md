@@ -1,10 +1,10 @@
 [![Build Status](https://travis-ci.org/lirm/aeron-go.svg?branch=master)](https://travis-ci.org/lirm/aeron-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/lirm/aeron-go)](https://goreportcard.com/report/github.com/lirm/aeron-go)
+[![Join the chat at https://gitter.im/aeron-go/Lobby](https://badges.gitter.im/aeron-go/Lobby.svg)](https://gitter.im/aeron-go/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 <!--[![Coverage Status](https://coveralls.io/repos/github/lirm/aeron-go/badge.svg?branch=master)](https://coveralls.io/github/lirm/aeron-go?branch=master)-->
 
 # aeron-go
 
-[![Join the chat at https://gitter.im/aeron-go/Lobby](https://badges.gitter.im/aeron-go/Lobby.svg)](https://gitter.im/aeron-go/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 Implementation of [Aeron](https://github.com/real-logic/Aeron) messaging client in Go.
 
 Architecture, design, and protocol of Aeron can be found [here](https://github.com/real-logic/Aeron/wiki)
