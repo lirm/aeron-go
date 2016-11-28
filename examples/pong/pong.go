@@ -49,7 +49,10 @@ func main() {
 	}
 
 	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
-	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
+	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to).
+		ErrorHandler(func(err error) {
+			logger.Fatalf("Received error: %v", err)
+		})
 
 	a := aeron.Connect(ctx)
 	defer a.Close()

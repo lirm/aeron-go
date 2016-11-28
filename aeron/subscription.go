@@ -30,9 +30,9 @@ type Subscription struct {
 	registrationID  int64
 	streamID        int32
 
-	images *ImageList
+	images          *ImageList
 
-	isClosed atomic.Bool
+	isClosed        atomic.Bool
 }
 
 // NewSubscription is a factory method to create new subscription to be added to the media driver
@@ -81,11 +81,11 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 		}
 
 		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].Poll(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].Poll(handler, fragmentLimit - fragmentsRead)
 		}
 
 		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].Poll(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].Poll(handler, fragmentLimit - fragmentsRead)
 		}
 	}
 
@@ -118,8 +118,8 @@ func (sub *Subscription) removeImage(correlationID int64) *Image {
 		if image.correlationID == correlationID {
 			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationID)
 
-			img[ix] = img[len(img)-1]
-			img = img[:len(img)-1]
+			img[ix] = img[len(img) - 1]
+			img = img[:len(img) - 1]
 
 			sub.images.Set(img)
 
