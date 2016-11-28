@@ -112,7 +112,6 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
 		}
 		if position < limit {
-			var appendResult term.AppenderResult
 			resValSupplier := term.DefaultReservedValueSupplier
 			if nil != reservedValueSupplier {
 				resValSupplier = reservedValueSupplier
@@ -120,25 +119,27 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			if logger.IsEnabledFor(logging.DEBUG) {
 				logger.Debugf("Size check %d <= %d", length, pub.maxPayloadLength)
 			}
+			var termOffsetA int64
+			var termId int32
 			if length <= pub.maxPayloadLength {
-				termAppender.AppendUnfragmentedMessage(&appendResult, buffer, offset, length, resValSupplier)
+				termOffsetA, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, resValSupplier)
 			} else {
 				pub.checkForMaxMessageLength(length)
-				termAppender.AppendFragmentedMessage(&appendResult, buffer, offset, length, pub.maxPayloadLength, resValSupplier)
+				termOffsetA, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, resValSupplier)
 			}
 
 			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("New term offset: %d", appendResult.TermOffset())
+				logger.Debugf("New term offset: %d", termOffsetA)
 			}
 
-			if appendResult.TermOffset() > 0 {
-				newPosition = (position - termOffset) + appendResult.TermOffset()
+			if termOffsetA > 0 {
+				newPosition = (position - termOffset) + termOffsetA
 			} else {
 				newPosition = AdminAction
-				if appendResult.TermOffset() == term.AppenderTripped {
+				if termOffsetA == term.AppenderTripped {
 					nextIndex := nextPartitionIndex(partitionIndex)
 
-					pub.appenders[nextIndex].SetTailTermID(appendResult.TermID() + 1)
+					pub.appenders[nextIndex].SetTailTermID(termId + 1)
 					pub.metaData.ActivePartitionIx.Set(nextIndex)
 				}
 			}
