@@ -119,24 +119,24 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			if logger.IsEnabledFor(logging.DEBUG) {
 				logger.Debugf("Size check %d <= %d", length, pub.maxPayloadLength)
 			}
-			var termOffset int64
+			var termOffsetA int64
 			var termId int32
 			if length <= pub.maxPayloadLength {
-				termOffset, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, resValSupplier)
+				termOffsetA, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, resValSupplier)
 			} else {
 				pub.checkForMaxMessageLength(length)
-				termOffset, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, resValSupplier)
+				termOffsetA, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, resValSupplier)
 			}
 
 			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("New term offset: %d", termOffset)
+				logger.Debugf("New term offset: %d", termOffsetA)
 			}
 
-			if termOffset > 0 {
-				newPosition = (position - termOffset) + termOffset
+			if termOffsetA > 0 {
+				newPosition = (position - termOffset) + termOffsetA
 			} else {
 				newPosition = AdminAction
-				if termOffset == term.AppenderTripped {
+				if termOffsetA == term.AppenderTripped {
 					nextIndex := nextPartitionIndex(partitionIndex)
 
 					pub.appenders[nextIndex].SetTailTermID(termId + 1)
