@@ -1,5 +1,3 @@
-// +build !linux !windows
-
 /*
 Copyright 2016 Stanislav Liberman
 
@@ -18,9 +16,7 @@ limitations under the License.
 
 package aeron
 
-import "os"
-
 // DefaultAeronDir is the location of media driver files
-var DefaultAeronDir = os.TempDir()
+var DefaultAeronDir string = os.TempDir()
 
-var UserName = os.Getenv("USER")
+var UserName = os.Getenv("USERNAME")

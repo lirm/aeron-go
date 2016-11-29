@@ -1,5 +1,3 @@
-// +build linux
-
 /*
 Copyright 2016 Stanislav Liberman
 
@@ -20,3 +18,5 @@ package aeron
 
 // DefaultAeronDir is the location of media driver files
 var DefaultAeronDir string = "/dev/shm"
+
+var UserName = os.Getenv("USER")

@@ -143,7 +143,7 @@ func (appender *Appender) AppendUnfragmentedMessage(srcBuffer *atomic.Buffer, sr
 	termOffset := rawTail & 0xFFFFFFFF
 	resultingOffset = termOffset + int64(alignedLength)
 	if resultingOffset > int64(termLength) {
-		resultingOffset = handleEndOfLogCondition(termID, appender.termBuffer, int32(resultingOffset),
+		resultingOffset = handleEndOfLogCondition(termID, appender.termBuffer, int32(termOffset),
 			&appender.headerWriter, termLength)
 	} else {
 		offset := int32(termOffset)
@@ -180,7 +180,7 @@ func (appender *Appender) AppendFragmentedMessage(srcBuffer *atomic.Buffer, srcO
 	termOffset := rawTail & 0xFFFFFFFF
 	resultingOffset = termOffset + int64(requiredLength)
 	if resultingOffset > int64(termLength) {
-		resultingOffset = handleEndOfLogCondition(termID, appender.termBuffer, int32(resultingOffset),
+		resultingOffset = handleEndOfLogCondition(termID, appender.termBuffer, int32(termOffset),
 			&appender.headerWriter, termLength)
 	} else {
 		flags := beginFrag
