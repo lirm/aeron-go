@@ -19,7 +19,6 @@ package aeron
 import (
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	"os"
 	"time"
 )
 
@@ -109,5 +108,5 @@ func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
 }
 
 func (ctx *Context) CncFileName() string {
-	return ctx.aeronDir + "/aeron-" + os.Getenv("USER") + "/" + counters.CncFile
+	return ctx.aeronDir + "/aeron-" + UserName + "/" + counters.CncFile
 }
