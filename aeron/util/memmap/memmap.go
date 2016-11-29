@@ -85,7 +85,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 	}
 
 	logger.Debugf("Mapping existing file: fd: %d, size: %d, offset: %d", f.Fd(), size, offset)
-	mmap, err := doMap(int(f.Fd()), offset, mapSize)
+	mmap, err := doMap(f, offset, mapSize)
 	logger.Debugf("Mapped existing file @%v for %d", mmap.mmap, mmap.size)
 
 	return mmap, nil
@@ -110,7 +110,7 @@ func NewFile(filename string, offset int64, length int) (*File, error) {
 		log.Fatal(err)
 	}
 
-	mmap, err := doMap(int(f.Fd()), offset, length)
+	mmap, err := doMap(f, offset, length)
 	logger.Debugf("Mapped a new file @%v for %d", mmap.mmap, mmap.size)
 
 	return mmap, nil

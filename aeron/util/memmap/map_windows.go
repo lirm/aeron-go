@@ -22,9 +22,9 @@ import (
 // We keep this map so that we can get back the original handle from the memory address.
 var memories map[unsafe.Pointer]mapper.MMap
 
-func doMap(fd int, offset int64, length int) (*File, error) {
+func doMap(f *os.File, offset int64, length int) (*File, error) {
 
-	mm, err := mapper.MapRegion(nil, length, mapper.RDWR, 0, offset)
+	mm, err := mapper.MapRegion(f, length, mapper.RDWR, 0, offset)
 	if err != nil {
 		return nil, err
 	}

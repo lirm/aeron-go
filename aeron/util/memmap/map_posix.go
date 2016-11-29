@@ -17,12 +17,13 @@
 package memmap
 
 import (
+	"os"
 	"syscall"
 	"unsafe"
 )
 
-func doMap(fd int, offset int64, length int) (*File, error) {
-	bytes, err := syscall.Mmap(fd, offset, length, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+func doMap(f *os.File, offset int64, length int) (*File, error) {
+	bytes, err := syscall.Mmap(int(f.Fd()), offset, length, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return nil, err
 	}
