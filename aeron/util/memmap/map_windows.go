@@ -16,6 +16,7 @@ package memmap
 
 import (
 	mapper "github.com/edsrzf/mmap-go"
+	"os"
 	"unsafe"
 )
 

@@ -1,4 +1,4 @@
-// +build !linux !windows
+// +build darwin freebsd
 
 // Copyright 2016 Stanislav Liberman
 //
