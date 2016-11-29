@@ -16,6 +16,8 @@ limitations under the License.
 
 package aeron
 
+import "os"
+
 // DefaultAeronDir is the location of media driver files
 var DefaultAeronDir string = os.TempDir()
 

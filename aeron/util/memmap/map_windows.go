@@ -15,71 +15,34 @@
 package memmap
 
 import (
-	"errors"
-	"os"
-	"sync"
-	"syscall"
+	mapper "github.com/edsrzf/mmap-go"
 	"unsafe"
 )
 
-//
-// Blatantly borrowed from https://github.com/edsrzf/mmap-go/blob/master/mmap_windows.go
-//
-
 // We keep this map so that we can get back the original handle from the memory address.
-var handleLock sync.Mutex
-var handleMap = map[uintptr]syscall.Handle{}
+var memories map[unsafe.Pointer]mapper.MMap
 
 func doMap(fd int, offset int64, length int) (*File, error) {
 
-	maxSizeHigh := uint32((offset + int64(length)) >> 32)
-	maxSizeLow := uint32((offset + int64(length)) & 0xFFFFFFFF)
-	h, errno := syscall.CreateFileMapping(syscall.Handle(uintptr(fd)), nil, syscall.PAGE_READWRITE, maxSizeHigh, maxSizeLow, nil)
-	if h == 0 {
-		return nil, os.NewSyscallError("CreateFileMapping", errno)
+	mm, err := mapper.MapRegion(nil, length, mapper.RDWR, 0, offset)
+	if err != nil {
+		return nil, err
 	}
-
-	// Actually map a view of the data into memory. The view's size
-	// is the length the user requested.
-	fileOffsetHigh := uint32(offset >> 32)
-	fileOffsetLow := uint32(offset & 0xFFFFFFFF)
-	addr, errno := syscall.MapViewOfFile(h, syscall.FILE_MAP_WRITE, fileOffsetHigh, fileOffsetLow, uintptr(length))
-	if addr == 0 {
-		return nil, os.NewSyscallError("MapViewOfFile", errno)
-	}
-
-	handleLock.Lock()
-	handleMap[addr] = h
-	handleLock.Unlock()
 
 	mmap := new(File)
-	mmap.mmap = unsafe.Pointer(&addr)
-	mmap.data = *(*[]byte)(mmap.mmap)
+	mmap.data = mm
+	mmap.mmap = unsafe.Pointer(&mm[0])
 	mmap.size = length
 
 	mmap.data[0] = 1 // test access
 
-	return mmap, nil
+	memories[mmap.mmap] = mm
+
+	return mmap, err
 }
 
 // Close attempts to unmap the mapped memory region
 func (mmap *File) Close() (err error) {
-	addr := uintptr(mmap.mmap)
-
-	handleLock.Lock()
-	defer handleLock.Unlock()
-	err = syscall.UnmapViewOfFile(addr)
-	if err != nil {
-		return err
-	}
-
-	handle, ok := handleMap[addr]
-	if !ok {
-		// should be impossible; we would've errored above
-		return errors.New("unknown base address")
-	}
-	delete(handleMap, addr)
-
-	e := syscall.CloseHandle(syscall.Handle(handle))
-	return os.NewSyscallError("CloseHandle", e)
+	mm := memories[mmap.mmap]
+	return mm.Unmap()
 }
