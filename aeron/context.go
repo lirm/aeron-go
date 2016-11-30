@@ -82,11 +82,13 @@ func (ctx *Context) MediaDriverTimeout(to time.Duration) *Context {
 	return ctx
 }
 
+// ResourceLingerTimeout sets the timeout for resource cleanup after they're released
 func (ctx *Context) ResourceLingerTimeout(to time.Duration) *Context {
 	ctx.resourceLingerTo = to
 	return ctx
 }
 
+// InterServiceTimeout sets the timeout for client heartbeat
 func (ctx *Context) InterServiceTimeout(to time.Duration) *Context {
 	ctx.interServiceTo = to
 	return ctx
@@ -97,16 +99,19 @@ func (ctx *Context) PublicationConnectionTimeout(to time.Duration) *Context {
 	return ctx
 }
 
+// AvailableImageHandler sets an optional callback for available image notifications
 func (ctx *Context) AvailableImageHandler(handler func(*Image)) *Context {
 	ctx.availableImageHandler = handler
 	return ctx
 }
 
+// UnavailableImageHandler sets an optional callback for unavailable image notification
 func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
 	ctx.unavailableImageHandler = handler
 	return ctx
 }
 
+// CncFileName returns the name of the Counters file
 func (ctx *Context) CncFileName() string {
 	return ctx.aeronDir + "/aeron-" + UserName + "/" + counters.CncFile
 }

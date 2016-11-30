@@ -19,4 +19,5 @@ package aeron
 // DefaultAeronDir is the location of media driver files
 var DefaultAeronDir string = "/dev/shm"
 
+// UserName is used to determine default directory for driver files
 var UserName = os.Getenv("USER")
