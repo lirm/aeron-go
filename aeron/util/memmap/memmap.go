@@ -17,6 +17,7 @@ package memmap
 import (
 	"errors"
 	"fmt"
+	mapper "github.com/edsrzf/mmap-go"
 	"github.com/op/go-logging"
 	"log"
 	"os"
@@ -27,11 +28,13 @@ import (
 // File is the wrapper around memory mapped file
 type File struct {
 	mmap unsafe.Pointer
-	data []byte
 	size int
 }
 
 var logger = logging.MustGetLogger("memmap")
+
+// We keep this map so that we can get back the original handle from the memory address.
+var memories = make(map[unsafe.Pointer]mapper.MMap)
 
 // GetFileSize is a helper function to retrieve file size
 func GetFileSize(filename string) int64 {
@@ -124,4 +127,26 @@ func (mmap *File) GetMemoryPtr() unsafe.Pointer {
 // GetMemorySize return the size of the mapped region of the file
 func (mmap *File) GetMemorySize() int {
 	return mmap.size
+}
+
+// Close attempts to unmap the mapped memory region
+func (mmap *File) Close() (err error) {
+	mm := memories[mmap.mmap]
+	return mm.Unmap()
+}
+
+func doMap(f *os.File, offset int64, length int) (*File, error) {
+
+	mm, err := mapper.MapRegion(f, length, mapper.RDWR, 0, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	mmap := new(File)
+	mmap.mmap = unsafe.Pointer(&mm[0])
+	mmap.size = length
+
+	memories[mmap.mmap] = mm
+
+	return mmap, err
 }
