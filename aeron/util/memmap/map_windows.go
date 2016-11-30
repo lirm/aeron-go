@@ -35,8 +35,6 @@ func doMap(f *os.File, offset int64, length int) (*File, error) {
 	mmap.mmap = unsafe.Pointer(&mm[0])
 	mmap.size = length
 
-	mmap.data[0] = 1 // test access
-
 	memories[mmap.mmap] = mm
 
 	return mmap, err
