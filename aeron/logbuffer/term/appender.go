@@ -148,7 +148,7 @@ func (appender *Appender) AppendUnfragmentedMessage(srcBuffer *atomic.Buffer, sr
 	} else {
 		offset := int32(termOffset)
 		appender.headerWriter.write(appender.termBuffer, offset, frameLength, logbuffer.TermID(rawTail))
-		appender.termBuffer.PutBytes(offset + logbuffer.DataFrameHeader.Length, srcBuffer, srcOffset, length)
+		appender.termBuffer.PutBytes(offset+logbuffer.DataFrameHeader.Length, srcBuffer, srcOffset, length)
 
 		if nil != reservedValueSupplier {
 			reservedValue := reservedValueSupplier(appender.termBuffer, offset, frameLength)

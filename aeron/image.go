@@ -78,6 +78,7 @@ type Image struct {
 	positionBitsToShift        uint8
 }
 
+// NewImage wraps around provided LogBuffers setting up the structures for polling
 func NewImage(sessionID int32, correlationID int64, logBuffers *logbuffer.LogBuffers) *Image {
 
 	image := new(Image)
@@ -98,6 +99,7 @@ func NewImage(sessionID int32, correlationID int64, logBuffers *logbuffer.LogBuf
 	return image
 }
 
+// IsClosed returns whether this image has been closed. No further operations are valid.
 func (image *Image) IsClosed() bool {
 	return image.isClosed.Get()
 }
@@ -124,6 +126,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	return result
 }
 
+// Close the image and mappings. The image becomes unusable after closing.
 func (image *Image) Close() error {
 	var err error
 	if image.isClosed.CompareAndSet(false, true) {
