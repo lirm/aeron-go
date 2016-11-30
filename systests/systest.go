@@ -108,7 +108,7 @@ func logtest(flag bool) {
 
 // TestAeronBasics will check for a simple send/receive scenario.
 // As all systests this assumes a running media driver.
-func TestAeronBasics() {
+func testAeronBasics() {
 	logger.Debug("Started TestAeronBasics")
 
 	a := Connect(NewContext())
@@ -122,7 +122,7 @@ func TestAeronBasics() {
 
 // TestAeronSendMultipleMessages tests sending and receive multiple messages in a row.
 // As all systests this assumes a running media driver.
-func TestAeronSendMultipleMessages() {
+func testAeronSendMultipleMessages() {
 	logger.Debug("Started TestAeronSendMultipleMessages")
 
 	a := Connect(NewContext())
@@ -147,7 +147,7 @@ func TestAeronSendMultipleMessages() {
 // TestAeronSendMultiplePublications tests sending on multiple publications with a sigle
 // subscription receiving. In IPC local mode this will end up with using the same Publication
 // but it's a scenario nonetheless. As all systests this assumes a running media driver.
-func TestAeronSendMultiplePublications() {
+func testAeronSendMultiplePublications() {
 	logger.Debug("Started TestAeronSendMultiplePublications")
 
 	//go func() {
@@ -202,7 +202,7 @@ func TestAeronSendMultiplePublications() {
 }
 
 // TestAeronResubscribe test using different subscriptions with the same publication
-func TestAeronResubscribe() {
+func testAeronResubscribe() {
 	logger.Debug("Started TestAeronResubscribe")
 
 	a := Connect(NewContext())
@@ -215,7 +215,7 @@ func TestAeronResubscribe() {
 }
 
 // TestResubStress tests sending and receiving when creating a new subscription for each cycle
-func TestResubStress() {
+func testResubStress() {
 	logger.Debug("Started TestAeronResubscribe")
 
 	a := Connect(NewContext())
@@ -229,7 +229,7 @@ func TestResubStress() {
 }
 
 // TestAeronClose simply tests explicit call to Aeron.Close()
-func TestAeronClose() {
+func testAeronClose() {
 	logger.Debug("Started TestAeronClose")
 
 	ctx := NewContext().MediaDriverTimeout(time.Second * 5)
@@ -240,15 +240,15 @@ func TestAeronClose() {
 func main() {
 	logtest(false)
 
-	TestAeronBasics()
+	testAeronBasics()
 
-	TestAeronClose()
+	testAeronClose()
 
-	TestAeronResubscribe()
+	testAeronResubscribe()
 
-	TestAeronSendMultipleMessages()
+	testAeronSendMultipleMessages()
 
-	TestAeronSendMultiplePublications()
+	testAeronSendMultiplePublications()
 
-	TestResubStress()
+	testResubStress()
 }

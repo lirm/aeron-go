@@ -97,7 +97,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 	mmap.size = len(mmap.data)
 	logger.Debugf("Mapped existing file @%v for %d", mmap.mmap, mmap.size)
 
-	return mmap, nil
+	return mmap, err
 }
 
 // NewFile is a factory method to create a new memory mapped file with the specified capacity
@@ -129,7 +129,7 @@ func NewFile(filename string, offset int64, length int) (*File, error) {
 	mmap.size = len(mmap.data)
 	logger.Debugf("Mapped a new file @%v for %d", mmap.mmap, mmap.size)
 
-	return mmap, nil
+	return mmap, err
 }
 
 // Close attempts to unmap the mapped memory region
