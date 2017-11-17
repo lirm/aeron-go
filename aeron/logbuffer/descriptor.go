@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Stanislav Liberman
+Copyright 2016-2017 Stanislav Liberman
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,71 +26,83 @@ import (
 const (
 	Clean                   int32 = 0
 	NeedsCleaning           int32 = 1
-	PartitionCount          int   = 3
-	LogMetaDataSectionIndex int   = PartitionCount
+	PartitionCount                = 3
+	LogMetaDataSectionIndex       = PartitionCount
 
 	termMinLength        int32 = 64 * 1024
+	termMaxLength        int32 = 1024 * 1024 * 1024
+	pageMinSize          int32 = 4 * 1024
+	pageMaxSize          int32 = 1024 * 1024 * 1024
 	maxSingleMappingSize int64 = 0x7FFFFFFF
-	logMetaDataLength    int32 = util.CacheLineLength * 7
+	logMetaDataLength          = pageMinSize
 )
 
 /* LogBufferMetaData is the flyweight for LogBuffer meta data
- * <pre>
- *   0                   1                   2                   3
- *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *  |                       Tail Counter 0                          |
- *  |                                                               |
- *  +---------------------------------------------------------------+
- *  |                       Tail Counter 1                          |
- *  |                                                               |
- *  +---------------------------------------------------------------+
- *  |                       Tail Counter 2                          |
- *  |                                                               |
- *  +---------------------------------------------------------------+
- *  |                   Active Partition Index                      |
- *  +---------------------------------------------------------------+
- *  |                      Cache Line Padding                      ...
- * ...                                                              |
- *  +---------------------------------------------------------------+
- *  |                 Time of Last Status Message                   |
- *  |                                                               |
- *  +---------------------------------------------------------------+
- *  |                      Cache Line Padding                      ...
- * ...                                                              |
- *  +---------------------------------------------------------------+
- *  |                 Registration / Correlation ID                 |
- *  |                                                               |
- *  +---------------------------------------------------------------+
- *  |                        Initial Term Id                        |
- *  +---------------------------------------------------------------+
- *  |                  Default Frame Header Length                  |
- *  +---------------------------------------------------------------+
- *  |                          MTU Length                           |
- *  +---------------------------------------------------------------+
- *  |                      Cache Line Padding                      ...
- * ...                                                              |
- *  +---------------------------------------------------------------+
- *  |                    Default Frame Header                      ...
- * ...                                                              |
- *  +---------------------------------------------------------------+
- * </pre>
+     * <pre>
+     *   0                   1                   2                   3
+     *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     *  |                       Tail Counter 0                          |
+     *  |                                                               |
+     *  +---------------------------------------------------------------+
+     *  |                       Tail Counter 1                          |
+     *  |                                                               |
+     *  +---------------------------------------------------------------+
+     *  |                       Tail Counter 2                          |
+     *  |                                                               |
+     *  +---------------------------------------------------------------+
+     *  |                      Active Term Count                        |
+     *  +---------------------------------------------------------------+
+     *  |                     Cache Line Padding                       ...
+     * ...                                                              |
+     *  +---------------------------------------------------------------+
+     *  |                    End of Stream Position                     |
+     *  |                                                               |
+     *  +---------------------------------------------------------------+
+     *  |                        Is Connected                           |
+     *  +---------------------------------------------------------------+
+     *  |                      Cache Line Padding                      ...
+     * ...                                                              |
+     *  +---------------------------------------------------------------+
+     *  |                 Registration / Correlation ID                 |
+     *  |                                                               |
+     *  +---------------------------------------------------------------+
+     *  |                        Initial Term Id                        |
+     *  +---------------------------------------------------------------+
+     *  |                  Default Frame Header Length                  |
+     *  +---------------------------------------------------------------+
+     *  |                          MTU Length                           |
+     *  +---------------------------------------------------------------+
+     *  |                         Term Length                           |
+     *  +---------------------------------------------------------------+
+     *  |                          Page Size                            |
+     *  +---------------------------------------------------------------+
+     *  |                      Cache Line Padding                      ...
+     * ...                                                              |
+     *  +---------------------------------------------------------------+
+     *  |                     Default Frame Header                     ...
+     * ...                                                              |
+     *  +---------------------------------------------------------------+
+     * </pre>
  */
 type LogBufferMetaData struct {
 	flyweight.FWBase
 
-	TailCounter         []flyweight.Int64Field // 0, 8, 16
-	ActivePartitionIx   flyweight.Int32Field   // 24
-	padding0            flyweight.Padding      //28
-	TimeOfLastStatusMsg flyweight.Int64Field   //128
-	padding1            flyweight.Padding
-	RegID               flyweight.Int64Field // 256
-	InitTermID          flyweight.Int32Field
-	DefaultFrameHdrLen  flyweight.Int32Field
-	MTULen              flyweight.Int32Field
-	padding2            flyweight.Padding
-	DefaultFrameHeader  flyweight.RawDataField // 384
-	padding3            flyweight.Padding
+	TailCounter        []flyweight.Int64Field // 0, 8, 16
+	ActiveTermCountOff flyweight.Int32Field   // 24
+	padding0           flyweight.Padding      // 28
+	EndOfStreamPosOff  flyweight.Int64Field   // 128
+	IsConnected        flyweight.Int32Field   // 136
+	padding1           flyweight.Padding      // 140
+	CorrelationId      flyweight.Int64Field   // 256
+	InitTermID         flyweight.Int32Field   // 264
+	DefaultFrameHdrLen flyweight.Int32Field   // 270
+	MTULen             flyweight.Int32Field   // 274
+	TermLen            flyweight.Int32Field   // 278
+	PageSize           flyweight.Int32Field   // 282
+	padding2           flyweight.Padding      // 286
+	DefaultFrameHeader flyweight.RawDataField // 384
+	padding3           flyweight.Padding
 }
 
 func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
@@ -99,14 +111,17 @@ func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	pos += m.TailCounter[0].Wrap(buf, pos)
 	pos += m.TailCounter[1].Wrap(buf, pos)
 	pos += m.TailCounter[2].Wrap(buf, pos)
-	pos += m.ActivePartitionIx.Wrap(buf, pos)
+	pos += m.ActiveTermCountOff.Wrap(buf, pos)
 	pos += m.padding0.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
-	pos += m.TimeOfLastStatusMsg.Wrap(buf, pos)
+	pos += m.EndOfStreamPosOff.Wrap(buf, pos)
+	pos += m.IsConnected.Wrap(buf, pos)
 	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
-	pos += m.RegID.Wrap(buf, pos)
+	pos += m.CorrelationId.Wrap(buf, pos)
 	pos += m.InitTermID.Wrap(buf, pos)
 	pos += m.DefaultFrameHdrLen.Wrap(buf, pos)
 	pos += m.MTULen.Wrap(buf, pos)
+	pos += m.TermLen.Wrap(buf, pos)
+	pos += m.PageSize.Wrap(buf, pos)
 	pos += m.padding2.Wrap(buf, pos, util.CacheLineLength, util.CacheLineLength)
 	pos += m.DefaultFrameHeader.Wrap(buf, pos, DataFrameHeader.Length)
 	pos += m.padding3.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)

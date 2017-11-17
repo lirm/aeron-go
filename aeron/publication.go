@@ -34,6 +34,8 @@ const (
 	AdminAction int64 = -3
 	// PublicationClosed indicates that this Publication is closed an no further Offers shall succeed
 	PublicationClosed int64 = -4
+	// MaxPositionExceeded indicates that ...
+	MaxPositionExceeded int64 = -5
 )
 
 // Publication is a sender structure
@@ -41,6 +43,7 @@ type Publication struct {
 	conductor           *ClientConductor
 	channel             string
 	regID               int64
+	origianlRegID       int64
 	streamID            int32
 	sessionID           int32
 	initialTermID       int32
@@ -101,12 +104,46 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 	newPosition := PublicationClosed
 
 	if !pub.IsClosed() {
+
 		limit := pub.pubLimit.get()
-		partitionIndex := pub.metaData.ActivePartitionIx.Get()
-		termAppender := pub.appenders[partitionIndex]
+		termCount := pub.metaData.ActiveTermCountOff.Get()
+		termAppender := pub.appenders[termCount]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
-		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
+		termId := logbuffer.TermID(rawTail)
+		position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
+
+		if termCount != (termId - pub.metaData.InitTermID.Get()) {
+			return AdminAction
+		}
+
+		/*
+            if (position < limit)
+            {
+                std::int32_t resultingOffset;
+                if (length <= m_maxPayloadLength)
+                {
+                    resultingOffset = termAppender->appendUnfragmentedMessage(
+                        m_headerWriter, buffer, offset, length, reservedValueSupplier, termId);
+                }
+                else
+                {
+                    checkForMaxMessageLength(length);
+                    resultingOffset = termAppender->appendFragmentedMessage(
+                        m_headerWriter, buffer, offset, length, m_maxPayloadLength, reservedValueSupplier, termId);
+                }
+
+                newPosition =
+                    Publication::newPosition(
+                        termCount, static_cast<std::int32_t>(termOffset), termId, position, resultingOffset);
+            }
+            else
+            {
+                newPosition = Publication::backPressureStatus(position, length);
+            }
+
+		*/
+
 
 		if logger.IsEnabledFor(logging.DEBUG) {
 			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)

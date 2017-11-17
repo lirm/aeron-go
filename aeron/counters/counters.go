@@ -28,8 +28,8 @@ import (
 var logger = logging.MustGetLogger("counters")
 
 const (
-	CncFile           string = "cnc.dat"
-	CurrentCncVersion int32  = 5
+	CncFile                 = "cnc.dat"
+	CurrentCncVersion int32 = 9
 )
 
 type MetaDataFlyweight struct {
@@ -41,8 +41,8 @@ type MetaDataFlyweight struct {
 	ToClientBufLen   flyweight.Int32Field
 	metadataBuLen    flyweight.Int32Field
 	valuesBufLen     flyweight.Int32Field
-	ClientLivenessTo flyweight.Int64Field
 	errorLogLen      flyweight.Int32Field
+	ClientLivenessTo flyweight.Int64Field
 
 	ToDriverBuf  flyweight.RawDataField
 	ToClientsBuf flyweight.RawDataField
@@ -58,8 +58,8 @@ func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	pos += m.ToClientBufLen.Wrap(buf, pos)
 	pos += m.metadataBuLen.Wrap(buf, pos)
 	pos += m.valuesBufLen.Wrap(buf, pos)
-	pos += m.ClientLivenessTo.Wrap(buf, pos)
 	pos += m.errorLogLen.Wrap(buf, pos)
+	pos += m.ClientLivenessTo.Wrap(buf, pos)
 
 	pos = int(util.AlignInt32(int32(pos), util.CacheLineLength*2))
 
