@@ -25,7 +25,7 @@ import (
 
 const (
 	Clean                   int32 = 0
-	NeedsCleaning           int32 = 1
+	NeedsCleaning                 = 1
 	PartitionCount                = 3
 	LogMetaDataSectionIndex       = PartitionCount
 
@@ -38,52 +38,52 @@ const (
 )
 
 /* LogBufferMetaData is the flyweight for LogBuffer meta data
-     * <pre>
-     *   0                   1                   2                   3
-     *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                       Tail Counter 0                          |
-     *  |                                                               |
-     *  +---------------------------------------------------------------+
-     *  |                       Tail Counter 1                          |
-     *  |                                                               |
-     *  +---------------------------------------------------------------+
-     *  |                       Tail Counter 2                          |
-     *  |                                                               |
-     *  +---------------------------------------------------------------+
-     *  |                      Active Term Count                        |
-     *  +---------------------------------------------------------------+
-     *  |                     Cache Line Padding                       ...
-     * ...                                                              |
-     *  +---------------------------------------------------------------+
-     *  |                    End of Stream Position                     |
-     *  |                                                               |
-     *  +---------------------------------------------------------------+
-     *  |                        Is Connected                           |
-     *  +---------------------------------------------------------------+
-     *  |                      Cache Line Padding                      ...
-     * ...                                                              |
-     *  +---------------------------------------------------------------+
-     *  |                 Registration / Correlation ID                 |
-     *  |                                                               |
-     *  +---------------------------------------------------------------+
-     *  |                        Initial Term Id                        |
-     *  +---------------------------------------------------------------+
-     *  |                  Default Frame Header Length                  |
-     *  +---------------------------------------------------------------+
-     *  |                          MTU Length                           |
-     *  +---------------------------------------------------------------+
-     *  |                         Term Length                           |
-     *  +---------------------------------------------------------------+
-     *  |                          Page Size                            |
-     *  +---------------------------------------------------------------+
-     *  |                      Cache Line Padding                      ...
-     * ...                                                              |
-     *  +---------------------------------------------------------------+
-     *  |                     Default Frame Header                     ...
-     * ...                                                              |
-     *  +---------------------------------------------------------------+
-     * </pre>
+ * <pre>
+ *   0                   1                   2                   3
+ *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  |                       Tail Counter 0                          |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                       Tail Counter 1                          |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                       Tail Counter 2                          |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                      Active Term Count                        |
+ *  +---------------------------------------------------------------+
+ *  |                     Cache Line Padding                       ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ *  |                    End of Stream Position                     |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                        Is Connected                           |
+ *  +---------------------------------------------------------------+
+ *  |                      Cache Line Padding                      ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ *  |                 Registration / Correlation ID                 |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                        Initial Term Id                        |
+ *  +---------------------------------------------------------------+
+ *  |                  Default Frame Header Length                  |
+ *  +---------------------------------------------------------------+
+ *  |                          MTU Length                           |
+ *  +---------------------------------------------------------------+
+ *  |                         Term Length                           |
+ *  +---------------------------------------------------------------+
+ *  |                          Page Size                            |
+ *  +---------------------------------------------------------------+
+ *  |                      Cache Line Padding                      ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ *  |                     Default Frame Header                     ...
+ * ...                                                              |
+ *  +---------------------------------------------------------------+
+ * </pre>
  */
 type LogBufferMetaData struct {
 	flyweight.FWBase
@@ -148,4 +148,23 @@ func computeTermLength(logLength int64) int64 {
 
 func TermID(rawTail int64) int32 {
 	return int32(rawTail >> 32)
+}
+
+func RotateLog(logMetaDataBuffer *LogBufferMetaData, currentTermCount int32, currentTermId int32) {
+	nextTermId := currentTermId + 1
+	nextTermCount := currentTermCount + 1
+	nextIndex := nextTermCount % PartitionCount
+	expectedTermId := nextTermId - PartitionCount
+
+	tail := logMetaDataBuffer.TailCounter[nextIndex]
+	rawTail := tail.Get()
+	if expectedTermId == TermID(rawTail) {
+		for !tail.CAS(rawTail, int64(nextTermId)<<32) {
+
+		}
+	}
+
+	// This should be CAS
+	// LogBufferDescriptor::casActiveTermCount(logMetaDataBuffer, currentTermCount, nextTermCount)
+	logMetaDataBuffer.ActiveTermCountOff.Set(nextTermCount)
 }

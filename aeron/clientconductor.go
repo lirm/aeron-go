@@ -47,17 +47,19 @@ const (
 )
 
 type publicationStateDefn struct {
-	regID              int64
-	timeOfRegistration int64
-	streamID           int32
-	sessionID          int32
-	posLimitCounterID  int32
-	errorCode          int32
-	status             int
-	channel            string
-	errorMessage       string
-	buffers            *logbuffer.LogBuffers
-	publication        *Publication
+	regID                    int64
+	origRegID                int64
+	timeOfRegistration       int64
+	streamID                 int32
+	sessionID                int32
+	posLimitCounterID        int32
+	channelStatusIndicatorID int32
+	errorCode                int32
+	status                   int
+	channel                  string
+	errorMessage             string
+	buffers                  *logbuffer.LogBuffers
+	publication              *Publication
 }
 
 func (pub *publicationStateDefn) Init(channel string, regID int64, streamID int32, now int64) *publicationStateDefn {
@@ -412,9 +414,10 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) chan
 }
 
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
-	logFileName string, regID int64) {
-	logger.Debugf("OnNewPublication: streamId=%d, sessionId=%d, posLimitCounterID=%d, logFileName=%s, regID=%d",
-		streamID, sessionID, posLimitCounterID, logFileName, regID)
+	channelStatusIndicatorID int32, logFileName string, regID int64, origRegID int64) {
+
+	logger.Debugf("OnNewPublication: streamId=%d, sessionId=%d, posLimitCounterID=%d, channelStatusIndicatorID=%d, logFileName=%s, correlationID=%d, regID=%d",
+		streamID, sessionID, posLimitCounterID, channelStatusIndicatorID, logFileName, regID, origRegID)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
@@ -424,7 +427,9 @@ func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, pos
 			pubDef.status = RegistrationStatus.RegisteredMediaDriver
 			pubDef.sessionID = sessionID
 			pubDef.posLimitCounterID = posLimitCounterID
+			pubDef.channelStatusIndicatorID = channelStatusIndicatorID
 			pubDef.buffers = logbuffer.Wrap(logFileName)
+			pubDef.origRegID = origRegID
 
 			logger.Debugf("Updated publication: %v", pubDef)
 
@@ -435,35 +440,30 @@ func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, pos
 	}
 }
 
-func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, logFilename string,
-	sourceIdentity string, subsPosCount int, subsPositions []driver.SubscriberPosition, corrID int64) {
-	logger.Debugf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subscriberPositions=%v, corrID=%d",
-		streamID, sessionID, logFilename, sourceIdentity, subsPositions, corrID)
+func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, logFilename string, sourceIdentity string,
+	subscriberPositionID int32, subsRegID int64, corrID int64) {
+	logger.Debugf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subsRegID=%d, corrID=%d",
+		streamID, sessionID, logFilename, sourceIdentity, subsRegID, corrID)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	for _, sub := range cc.subs {
 		if sub.streamID == streamID && sub.subscription != nil {
-			if !sub.subscription.hasImage(sessionID) {
-				for _, subPos := range subsPositions {
-					if sub.regID == subPos.RegistrationID() {
+			if !sub.subscription.hasImage(sessionID) && sub.regID == subsRegID {
 
-						image := NewImage(sessionID, corrID, logbuffer.Wrap(logFilename))
-						image.subscriptionRegistrationID = sub.regID
-						image.sourceIdentity = sourceIdentity
-						image.subscriberPosition = NewPosition(cc.counterValuesBuffer,
-							subPos.IndicatorID())
-						image.exceptionHandler = cc.errorHandler
-						logger.Debugf("OnAvailableImage: new image position: %v -> %d",
-							image.subscriberPosition, image.subscriberPosition.get())
+				image := NewImage(sessionID, corrID, logbuffer.Wrap(logFilename))
+				image.subscriptionRegistrationID = sub.regID
+				image.sourceIdentity = sourceIdentity
+				image.subscriberPosition = NewPosition(cc.counterValuesBuffer, subscriberPositionID)
+				image.exceptionHandler = cc.errorHandler
+				logger.Debugf("OnAvailableImage: new image position: %v -> %d",
+					image.subscriberPosition, image.subscriberPosition.get())
 
-						sub.subscription.addImage(image)
+				sub.subscription.addImage(image)
 
-						if nil != cc.onAvailableImageHandler {
-							cc.onAvailableImageHandler(image)
-						}
-					}
+				if nil != cc.onAvailableImageHandler {
+					cc.onAvailableImageHandler(image)
 				}
 			}
 		}

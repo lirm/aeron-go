@@ -75,6 +75,11 @@ func (fld *Int64Field) GetAndAddInt64(value int64) int64 {
 	return n - value
 }
 
+func (fld *Int64Field) CAS(curValue, newValue int64) bool {
+	n := syncatomic.CompareAndSwapInt64((*int64)(fld.offset), curValue, newValue)
+	return n
+}
+
 // StringField is string field for flyweight
 type StringField struct {
 	lenOffset  unsafe.Pointer

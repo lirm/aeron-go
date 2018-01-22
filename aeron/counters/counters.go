@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Stanislav Liberman
+Copyright 2016-2018 Stanislav Liberman
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ var logger = logging.MustGetLogger("counters")
 
 const (
 	CncFile                 = "cnc.dat"
-	CurrentCncVersion int32 = 9
+	CurrentCncVersion int32 = 12
 )
 
 type MetaDataFlyweight struct {

@@ -94,7 +94,6 @@ func main() {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-
 		for true {
 			ret := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
 			if logger.IsEnabledFor(logging.DEBUG) {

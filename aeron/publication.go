@@ -43,7 +43,8 @@ type Publication struct {
 	conductor           *ClientConductor
 	channel             string
 	regID               int64
-	origianlRegID       int64
+	originalRegID       int64
+	maxPossiblePosition int64
 	streamID            int32
 	sessionID           int32
 	initialTermID       int32
@@ -60,12 +61,15 @@ type Publication struct {
 
 // NewPublication is a factory method create new publications
 func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
+	termBufferCapacity := logBuffers.Buffer(0).Capacity()
+
 	pub := new(Publication)
 	pub.metaData = logBuffers.Meta()
 	pub.initialTermID = pub.metaData.InitTermID.Get()
 	pub.maxPayloadLength = pub.metaData.MTULen.Get() - logbuffer.DataFrameHeader.Length
-	pub.maxMessageLength = logbuffer.ComputeMaxMessageLength(logBuffers.Buffer(0).Capacity())
-	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(logBuffers.Buffer(0).Capacity()))
+	pub.maxMessageLength = logbuffer.ComputeMaxMessageLength(termBufferCapacity)
+	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(termBufferCapacity))
+	pub.maxPossiblePosition = int64(termBufferCapacity) * (1 << 31)
 
 	pub.isClosed.Set(false)
 
@@ -80,7 +84,7 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 
 // IsConnected returns whether this publication is connected to the driver (not whether it has any Subscriptions)
 func (pub *Publication) IsConnected() bool {
-	return !pub.IsClosed() && pub.conductor.isPublicationConnected(pub.metaData.TimeOfLastStatusMsg.Get())
+	return !pub.IsClosed() && pub.metaData.IsConnected.Get() == 1
 }
 
 // IsClosed returns whether this Publication has been closed
@@ -117,77 +121,53 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			return AdminAction
 		}
 
-		/*
-            if (position < limit)
-            {
-                std::int32_t resultingOffset;
-                if (length <= m_maxPayloadLength)
-                {
-                    resultingOffset = termAppender->appendUnfragmentedMessage(
-                        m_headerWriter, buffer, offset, length, reservedValueSupplier, termId);
-                }
-                else
-                {
-                    checkForMaxMessageLength(length);
-                    resultingOffset = termAppender->appendFragmentedMessage(
-                        m_headerWriter, buffer, offset, length, m_maxPayloadLength, reservedValueSupplier, termId);
-                }
-
-                newPosition =
-                    Publication::newPosition(
-                        termCount, static_cast<std::int32_t>(termOffset), termId, position, resultingOffset);
-            }
-            else
-            {
-                newPosition = Publication::backPressureStatus(position, length);
-            }
-
-		*/
-
-
 		if logger.IsEnabledFor(logging.DEBUG) {
 			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
 		}
 		if position < limit {
-			resValSupplier := term.DefaultReservedValueSupplier
-			if nil != reservedValueSupplier {
-				resValSupplier = reservedValueSupplier
-			}
-			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("Size check %d <= %d", length, pub.maxPayloadLength)
-			}
 			var termOffsetA int64
 			var termId int32
 			if length <= pub.maxPayloadLength {
-				termOffsetA, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, resValSupplier)
+				termOffsetA, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, reservedValueSupplier)
 			} else {
 				pub.checkForMaxMessageLength(length)
-				termOffsetA, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, resValSupplier)
+				termOffsetA, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, reservedValueSupplier)
 			}
 
-			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("New term offset: %d", termOffsetA)
-			}
+			newPosition = pub.newPosition(termCount, termOffset, termId, position, termOffsetA)
 
-			if termOffsetA > 0 {
-				newPosition = (position - termOffset) + termOffsetA
-			} else {
-				newPosition = AdminAction
-				if termOffsetA == term.AppenderTripped {
-					nextIndex := nextPartitionIndex(partitionIndex)
-
-					pub.appenders[nextIndex].SetTailTermID(termId + 1)
-					pub.metaData.ActivePartitionIx.Set(nextIndex)
-				}
-			}
-		} else if pub.conductor.isPublicationConnected(pub.metaData.TimeOfLastStatusMsg.Get()) {
-			newPosition = BackPressured
 		} else {
-			newPosition = NotConnected
+			newPosition = pub.backPressureStatus(position, length)
 		}
 	}
 
 	return newPosition
+}
+
+func (pub *Publication) newPosition(termCount int32, termOffset int64, termId int32, position int64, resultingOffset int64) int64 {
+	if resultingOffset > 0 {
+		return (position - termOffset) + resultingOffset
+	}
+
+	if (position + termOffset) > pub.maxPossiblePosition {
+		return MaxPositionExceeded
+	}
+
+	logbuffer.RotateLog(pub.metaData, termCount, termId)
+	return AdminAction
+}
+
+func (pub *Publication) backPressureStatus(currentPosition int64, messageLength int32) int64 {
+
+	if (currentPosition + int64(messageLength)) >= pub.maxPossiblePosition {
+		return MaxPositionExceeded
+	}
+
+	if pub.IsConnected() {
+		return BackPressured
+	}
+
+	return NotConnected
 }
 
 func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) int64 {
@@ -197,31 +177,18 @@ func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) int
 		pub.checkForMaxPayloadLength(length)
 
 		limit := pub.pubLimit.get()
-		partitionIndex := pub.metaData.ActivePartitionIx.Get()
-		termAppender := pub.appenders[partitionIndex]
+		termCount := pub.metaData.ActiveTermCountOff.Get()
+		termAppender := pub.appenders[termCount]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
 		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
 
 		if position < limit {
-			termOffset, termId := termAppender.Claim(length, bufferClaim)
+			resultingOffset, termId := termAppender.Claim(length, bufferClaim)
 
-			if termOffset > 0 {
-				newPosition = (position - termOffset) + termOffset
-			} else {
-				newPosition = AdminAction
-				if termOffset == term.AppenderTripped {
-					nextIndex := nextPartitionIndex(partitionIndex)
-
-					pub.appenders[nextIndex].SetTailTermID(termId + 1)
-					pub.metaData.ActivePartitionIx.Set(nextIndex)
-				}
-			}
-
-		} else if pub.conductor.isPublicationConnected(pub.metaData.TimeOfLastStatusMsg.Get()) {
-			newPosition = BackPressured
+			newPosition = pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
 		} else {
-			newPosition = NotConnected
+			newPosition = pub.backPressureStatus(position, length)
 		}
 
 	}
