@@ -19,7 +19,7 @@ Example publication can be found [here](https://github.com/lirm/aeron-go/tree/ma
 
 Instantiate Aeron with Context:
 ```go
-ctx := aeron.NewContext().AeronDir("/tmp").MediaDriverTimeout(time.Second * 10)
+ctx := aeron.NewContext().MediaDriverTimeout(time.Second * 10)
 
 a := aeron.Connect(ctx)
 ```
