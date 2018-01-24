@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Stanislav Liberman
+Copyright 2016-2018 Stanislav Liberman
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,8 +42,8 @@ var RegistrationStatus = struct {
 }
 
 const (
-	keepaliveTimeoutNS int64 = 500 * int64(time.Millisecond)
-	resourceTimeoutNS  int64 = 1000 * int64(time.Millisecond)
+	keepaliveTimeoutNS = 500 * int64(time.Millisecond)
+	resourceTimeoutNS  = 1000 * int64(time.Millisecond)
 )
 
 type publicationStateDefn struct {
@@ -269,8 +269,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 					publication.regID = regID
 					publication.streamID = pub.streamID
 					publication.sessionID = pub.sessionID
-					publication.pubLimit = NewPosition(cc.counterValuesBuffer,
-						pub.posLimitCounterID)
+					publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
 
 				case RegistrationStatus.ErroredMediaDriver:
 					log.Fatalf("Error on %d: %d: %s", regID, pub.errorCode, pub.errorMessage)
@@ -351,7 +350,9 @@ func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
 					errStr := fmt.Sprintf("No response from driver. started: %d, now: %d, to: %d",
 						sub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
 						cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
-					cc.errorHandler(errors.New(errStr))
+					if cc.errorHandler != nil {
+						cc.errorHandler(errors.New(errStr))
+					}
 					log.Fatalf(errStr)
 				}
 			case RegistrationStatus.ErroredMediaDriver:

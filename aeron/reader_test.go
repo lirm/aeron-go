@@ -14,24 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flyweight
+package aeron
 
-import "github.com/lirm/aeron-go/aeron/atomic"
+import (
+	"testing"
+	"fmt"
+	"github.com/lirm/aeron-go/aeron/counters"
+)
 
-type Flyweight interface {
-	Wrap(*atomic.Buffer, int) Flyweight
-	Size() int
-	SetSize(int)
-}
+func TestRead(t *testing.T) {
+	ctx := NewContext()
+	counterFile, _ := counters.MapFile(ctx.CncFileName())
 
-type FWBase struct {
-	size int
-}
+	reader := counters.NewReader(counterFile.ValuesBuf.Get(), counterFile.MetaDataBuf.Get())
 
-func (m *FWBase) Size() int {
-	return m.size
-}
-
-func (m *FWBase) SetSize(size int) {
-	m.size = size
+	reader.Scan(func(counter counters.Counter) {
+		fmt.Printf("[%d]=%d label:%s\n", counter.Id, counter.Value, counter.Label)
+	})
 }
