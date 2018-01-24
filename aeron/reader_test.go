@@ -17,9 +17,9 @@ limitations under the License.
 package aeron
 
 import (
-	"testing"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/counters"
+	"testing"
 )
 
 func TestRead(t *testing.T) {

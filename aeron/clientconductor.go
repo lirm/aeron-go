@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
+	ctr "github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -29,7 +30,6 @@ import (
 	"runtime"
 	"sync"
 	"time"
-	ctr "github.com/lirm/aeron-go/aeron/counters"
 )
 
 var RegistrationStatus = struct {

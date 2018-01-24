@@ -44,7 +44,7 @@ type Counter struct {
 	Label  string
 }
 
-func NewReader(values, metaData *atomic.Buffer) (*Reader) {
+func NewReader(values, metaData *atomic.Buffer) *Reader {
 
 	reader := Reader{metaData: metaData, values: values}
 	reader.maxCounterID = int(values.Capacity() / COUNTER_LENGTH)
