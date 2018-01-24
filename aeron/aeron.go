@@ -71,8 +71,7 @@ func Connect(ctx *Context) *Aeron {
 	clientLivenessTo := time.Duration(aeron.counters.ClientLivenessTo.Get())
 
 	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTo, ctx.mediaDriverTo,
-		ctx.publicationConnectionTo, ctx.resourceLingerTo)
-	aeron.conductor.counterValuesBuffer = aeron.counters.ValuesBuf.Get()
+		ctx.publicationConnectionTo, ctx.resourceLingerTo, aeron.counters)
 
 	aeron.conductor.onAvailableImageHandler = ctx.availableImageHandler
 	aeron.conductor.onUnavailableImageHandler = ctx.unavailableImageHandler

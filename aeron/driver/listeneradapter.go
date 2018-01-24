@@ -34,16 +34,26 @@ var Events = struct {
 	OnPublicationReady int32
 	/** Operation Succeeded */
 	OnOperationSuccess int32
-
 	/** Inform client of timeout and removal of inactive image */
 	OnUnavailableImage int32
+	/** New Exclusive Publication Buffer notification */
+	OnExclusivePublicationReady int32
+	/** New subscription notification */
+	OnSubscriptionReady int32
+	/** New counter notification */
+	OnCounterReady int32
+	/** inform clients of removal of counter */
+	OnUnavailableCounter int32
 }{
 	0x0F01,
 	0x0F02,
 	0x0F03,
 	0x0F04,
-
 	0x0F05,
+	0x0F06,
+	0x0F07,
+	0x0F08,
+	0x0F09,
 }
 
 type SubscriberPosition struct {
@@ -67,6 +77,7 @@ type Listener interface {
 	OnUnavailableImage(streamID int32, correlationID int64)
 	OnOperationSuccess(correlationID int64)
 	OnErrorResponse(offendingCommandCorrelationID int64, errorCode int32, errorMessage string)
+	OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32)
 }
 
 type ListenerAdapter struct {
@@ -102,6 +113,16 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 
 			adapter.listener.OnNewPublication(streamID, sessionID, positionLimitCounterID, channelStatusIndicatorID,
 				logFileName, correlationID, registrationID)
+		case Events.OnSubscriptionReady:
+			logger.Debugf("received ON_SUBSCRIPTION_READY")
+
+			var msg subscriptionReady
+			msg.Wrap(buffer, int(offset))
+
+			correlationID := msg.correlationID.Get()
+			channelStatusIndicatorID := msg.channelStatusIndicatorID.Get()
+
+			adapter.listener.OnSubscriptionReady(correlationID, channelStatusIndicatorID)
 		case Events.OnAvailableImage:
 			logger.Debugf("received ON_AVAILABLE_IMAGE")
 
@@ -149,7 +170,7 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationID.Get(),
 				msg.errorCode.Get(), msg.errorMessage.Get())
 		default:
-			logger.Debugf("received unhandled %d", msgTypeID)
+			logger.Fatalf("received unhandled %d", msgTypeID)
 		}
 	}
 

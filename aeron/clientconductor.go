@@ -29,6 +29,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	ctr "github.com/lirm/aeron-go/aeron/counters"
 )
 
 var RegistrationStatus = struct {
@@ -107,6 +108,7 @@ type ClientConductor struct {
 	driverProxy *driver.Proxy
 
 	counterValuesBuffer *atomic.Buffer
+	counterReader       *ctr.Reader
 
 	driverListenerAdapter *driver.ListenerAdapter
 
@@ -135,7 +137,7 @@ type ClientConductor struct {
 
 // Init is the primary initialization method for ClientConductor
 func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver,
-	interServiceTo, driverTo, pubConnectionTo, lingerTo time.Duration) *ClientConductor {
+	interServiceTo, driverTo, pubConnectionTo, lingerTo time.Duration, counters *ctr.MetaDataFlyweight) *ClientConductor {
 
 	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTo,
 		driverTo, pubConnectionTo)
@@ -148,6 +150,9 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	cc.driverTimeoutNs = driverTo.Nanoseconds()
 	cc.publicationConnectionTimeoutNs = pubConnectionTo.Nanoseconds()
 	cc.resourceLingerTimeoutNs = lingerTo.Nanoseconds()
+
+	cc.counterValuesBuffer = counters.ValuesBuf.Get()
+	cc.counterReader = ctr.NewReader(counters.ValuesBuf.Get(), counters.MetaDataBuf.Get())
 
 	cc.pendingCloses = make(map[int64]chan bool)
 	cc.lingeringResources = make(chan lingerResourse, 1024)
@@ -256,12 +261,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 			} else {
 				switch pub.status {
 				case RegistrationStatus.AwaitingMediaDriver:
-					if now := time.Now().UnixNano(); now > (pub.timeOfRegistration + cc.driverTimeoutNs) {
-						logger.Errorf("No response from driver. started: %d, now: %d, to: %d",
-							pub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
-							cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
-						log.Panic(fmt.Sprintf("No response from driver on %v of %v", pub, cc.pubs))
-					}
+					waitForMediaDriver(pub.timeOfRegistration, cc)
 				case RegistrationStatus.RegisteredMediaDriver:
 					publication = NewPublication(pub.buffers)
 					publication.conductor = cc
@@ -346,15 +346,7 @@ func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
 
 			switch sub.status {
 			case RegistrationStatus.AwaitingMediaDriver:
-				if now := time.Now().UnixNano(); now > (sub.timeOfRegistration + cc.driverTimeoutNs) {
-					errStr := fmt.Sprintf("No response from driver. started: %d, now: %d, to: %d",
-						sub.timeOfRegistration, now/time.Millisecond.Nanoseconds(),
-						cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
-					if cc.errorHandler != nil {
-						cc.errorHandler(errors.New(errStr))
-					}
-					log.Fatalf(errStr)
-				}
+				waitForMediaDriver(sub.timeOfRegistration, cc)
 			case RegistrationStatus.ErroredMediaDriver:
 				errStr := fmt.Sprintf("Error on %d: %d: %s", regID, sub.errorCode, sub.errorMessage)
 				cc.errorHandler(errors.New(errStr))
@@ -367,6 +359,18 @@ func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
 	}
 
 	return subscription
+}
+func waitForMediaDriver(timeOfRegistration int64, cc *ClientConductor) {
+	if now := time.Now().UnixNano(); now > (timeOfRegistration + cc.driverTimeoutNs) {
+		errStr := fmt.Sprintf("No response from driver. started: %d, now: %d, to: %d",
+			timeOfRegistration/time.Millisecond.Nanoseconds(),
+			now/time.Millisecond.Nanoseconds(),
+			cc.driverTimeoutNs/time.Millisecond.Nanoseconds())
+		if cc.errorHandler != nil {
+			cc.errorHandler(errors.New(errStr))
+		}
+		log.Fatalf(errStr)
+	}
 }
 
 func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) chan bool {
@@ -441,6 +445,27 @@ func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, pos
 	}
 }
 
+func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32) {
+	logger.Debugf("OnSubscriptionReady: correlationID=%d, channelStatusIndicatorID=%d",
+		correlationID, channelStatusIndicatorID)
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	for _, sub := range cc.subs {
+		if sub.regID == correlationID {
+			sub.status = RegistrationStatus.RegisteredMediaDriver
+
+			sub.subscription = NewSubscription(cc, sub.channel, correlationID, sub.streamID)
+
+			if cc.onNewSubscriptionHandler != nil {
+				cc.onNewSubscriptionHandler(sub.channel, sub.streamID, correlationID)
+			}
+		}
+	}
+
+}
+
 func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, logFilename string, sourceIdentity string,
 	subscriberPositionID int32, subsRegID int64, corrID int64) {
 	logger.Debugf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subsRegID=%d, corrID=%d",
@@ -496,17 +521,6 @@ func (cc *ClientConductor) OnOperationSuccess(corrID int64) {
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
-
-	for _, sub := range cc.subs {
-		if sub.regID == corrID && sub.status == RegistrationStatus.AwaitingMediaDriver {
-			sub.status = RegistrationStatus.RegisteredMediaDriver
-			sub.subscription = NewSubscription(cc, sub.channel, corrID, sub.streamID)
-
-			if cc.onNewSubscriptionHandler != nil {
-				cc.onNewSubscriptionHandler(sub.channel, sub.streamID, corrID)
-			}
-		}
-	}
 
 	if cc.pendingCloses[corrID] != nil {
 		cc.pendingCloses[corrID] <- true

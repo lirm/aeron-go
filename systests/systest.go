@@ -116,6 +116,7 @@ func testAeronBasics() {
 
 	pub := <-a.AddPublication(TestChannel, TestStreamID)
 	defer pub.Close()
+	logger.Debugf("Added publication: %v\n", pub)
 
 	subAndSend(1, a, pub)
 }

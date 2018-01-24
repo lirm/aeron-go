@@ -86,7 +86,7 @@ func TestNewPublication(t *testing.T) {
 	proxy.Init(&rb)
 
 	var cc ClientConductor
-	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
+	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, meta)
 	defer cc.Close()
 
 	lbName, lb := prepareFile(t)
@@ -152,7 +152,7 @@ func TestPublication_Offer(t *testing.T) {
 	proxy.Init(&rb)
 
 	var cc ClientConductor
-	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
+	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, meta)
 	defer cc.Close()
 
 	lbName, lb := prepareFile(t)

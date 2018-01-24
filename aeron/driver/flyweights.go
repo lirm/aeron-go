@@ -144,6 +144,34 @@ func (m *publicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywei
 }
 
 /**
+ * Message to denote that a Subscription has been successfully set up.
+ *
+ *   0                   1                   2                   3
+ *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  |                         Correlation ID                        |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                  Channel Status Indicator ID                  |
+ *  +---------------------------------------------------------------+
+ */
+type subscriptionReady struct {
+	flyweight.FWBase
+
+	correlationID            flyweight.Int64Field
+	channelStatusIndicatorID flyweight.Int32Field
+}
+
+func (m *subscriptionReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.correlationID.Wrap(buf, pos)
+	pos += m.channelStatusIndicatorID.Wrap(buf, pos)
+
+	m.SetSize(pos - offset)
+	return m
+}
+
+/**
 * Message to denote that new buffers have been added for a subscription.
 *
 * NOTE: Layout should be SBE compliant

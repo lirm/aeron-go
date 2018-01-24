@@ -29,6 +29,6 @@ func TestRead(t *testing.T) {
 	reader := counters.NewReader(counterFile.ValuesBuf.Get(), counterFile.MetaDataBuf.Get())
 
 	reader.Scan(func(counter counters.Counter) {
-		fmt.Printf("[%d]=%d label:%s\n", counter.Id, counter.Value, counter.Label)
+		fmt.Printf("[%d]=%d\t\tlabel:%s\n", counter.Id, counter.Value, counter.Label)
 	})
 }
