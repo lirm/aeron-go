@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Stanislav Liberman
+Copyright 2016-2018 Stanislav Liberman
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -73,6 +73,11 @@ func (fld *Int64Field) Set(value int64) {
 func (fld *Int64Field) GetAndAddInt64(value int64) int64 {
 	n := syncatomic.AddInt64((*int64)(fld.offset), value)
 	return n - value
+}
+
+func (fld *Int64Field) CAS(curValue, newValue int64) bool {
+	n := syncatomic.CompareAndSwapInt64((*int64)(fld.offset), curValue, newValue)
+	return n
 }
 
 // StringField is string field for flyweight

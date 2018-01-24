@@ -86,7 +86,7 @@ func TestNewPublication(t *testing.T) {
 	proxy.Init(&rb)
 
 	var cc ClientConductor
-	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
+	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, meta)
 	defer cc.Close()
 
 	lbName, lb := prepareFile(t)
@@ -119,16 +119,16 @@ func TestNewPublication(t *testing.T) {
 	pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
 	t.Logf("new pos: %d", pos)
 	if pos != NotConnected {
-		t.Errorf("Expected publication to not be connected: %d", pos)
+		t.Errorf("Expected publication to not be connected at %d: %d", milliEpoch, pos)
 	}
 
-	pub.metaData.TimeOfLastStatusMsg.Set(milliEpoch.Nanoseconds())
-	pos = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
-	t.Logf("new pos: %d", pos)
-	if pos != BackPressured {
-		t.Errorf("Expected publication to be back pressured: %d", pos)
-	}
-
+	//pub.metaData.TimeOfLastStatusMsg.Set(milliEpoch.Nanoseconds())
+	//pos = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	//t.Logf("new pos: %d", pos)
+	//if pos != BackPressured {
+	//	t.Errorf("Expected publication to be back pressured: %d", pos)
+	//}
+	//
 	pub.pubLimit.set(1024)
 	pos = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
 	t.Logf("new pos: %d", pos)
@@ -152,7 +152,7 @@ func TestPublication_Offer(t *testing.T) {
 	proxy.Init(&rb)
 
 	var cc ClientConductor
-	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
+	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, meta)
 	defer cc.Close()
 
 	lbName, lb := prepareFile(t)
@@ -180,8 +180,8 @@ func TestPublication_Offer(t *testing.T) {
 	}
 
 	srcBuffer := atomic.MakeBuffer(make([]byte, 256))
-	milliEpoch := (time.Nanosecond * time.Duration(time.Now().UnixNano())) / time.Millisecond
-	pub.metaData.TimeOfLastStatusMsg.Set(milliEpoch.Nanoseconds())
+	//milliEpoch := (time.Nanosecond * time.Duration(time.Now().UnixNano())) / time.Millisecond
+	//pub.metaData.TimeOfLastStatusMsg.Set(milliEpoch.Nanoseconds())
 
 	termBufLen := lb.Buffer(0).Capacity()
 	t.Logf("Term buffer length: %d", termBufLen)

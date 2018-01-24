@@ -59,7 +59,7 @@ func (sub *Subscription) IsClosed() bool {
 func (sub *Subscription) Close() error {
 	if sub.isClosed.CompareAndSet(false, true) {
 		images := sub.images.Empty()
-		<-sub.conductor.releaseSubscription(sub.registrationID, images)
+		sub.conductor.releaseSubscription(sub.registrationID, images)
 	}
 
 	return nil

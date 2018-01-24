@@ -69,7 +69,7 @@ func FastMod3(value uint64) int32 {
 }
 
 // IsPowerOfTwo checks that the argument number is a power of two
-func IsPowerOfTwo(value int32) bool {
+func IsPowerOfTwo(value int64) bool {
 	return value > 0 && ((value & (^value + 1)) == value)
 }
 

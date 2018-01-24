@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Stanislav Liberman
+Copyright 2016-2018 Stanislav Liberman
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,10 +28,52 @@ import (
 var logger = logging.MustGetLogger("counters")
 
 const (
-	CncFile           string = "cnc.dat"
-	CurrentCncVersion int32  = 5
+	CncFile                 = "cnc.dat"
+	CurrentCncVersion int32 = 12
 )
 
+/**
+ * Description of the command and control file used between driver and clients.
+ * <p>
+ * File Layout
+ * <pre>
+ *  +-----------------------------+
+ *  |          Meta Data          |
+ *  +-----------------------------+
+ *  |      to-driver Buffer       |
+ *  +-----------------------------+
+ *  |      to-clients Buffer      |
+ *  +-----------------------------+
+ *  |   Counters Metadata Buffer  |
+ *  +-----------------------------+
+ *  |    Counters Values Buffer   |
+ *  +-----------------------------+
+ *  |          Error Log          |
+ *  +-----------------------------+
+ * </pre>
+ * <p>
+ * Meta Data Layout (CnC Version 7)
+ * <pre>
+ *   0                   1                   2                   3
+ *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  |                      Aeron CnC Version                        |
+ *  +---------------------------------------------------------------+
+ *  |                   to-driver buffer length                     |
+ *  +---------------------------------------------------------------+
+ *  |                  to-clients buffer length                     |
+ *  +---------------------------------------------------------------+
+ *  |               Counters Metadata buffer length                 |
+ *  +---------------------------------------------------------------+
+ *  |                Counters Values buffer length                  |
+ *  +---------------------------------------------------------------+
+ *  |                   Error Log buffer length                     |
+ *  +---------------------------------------------------------------+
+ *  |                   Client Liveness Timeout                     |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ * </pre>
+ */
 type MetaDataFlyweight struct {
 	flyweight.FWBase
 
@@ -41,8 +83,8 @@ type MetaDataFlyweight struct {
 	ToClientBufLen   flyweight.Int32Field
 	metadataBuLen    flyweight.Int32Field
 	valuesBufLen     flyweight.Int32Field
-	ClientLivenessTo flyweight.Int64Field
 	errorLogLen      flyweight.Int32Field
+	ClientLivenessTo flyweight.Int64Field
 
 	ToDriverBuf  flyweight.RawDataField
 	ToClientsBuf flyweight.RawDataField
@@ -58,8 +100,8 @@ func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	pos += m.ToClientBufLen.Wrap(buf, pos)
 	pos += m.metadataBuLen.Wrap(buf, pos)
 	pos += m.valuesBufLen.Wrap(buf, pos)
-	pos += m.ClientLivenessTo.Wrap(buf, pos)
 	pos += m.errorLogLen.Wrap(buf, pos)
+	pos += m.ClientLivenessTo.Wrap(buf, pos)
 
 	pos = int(util.AlignInt32(int32(pos), util.CacheLineLength*2))
 

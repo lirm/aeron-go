@@ -94,9 +94,13 @@ func main() {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
+		for true {
+			ret := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
 			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("Failed offer")
+				logger.Debugf("Failed offer %d", ret)
+			}
+			if ret > 0 {
+				break
 			}
 		}
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Stanislav Liberman
+Copyright 2016-2018 Stanislav Liberman
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,16 +34,26 @@ var Events = struct {
 	OnPublicationReady int32
 	/** Operation Succeeded */
 	OnOperationSuccess int32
-
 	/** Inform client of timeout and removal of inactive image */
 	OnUnavailableImage int32
+	/** New Exclusive Publication Buffer notification */
+	OnExclusivePublicationReady int32
+	/** New subscription notification */
+	OnSubscriptionReady int32
+	/** New counter notification */
+	OnCounterReady int32
+	/** inform clients of removal of counter */
+	OnUnavailableCounter int32
 }{
 	0x0F01,
 	0x0F02,
 	0x0F03,
 	0x0F04,
-
 	0x0F05,
+	0x0F06,
+	0x0F07,
+	0x0F08,
+	0x0F09,
 }
 
 type SubscriberPosition struct {
@@ -60,15 +70,18 @@ func (pos *SubscriberPosition) IndicatorID() int32 {
 }
 
 type Listener interface {
-	OnNewPublication(streamID int32, sessionID int32, positionLimitCounterID int32,
-		logFileName string, registrationID int64)
-	OnAvailableImage(streamID int32, sessionID int32, logFilename string,
-		sourceIdentity string, subscriberPositionCount int,
-		subscriberPositions []SubscriberPosition,
-		correlationID int64)
+	OnNewPublication(streamID int32, sessionID int32, positionLimitCounterID int32, channelStatusIndicatorID int32,
+		logFileName string, correlationID int64, registrationID int64)
+	OnNewExclusivePublication(streamID int32, sessionID int32, positionLimitCounterID int32, channelStatusIndicatorID int32,
+		logFileName string, correlationID int64, registrationID int64)
+	OnAvailableImage(streamID int32, sessionID int32, logFilename string, sourceIdentity string,
+		subscriberPositionID int32, subsRegID int64, correlationID int64)
 	OnUnavailableImage(streamID int32, correlationID int64)
 	OnOperationSuccess(correlationID int64)
 	OnErrorResponse(offendingCommandCorrelationID int64, errorCode int32, errorMessage string)
+	OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32)
+	OnAvailableCounter(correlationID int64, counterID int32)
+	OnUnavailableCounter(correlationID int64, counterID int32)
 }
 
 type ListenerAdapter struct {
@@ -94,49 +107,61 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			var msg publicationReady
 			msg.Wrap(buffer, int(offset))
 
-			correlationID := msg.correlationID.Get()
-			sessionID := msg.sessionID.Get()
 			streamID := msg.streamID.Get()
+			sessionID := msg.sessionID.Get()
 			positionLimitCounterID := msg.publicationLimitOffset.Get()
-			logFileName := msg.logFile.Get()
+			channelStatusIndicatorID := msg.channelStatusIndicatorID.Get()
+			correlationID := msg.correlationID.Get()
+			registrationID := msg.registrationID.Get()
+			logFileName := msg.logFileName.Get()
 
-			adapter.listener.OnNewPublication(streamID, sessionID, positionLimitCounterID, logFileName, correlationID)
+			adapter.listener.OnNewPublication(streamID, sessionID, positionLimitCounterID, channelStatusIndicatorID,
+				logFileName, correlationID, registrationID)
+		case Events.OnExclusivePublicationReady:
+			logger.Debugf("received ON_EXCLUSIVE_PUBLICATION_READY")
+
+			var msg publicationReady
+			msg.Wrap(buffer, int(offset))
+
+			streamID := msg.streamID.Get()
+			sessionID := msg.sessionID.Get()
+			positionLimitCounterID := msg.publicationLimitOffset.Get()
+			channelStatusIndicatorID := msg.channelStatusIndicatorID.Get()
+			correlationID := msg.correlationID.Get()
+			registrationID := msg.registrationID.Get()
+			logFileName := msg.logFileName.Get()
+
+			adapter.listener.OnNewExclusivePublication(streamID, sessionID, positionLimitCounterID, channelStatusIndicatorID,
+				logFileName, correlationID, registrationID)
+		case Events.OnSubscriptionReady:
+			logger.Debugf("received ON_SUBSCRIPTION_READY")
+
+			var msg subscriptionReady
+			msg.Wrap(buffer, int(offset))
+
+			correlationID := msg.correlationID.Get()
+			channelStatusIndicatorID := msg.channelStatusIndicatorID.Get()
+
+			adapter.listener.OnSubscriptionReady(correlationID, channelStatusIndicatorID)
 		case Events.OnAvailableImage:
 			logger.Debugf("received ON_AVAILABLE_IMAGE")
 
 			var header imageReadyHeader
 			header.Wrap(buffer, int(offset))
 
-			correlationID := header.correlationID.Get()
-			sessionID := header.sessionID.Get()
 			streamID := header.streamID.Get()
-			subsPosBlockLen := header.subsPosBlockLen.Get()
-			subsPosBlockCnt := int(header.subsPosBlockCnt.Get())
-			logger.Debugf("position count: %d block len: %d", subsPosBlockCnt, subsPosBlockLen)
+			sessionID := header.sessionID.Get()
+			logFileName := header.logFile.Get()
+			sourceIdentity := header.sourceIdentity.Get()
+			subsPosID := header.subsPosID.Get()
+			subsRegID := header.subsRegistrationID.Get()
+			correlationID := header.correlationID.Get()
 
-			subscriberPositions := make([]SubscriberPosition, subsPosBlockCnt)
-			pos := offset + int32(24)
-			var posFly subscriberPositionFly
-			for ix := 0; ix < subsPosBlockCnt; ix++ {
-				posFly.Wrap(buffer, int(pos))
-				pos += subsPosBlockLen
-
-				subscriberPositions[ix].indicatorID = posFly.indicatorID.Get()
-				subscriberPositions[ix].registrationID = posFly.registrationID.Get()
-			}
-			logger.Debugf("positions: %v", subscriberPositions)
-
-			var trailer imageReadyTrailer
-			trailer.Wrap(buffer, int(pos))
-
-			logFileName := trailer.logFile.Get()
 			logger.Debugf("logFileName: %v", logFileName)
-
-			sourceIdentity := trailer.sourceIdentity.Get()
 			logger.Debugf("sourceIdentity: %v", sourceIdentity)
 
-			adapter.listener.OnAvailableImage(streamID, sessionID, logFileName, sourceIdentity,
-				subsPosBlockCnt, subscriberPositions, correlationID)
+			adapter.listener.OnAvailableImage(streamID, sessionID, logFileName, sourceIdentity, subsPosID, subsRegID,
+				correlationID)
 		case Events.OnOperationSuccess:
 			logger.Debugf("received ON_OPERATION_SUCCESS")
 
@@ -164,8 +189,22 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 
 			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationID.Get(),
 				msg.errorCode.Get(), msg.errorMessage.Get())
+		case Events.OnCounterReady:
+			logger.Debugf("received ON_COUNTER_READY")
+
+			var msg counterUpdate
+			msg.Wrap(buffer, int(offset))
+
+			adapter.listener.OnAvailableCounter(msg.correlationID.Get(), msg.counterID.Get())
+		case Events.OnUnavailableCounter:
+			logger.Debugf("received ON_UNAVAILABLE_COUNTER")
+
+			var msg counterUpdate
+			msg.Wrap(buffer, int(offset))
+
+			adapter.listener.OnUnavailableCounter(msg.correlationID.Get(), msg.counterID.Get())
 		default:
-			logger.Debugf("received unhandled %d", msgTypeID)
+			logger.Fatalf("received unhandled %d", msgTypeID)
 		}
 	}
 

@@ -36,7 +36,7 @@ var BufferDescriptor = struct {
 }
 
 func checkCapacity(capacity int32) {
-	if !util.IsPowerOfTwo(capacity) {
+	if !util.IsPowerOfTwo(int64(capacity)) {
 		log.Fatalf("Capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=%d", capacity)
 	}
 }

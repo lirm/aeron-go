@@ -60,7 +60,7 @@ func (buf *ManyToOne) Init(buffer *atomic.Buffer) *ManyToOne {
 	if buf.capacity <= 0 {
 		panic("Undelying buffer capacity is infufficient")
 	}
-	util.IsPowerOfTwo(buf.capacity)
+	util.IsPowerOfTwo(int64(buf.capacity))
 
 	buf.maxMsgLength = buf.capacity / 8
 	buf.tailPositionIndex = buf.capacity + descriptor.tailPositionOffset

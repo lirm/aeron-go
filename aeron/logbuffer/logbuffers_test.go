@@ -142,9 +142,9 @@ func TestLogBuffers_Meta(t *testing.T) {
 
 	t.Logf("meta fly size: %d", meta.Size())
 
-	t.Logf("active partition index: %d", meta.ActivePartitionIx.Get())
+	t.Logf("active term count offset: %d", meta.ActiveTermCountOff.Get())
 	t.Logf("initTermID: %d", meta.InitTermID.Get())
-	t.Logf("regID: %d", meta.RegID.Get())
+	t.Logf("CorrelationId: %d", meta.CorrelationId.Get())
 	t.Logf("tailCounter0: %d", meta.TailCounter[0].Get())
 	t.Logf("tailCounter1: %d", meta.TailCounter[1].Get())
 	t.Logf("tailCounter2: %d", meta.TailCounter[2].Get())
