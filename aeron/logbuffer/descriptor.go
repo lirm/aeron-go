@@ -136,7 +136,12 @@ func checkTermLength(termLength int64) {
 			termMinLength, termLength))
 	}
 
-	if (termLength & (int64(FrameAlignment) - 1)) != 0 {
+	if termLength > int64(termMaxLength) {
+		panic(fmt.Sprintf("Term length greater than max size of %d, length=%d",
+			termMaxLength, termLength))
+	}
+
+	if !util.IsPowerOfTwo(termLength) {
 		panic(fmt.Sprintf("Term length not a multiple of %d, length=%d",
 			FrameAlignment, termLength))
 	}
