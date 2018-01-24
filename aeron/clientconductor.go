@@ -421,6 +421,56 @@ func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, pos
 	}
 }
 
+// TODO Implement logic specific to exclusive publications
+func (cc *ClientConductor) OnNewExclusivePublication(streamID int32, sessionID int32, posLimitCounterID int32,
+	channelStatusIndicatorID int32, logFileName string, regID int64, origRegID int64) {
+
+	logger.Debugf("OnNewExclusivePublication: streamId=%d, sessionId=%d, posLimitCounterID=%d, channelStatusIndicatorID=%d, logFileName=%s, correlationID=%d, regID=%d",
+		streamID, sessionID, posLimitCounterID, channelStatusIndicatorID, logFileName, regID, origRegID)
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	log.Panic("OnNewExclusivePublication: Not supported yet")
+
+	//for _, pubDef := range cc.pubs {
+	//	if pubDef.regID == regID {
+	//		pubDef.status = RegistrationStatus.RegisteredMediaDriver
+	//		pubDef.sessionID = sessionID
+	//		pubDef.posLimitCounterID = posLimitCounterID
+	//		pubDef.channelStatusIndicatorID = channelStatusIndicatorID
+	//		pubDef.buffers = logbuffer.Wrap(logFileName)
+	//		pubDef.origRegID = origRegID
+	//
+	//		logger.Debugf("Updated publication: %v", pubDef)
+	//
+	//		if cc.onNewPublicationHandler != nil {
+	//			cc.onNewPublicationHandler(pubDef.channel, streamID, sessionID, regID)
+	//		}
+	//	}
+	//}
+}
+
+func (cc *ClientConductor) OnAvailableCounter(correlationID int64, counterID int32) {
+	logger.Debugf("OnAvailableCounter: correlationID=%d, counterID=%d",
+		correlationID, counterID)
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	log.Panic("OnAvailableCounter: Not supported yet")
+}
+
+func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID int32) {
+	logger.Debugf("OnUnavailableCounter: correlationID=%d, counterID=%d",
+		correlationID, counterID)
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	log.Panic("OnUnavailableCounter: Not supported yet")
+}
+
 func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32) {
 	logger.Debugf("OnSubscriptionReady: correlationID=%d, channelStatusIndicatorID=%d",
 		correlationID, channelStatusIndicatorID)

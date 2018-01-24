@@ -72,12 +72,16 @@ func (pos *SubscriberPosition) IndicatorID() int32 {
 type Listener interface {
 	OnNewPublication(streamID int32, sessionID int32, positionLimitCounterID int32, channelStatusIndicatorID int32,
 		logFileName string, correlationID int64, registrationID int64)
+	OnNewExclusivePublication(streamID int32, sessionID int32, positionLimitCounterID int32, channelStatusIndicatorID int32,
+		logFileName string, correlationID int64, registrationID int64)
 	OnAvailableImage(streamID int32, sessionID int32, logFilename string, sourceIdentity string,
 		subscriberPositionID int32, subsRegID int64, correlationID int64)
 	OnUnavailableImage(streamID int32, correlationID int64)
 	OnOperationSuccess(correlationID int64)
 	OnErrorResponse(offendingCommandCorrelationID int64, errorCode int32, errorMessage string)
 	OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32)
+	OnAvailableCounter(correlationID int64, counterID int32)
+	OnUnavailableCounter(correlationID int64, counterID int32)
 }
 
 type ListenerAdapter struct {
@@ -112,6 +116,22 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			logFileName := msg.logFileName.Get()
 
 			adapter.listener.OnNewPublication(streamID, sessionID, positionLimitCounterID, channelStatusIndicatorID,
+				logFileName, correlationID, registrationID)
+		case Events.OnExclusivePublicationReady:
+			logger.Debugf("received ON_EXCLUSIVE_PUBLICATION_READY")
+
+			var msg publicationReady
+			msg.Wrap(buffer, int(offset))
+
+			streamID := msg.streamID.Get()
+			sessionID := msg.sessionID.Get()
+			positionLimitCounterID := msg.publicationLimitOffset.Get()
+			channelStatusIndicatorID := msg.channelStatusIndicatorID.Get()
+			correlationID := msg.correlationID.Get()
+			registrationID := msg.registrationID.Get()
+			logFileName := msg.logFileName.Get()
+
+			adapter.listener.OnNewExclusivePublication(streamID, sessionID, positionLimitCounterID, channelStatusIndicatorID,
 				logFileName, correlationID, registrationID)
 		case Events.OnSubscriptionReady:
 			logger.Debugf("received ON_SUBSCRIPTION_READY")
@@ -169,6 +189,20 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 
 			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationID.Get(),
 				msg.errorCode.Get(), msg.errorMessage.Get())
+		case Events.OnCounterReady:
+			logger.Debugf("received ON_COUNTER_READY")
+
+			var msg counterUpdate
+			msg.Wrap(buffer, int(offset))
+
+			adapter.listener.OnAvailableCounter(msg.correlationID.Get(), msg.counterID.Get())
+		case Events.OnUnavailableCounter:
+			logger.Debugf("received ON_UNAVAILABLE_COUNTER")
+
+			var msg counterUpdate
+			msg.Wrap(buffer, int(offset))
+
+			adapter.listener.OnUnavailableCounter(msg.correlationID.Get(), msg.counterID.Get())
 		default:
 			logger.Fatalf("received unhandled %d", msgTypeID)
 		}

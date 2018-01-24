@@ -55,6 +55,7 @@ func send(n int, pub *Publication) {
 func receive(n int, sub *Subscription) {
 	counter := 0
 	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+		logger.Debugf("    message: %s", string(buffer.GetBytesArray(offset, length)))
 		counter++
 	}
 	var fragmentsRead atomic.Int
@@ -116,7 +117,7 @@ func testAeronBasics() {
 
 	pub := <-a.AddPublication(TestChannel, TestStreamID)
 	defer pub.Close()
-	logger.Debugf("Added publication: %v\n", pub)
+	//logger.Debugf("Added publication: %v\n", pub)
 
 	subAndSend(1, a, pub)
 }

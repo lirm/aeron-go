@@ -21,38 +21,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/flyweight"
 )
 
-type subscriberPositionFly struct {
-	flyweight.FWBase
-
-	indicatorID    flyweight.Int32Field
-	registrationID flyweight.Int64Field
-}
-
-func (m *subscriberPositionFly) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
-	pos := offset
-	pos += m.indicatorID.Wrap(buf, pos)
-	pos += m.registrationID.Wrap(buf, pos)
-
-	m.SetSize(pos - offset)
-	return m
-}
-
-type imageReadyTrailer struct {
-	flyweight.FWBase
-
-	logFile        flyweight.StringField
-	sourceIdentity flyweight.StringField
-}
-
-func (m *imageReadyTrailer) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
-	pos := offset
-	pos += m.logFile.Wrap(buf, pos, m)
-	pos += m.sourceIdentity.Wrap(buf, pos, m)
-
-	m.SetSize(pos - offset)
-	return m
-}
-
 /**
  * Control message flyweight for any errors sent from driver to clients
  *
@@ -225,6 +193,34 @@ func (m *imageReadyHeader) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywei
 	pos += m.subsPosID.Wrap(buf, pos)
 	pos += m.logFile.Wrap(buf, pos, m)
 	pos += m.sourceIdentity.Wrap(buf, pos, m)
+
+	m.SetSize(pos - offset)
+	return m
+}
+
+/**
+ * Message to denote that a Counter has been successfully set up or removed.
+ *
+ *   0                   1                   2                   3
+ *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  |                         Correlation ID                        |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                           Counter ID                          |
+ *  +---------------------------------------------------------------+
+ */
+type counterUpdate struct {
+	flyweight.FWBase
+
+	correlationID flyweight.Int64Field
+	counterID     flyweight.Int32Field
+}
+
+func (m *counterUpdate) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.correlationID.Wrap(buf, pos)
+	pos += m.counterID.Wrap(buf, pos)
 
 	m.SetSize(pos - offset)
 	return m
