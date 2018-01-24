@@ -282,7 +282,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 	return publication
 }
 
-func (cc *ClientConductor) releasePublication(regID int64) chan bool {
+func (cc *ClientConductor) releasePublication(regID int64) {
 	logger.Debugf("ReleasePublication: regID=%d", regID)
 
 	cc.verifyDriverIsActive()
@@ -290,28 +290,16 @@ func (cc *ClientConductor) releasePublication(regID int64) chan bool {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	ch := make(chan bool, 1)
-	found := false
-
 	for i, pub := range cc.pubs {
 		if pub.regID == regID {
-			corrID := cc.driverProxy.RemovePublication(regID)
+			cc.driverProxy.RemovePublication(regID)
 
 			cc.pubs[i] = cc.pubs[len(cc.pubs)-1]
 			cc.pubs[len(cc.pubs)-1] = nil
 			cc.pubs = cc.pubs[:len(cc.pubs)-1]
-
-			cc.pendingCloses[corrID] = ch
-			found = true
 		}
 	}
 
-	// Need to report if it's already been closed
-	if !found {
-		ch <- false
-	}
-
-	return ch
 }
 
 // AddSubscription sends the add subscription command through the driver proxy
@@ -373,7 +361,7 @@ func waitForMediaDriver(timeOfRegistration int64, cc *ClientConductor) {
 	}
 }
 
-func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) chan bool {
+func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 	logger.Debugf("ReleaseSubscription: regID=%d", regID)
 
 	cc.verifyDriverIsActive()
@@ -383,16 +371,13 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) chan
 
 	now := time.Now().UnixNano()
 
-	ch := make(chan bool, 1)
-	found := false
-
 	for i, sub := range cc.subs {
 		if sub.regID == regID {
 			if logger.IsEnabledFor(logging.DEBUG) {
 				logger.Debugf("Removing subscription: %d; %v", regID, images)
 			}
 
-			corrID := cc.driverProxy.RemoveSubscription(regID)
+			cc.driverProxy.RemoveSubscription(regID)
 
 			cc.subs[i] = cc.subs[len(cc.subs)-1]
 			cc.subs[len(cc.subs)-1] = nil
@@ -404,18 +389,9 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) chan
 				}
 				cc.lingeringResources <- lingerResourse{now, &image}
 			}
-
-			cc.pendingCloses[corrID] = ch
-			found = true
 		}
 	}
 
-	// Need to report if it's already been closed
-	if !found {
-		ch <- false
-	}
-
-	return ch
 }
 
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
@@ -522,11 +498,6 @@ func (cc *ClientConductor) OnOperationSuccess(corrID int64) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	if cc.pendingCloses[corrID] != nil {
-		cc.pendingCloses[corrID] <- true
-		close(cc.pendingCloses[corrID])
-		delete(cc.pendingCloses, corrID)
-	}
 }
 
 func (cc *ClientConductor) OnErrorResponse(corrID int64, errorCode int32, errorMessage string) {

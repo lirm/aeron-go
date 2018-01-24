@@ -71,7 +71,7 @@ func (driver *Proxy) AddSubscription(channel string, streamID int32) int64 {
 }
 
 // RemoveSubscription sends driver command to remove subscription
-func (driver *Proxy) RemoveSubscription(registrationID int64) int64 {
+func (driver *Proxy) RemoveSubscription(registrationID int64) {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
 	logger.Debugf("driver.RemoveSubscription: correlationId=%d (subId=%d)", correlationID, registrationID)
@@ -91,8 +91,6 @@ func (driver *Proxy) RemoveSubscription(registrationID int64) int64 {
 	}
 
 	driver.writeCommandToDriver(filler)
-
-	return correlationID
 }
 
 // AddPublication sends driver command to add new publication
@@ -122,7 +120,7 @@ func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
 }
 
 // RemovePublication sends driver command to remove publication
-func (driver *Proxy) RemovePublication(registrationID int64) int64 {
+func (driver *Proxy) RemovePublication(registrationID int64) {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
 	logger.Debugf("driver.RemovePublication: correlationId=%d (pudId=%d)", correlationID, registrationID)
@@ -142,8 +140,6 @@ func (driver *Proxy) RemovePublication(registrationID int64) int64 {
 	}
 
 	driver.writeCommandToDriver(filler)
-
-	return correlationID
 }
 
 // SendClientKeepalive send keep alive message to the driver

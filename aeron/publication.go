@@ -96,7 +96,7 @@ func (pub *Publication) IsClosed() bool {
 func (pub *Publication) Close() error {
 	// FIXME Why can pub be nil?!
 	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
-		<-pub.conductor.releasePublication(pub.regID)
+		pub.conductor.releasePublication(pub.regID)
 	}
 
 	return nil
