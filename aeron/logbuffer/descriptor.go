@@ -29,12 +29,12 @@ const (
 	PartitionCount                = 3
 	LogMetaDataSectionIndex       = PartitionCount
 
-	termMinLength        int32 = 64 * 1024
+	TermMinLength        int32 = 64 * 1024
 	termMaxLength        int32 = 1024 * 1024 * 1024
 	pageMinSize          int32 = 4 * 1024
 	pageMaxSize          int32 = 1024 * 1024 * 1024
 	maxSingleMappingSize int64 = 0x7FFFFFFF
-	logMetaDataLength          = pageMinSize
+	LogMetaDataLength          = pageMinSize
 )
 
 /* LogBufferMetaData is the flyweight for LogBuffer meta data
@@ -107,7 +107,7 @@ type LogBufferMetaData struct {
 
 func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
-	m.TailCounter = make([]flyweight.Int64Field, 3)
+	m.TailCounter = make([]flyweight.Int64Field, PartitionCount)
 	pos += m.TailCounter[0].Wrap(buf, pos)
 	pos += m.TailCounter[1].Wrap(buf, pos)
 	pos += m.TailCounter[2].Wrap(buf, pos)
@@ -130,25 +130,38 @@ func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	return m
 }
 
-func checkTermLength(termLength int64) {
-	if termLength < int64(termMinLength) {
+func checkTermLength(termLength int32) {
+	if termLength < TermMinLength {
 		panic(fmt.Sprintf("Term length less than min size of %d, length=%d",
-			termMinLength, termLength))
+			TermMinLength, termLength))
 	}
 
-	if termLength > int64(termMaxLength) {
+	if termLength > termMaxLength {
 		panic(fmt.Sprintf("Term length greater than max size of %d, length=%d",
 			termMaxLength, termLength))
 	}
 
-	if !util.IsPowerOfTwo(termLength) {
-		panic(fmt.Sprintf("Term length not a multiple of %d, length=%d",
-			FrameAlignment, termLength))
+	if !util.IsPowerOfTwo(int64(termLength)) {
+		panic(fmt.Sprintf("Term length not a power of 2, length=%d", termLength))
 	}
 }
 
-func computeTermLength(logLength int64) int64 {
-	return (logLength - int64(logMetaDataLength)) / int64(PartitionCount)
+func computeTermLength(logLength int32) int32 {
+	return (logLength - LogMetaDataLength) / PartitionCount
+}
+
+func checkPageSize(pageSize int32) {
+	if pageSize < pageMinSize {
+		panic(fmt.Sprintf("Page size less than min size of %d, size=%d", pageMinSize, pageSize))
+	}
+
+	if pageSize > pageMaxSize {
+		panic(fmt.Sprintf("Page Size greater than max size of %d, size=%d", pageMaxSize, pageSize))
+	}
+
+	if !util.IsPowerOfTwo(int64(pageSize)) {
+		panic(fmt.Sprintf("Page size not a power of 2, size=%d", pageSize))
+	}
 }
 
 func TermID(rawTail int64) int32 {

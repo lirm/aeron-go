@@ -16,7 +16,10 @@ limitations under the License.
 
 package util
 
-import "unsafe"
+import (
+	"fmt"
+	"unsafe"
+)
 
 var i32 int32
 var i64 int64
@@ -102,4 +105,17 @@ func Memcpy(dest uintptr, src uintptr, length int32) {
 
 		*(*int8)(destPtr) = *(*int8)(srcPtr)
 	}
+}
+
+func Print(bytes []byte) {
+	for i, b := range bytes {
+		if i > 0 && i%16 == 0 && i%32 != 0 {
+			fmt.Print(" :  ")
+		}
+		if i > 0 && i%32 == 0 {
+			fmt.Print("\n")
+		}
+		fmt.Printf("%02x ", b)
+	}
+	fmt.Print("\n")
 }

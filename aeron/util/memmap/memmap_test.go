@@ -41,8 +41,11 @@ func TestMmapBasics(t *testing.T) {
 	// t.Logf("1: Got %d stuff from file", num)
 	fmt.Printf("1: Got %d stuff from file\n", num)
 
-	buf.PutInt64Ordered(0, 42)
+	var expected int64 = 42
+	buf.PutInt64Ordered(0, expected)
 	num = buf.GetInt64Volatile(0)
 	t.Logf("2: Got %d stuff from file\n", num)
-
+	if num != expected {
+		t.Fail()
+	}
 }

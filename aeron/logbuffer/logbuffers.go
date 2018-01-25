@@ -37,7 +37,7 @@ func Wrap(fileName string) *LogBuffers {
 	buffers := new(LogBuffers)
 
 	logLength := memmap.GetFileSize(fileName)
-	termLength := computeTermLength(logLength)
+	termLength := computeTermLength(int32(logLength))
 
 	checkTermLength(termLength)
 
@@ -47,18 +47,30 @@ func Wrap(fileName string) *LogBuffers {
 			panic(err)
 		}
 
-		buffers.mmapFiles = [](*memmap.File){mmap}
-		basePtr := uintptr(buffers.mmapFiles[0].GetMemoryPtr())
+		buffers.mmapFiles = []*memmap.File{mmap}
+		basePtr := uintptr(mmap.GetMemoryPtr())
 		for i := 0; i < PartitionCount; i++ {
-			ptr := unsafe.Pointer(basePtr + uintptr(int64(i)*termLength))
+			ptr := unsafe.Pointer(basePtr + uintptr(int64(i)*int64(termLength)))
 			buffers.buffers[i].Wrap(ptr, int32(termLength))
 		}
 
-		ptr := unsafe.Pointer(basePtr + uintptr(logLength-int64(logMetaDataLength)))
-		buffers.buffers[LogMetaDataSectionIndex].Wrap(ptr, logMetaDataLength)
+		ptr := unsafe.Pointer(basePtr + uintptr(logLength-int64(LogMetaDataLength)))
+		buffers.buffers[LogMetaDataSectionIndex].Wrap(ptr, LogMetaDataLength)
+
+		buffers.meta.Wrap(&buffers.buffers[LogMetaDataSectionIndex], 0)
+
+		//metaBytes := buffers.buffers[LogMetaDataSectionIndex].GetBytesArray(0, LogMetaDataLength)
+		//util.Print(metaBytes)
+
+		//fmt.Printf("meta: TermLen: %d \n", buffers.meta.TermLen.Get())
+		//fmt.Printf("meta: PageSize: %d \n", buffers.meta.PageSize.Get())
+		//fmt.Printf("meta: CorrelationId: %d \n", buffers.meta.CorrelationId.Get())
+		//fmt.Printf("meta: InitTermID: %d \n", buffers.meta.InitTermID.Get())
+		//fmt.Printf("meta: MTULen: %d \n", buffers.meta.MTULen.Get())
+		//fmt.Printf("meta: EndOfStreamPosOff: %d \n", buffers.meta.EndOfStreamPosOff.Get())
 	} else {
-		buffers.mmapFiles = make([](*memmap.File), PartitionCount+1)
-		metaDataSectionOffset := termLength * int64(PartitionCount)
+		buffers.mmapFiles = make([]*memmap.File, PartitionCount+1)
+		metaDataSectionOffset := int64(termLength) * int64(LogMetaDataSectionIndex)
 		metaDataSectionLength := int(logLength - metaDataSectionOffset)
 
 		mmap, err := memmap.MapExisting(fileName, metaDataSectionOffset, metaDataSectionLength)
@@ -69,7 +81,7 @@ func Wrap(fileName string) *LogBuffers {
 
 		for i := 0; i < PartitionCount; i++ {
 			// one map for each term
-			mmap, err := memmap.MapExisting(fileName, int64(i)*termLength, int(termLength))
+			mmap, err := memmap.MapExisting(fileName, int64(i)*int64(termLength), int(termLength))
 			if err != nil {
 				panic("Failed to map the log buffer")
 			}
@@ -80,10 +92,9 @@ func Wrap(fileName string) *LogBuffers {
 			buffers.buffers[i].Wrap(basePtr, int32(termLength))
 		}
 		metaDataBasePtr := buffers.mmapFiles[0].GetMemoryPtr()
-		buffers.buffers[LogMetaDataSectionIndex].Wrap(metaDataBasePtr, logMetaDataLength)
+		buffers.buffers[LogMetaDataSectionIndex].Wrap(metaDataBasePtr, LogMetaDataLength)
+		buffers.meta.Wrap(&buffers.buffers[PartitionCount], 0)
 	}
-
-	buffers.meta.Wrap(&buffers.buffers[PartitionCount], 0)
 
 	return buffers
 }

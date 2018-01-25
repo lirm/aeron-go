@@ -18,21 +18,34 @@ package logbuffer
 
 import (
 	"fmt"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
 	"testing"
+	"unsafe"
 )
 
 func prepareFile(t *testing.T) *LogBuffers {
 	logging.SetLevel(logging.INFO, "logbuffers")
 	logging.SetLevel(logging.INFO, "memmap")
 	fname := "logbuffers.bin"
-	mmap, err := memmap.NewFile(fname, 0, 256*1024)
+
+	var logLength = (TermMinLength * PartitionCount) + LogMetaDataLength
+	mmap, err := memmap.NewFile(fname, 0, int(logLength))
 	if err != nil {
 		t.Error(err.Error())
 		return nil
 	}
+	basePtr := uintptr(mmap.GetMemoryPtr())
+	ptr := unsafe.Pointer(basePtr + uintptr(int64(logLength-LogMetaDataLength)))
+	buf := atomic.MakeBuffer(ptr, LogMetaDataLength)
+
+	var meta LogBufferMetaData
+	meta.Wrap(buf, 0)
+
+	meta.TermLen.Set(1024)
+
 	mmap.Close()
 
 	return Wrap(fname)
@@ -58,8 +71,6 @@ func TestWrap(t *testing.T) {
 func TestWrapFail(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
-			errStr := fmt.Sprintf("Panic: %v", err)
-			t.Logf("caught panic: %v", errStr)
 		}
 	}()
 
@@ -78,9 +89,7 @@ func TestWrapFail(t *testing.T) {
 func TestLogBuffers_Buffer(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
-			errStr := fmt.Sprintf("Panic: %v", err)
-			logger.Error(errStr)
-			t.FailNow()
+			t.Fatalf("Panic: %v", err)
 		}
 	}()
 
@@ -101,7 +110,7 @@ func TestLogBuffers_Buffer(t *testing.T) {
 func TestLogBuffers_BufferFail(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
-			t.Logf("Panic: %v", err)
+
 		}
 	}()
 
@@ -112,6 +121,7 @@ func TestLogBuffers_BufferFail(t *testing.T) {
 		t.Fail()
 	}
 
+	// Index is zero-based
 	lb.Buffer(PartitionCount + 1)
 	t.Fail()
 }
@@ -119,9 +129,7 @@ func TestLogBuffers_BufferFail(t *testing.T) {
 func TestLogBuffers_Meta(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
-			errStr := fmt.Sprintf("Panic: %v", err)
-			logger.Error(errStr)
-			t.FailNow()
+			t.Fatalf("Panic: %v", err)
 		}
 	}()
 
@@ -140,15 +148,14 @@ func TestLogBuffers_Meta(t *testing.T) {
 
 	meta := lb.Meta()
 
-	t.Logf("meta fly size: %d", meta.Size())
-
-	t.Logf("active term count offset: %d", meta.ActiveTermCountOff.Get())
-	t.Logf("initTermID: %d", meta.InitTermID.Get())
-	t.Logf("CorrelationId: %d", meta.CorrelationId.Get())
-	t.Logf("tailCounter0: %d", meta.TailCounter[0].Get())
-	t.Logf("tailCounter1: %d", meta.TailCounter[1].Get())
-	t.Logf("tailCounter2: %d", meta.TailCounter[2].Get())
-	t.Logf("defaultFrameHdrLen: %d", meta.DefaultFrameHdrLen.Get())
+	//t.Logf("meta fly size: %d", meta.Size())
+	//t.Logf("active term count offset: %d", meta.ActiveTermCountOff.Get())
+	//t.Logf("initTermID: %d", meta.InitTermID.Get())
+	//t.Logf("CorrelationId: %d", meta.CorrelationId.Get())
+	//t.Logf("tailCounter0: %d", meta.TailCounter[0].Get())
+	//t.Logf("tailCounter1: %d", meta.TailCounter[1].Get())
+	//t.Logf("tailCounter2: %d", meta.TailCounter[2].Get())
+	//t.Logf("defaultFrameHdrLen: %d", meta.DefaultFrameHdrLen.Get())
 
 	if meta.Size() != int(util.CacheLineLength*7) {
 		t.Errorf("Actual size: %d vs %d", meta.Size(), util.CacheLineLength*7)

@@ -27,6 +27,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 func prepareFile(t *testing.T) (string, *logbuffer.LogBuffers) {
@@ -35,11 +36,21 @@ func prepareFile(t *testing.T) (string, *logbuffer.LogBuffers) {
 	logging.SetLevel(logging.INFO, "aeron")
 
 	logBufferName := "logbuffers.bin"
-	mmap, err := memmap.NewFile(logBufferName, 0, 256*1024)
+	var logLength = (logbuffer.TermMinLength * logbuffer.PartitionCount) + logbuffer.LogMetaDataLength
+	mmap, err := memmap.NewFile(logBufferName, 0, int(logLength))
 	if err != nil {
 		t.Error(err.Error())
-		return logBufferName, nil
+		return "", nil
 	}
+	basePtr := uintptr(mmap.GetMemoryPtr())
+	ptr := unsafe.Pointer(basePtr + uintptr(int64(logLength-logbuffer.LogMetaDataLength)))
+	buf := atomic.MakeBuffer(ptr, logbuffer.LogMetaDataLength)
+
+	var meta logbuffer.LogBufferMetaData
+	meta.Wrap(buf, 0)
+
+	meta.TermLen.Set(1024)
+
 	mmap.Close()
 
 	return logBufferName, logbuffer.Wrap(logBufferName)
@@ -190,7 +201,7 @@ func TestPublication_Offer(t *testing.T) {
 	pub.pubLimit.set(int64(termBufLen))
 	for i := int64(1); i <= int64(termBufLen)/frameLen; i++ {
 		pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
-		t.Logf("new pos: %d", pos)
+		//t.Logf("new pos: %d", pos)
 		if pos != frameLen*i {
 			t.Errorf("Expected publication to advance to position %d (have %d)", frameLen*i, pos)
 		}
