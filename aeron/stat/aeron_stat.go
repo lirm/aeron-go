@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aeron
+package main
 
 import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/counters"
-	"testing"
+	"github.com/lirm/aeron-go/aeron"
 )
 
-func TestRead(t *testing.T) {
-	ctx := NewContext()
+func main() {
+	ctx := aeron.NewContext()
 	counterFile, _ := counters.MapFile(ctx.CncFileName())
 
 	reader := counters.NewReader(counterFile.ValuesBuf.Get(), counterFile.MetaDataBuf.Get())
