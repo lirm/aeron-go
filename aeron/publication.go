@@ -111,7 +111,8 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 
 		limit := pub.pubLimit.get()
 		termCount := pub.metaData.ActiveTermCountOff.Get()
-		termAppender := pub.appenders[termCount]
+		termIndex := termCount % logbuffer.PartitionCount
+		termAppender := pub.appenders[termIndex]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
 		termId := logbuffer.TermID(rawTail)
