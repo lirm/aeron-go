@@ -209,6 +209,7 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 	for cc.running.Get() {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
 		workCount += cc.onHeartbeatCheckTimeouts()
+
 		idleStrategy.Idle(workCount)
 	}
 
@@ -270,6 +271,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 					publication.streamID = pub.streamID
 					publication.sessionID = pub.sessionID
 					publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
+					publication.channelStatusIndicatorID = pub.channelStatusIndicatorID
 
 				case RegistrationStatus.ErroredMediaDriver:
 					log.Fatalf("Error on %d: %d: %s", regID, pub.errorCode, pub.errorMessage)

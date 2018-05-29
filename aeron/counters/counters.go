@@ -29,7 +29,7 @@ var logger = logging.MustGetLogger("counters")
 
 const (
 	CncFile                 = "cnc.dat"
-	CurrentCncVersion int32 = 12
+	CurrentCncVersion int32 = 13
 )
 
 /**

@@ -40,18 +40,19 @@ const (
 
 // Publication is a sender structure
 type Publication struct {
-	conductor           *ClientConductor
-	channel             string
-	regID               int64
-	originalRegID       int64
-	maxPossiblePosition int64
-	streamID            int32
-	sessionID           int32
-	initialTermID       int32
-	maxPayloadLength    int32
-	maxMessageLength    int32
-	positionBitsToShift int32
-	pubLimit            Position
+	conductor                *ClientConductor
+	channel                  string
+	regID                    int64
+	originalRegID            int64
+	maxPossiblePosition      int64
+	streamID                 int32
+	sessionID                int32
+	initialTermID            int32
+	maxPayloadLength         int32
+	maxMessageLength         int32
+	positionBitsToShift      int32
+	pubLimit                 Position
+	channelStatusIndicatorID int32
 
 	isClosed atomic.Bool
 	metaData *logbuffer.LogBufferMetaData
@@ -80,6 +81,10 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	}
 
 	return pub
+}
+
+func (pub *Publication) ChannelStatusID() int32 {
+	return pub.channelStatusIndicatorID
 }
 
 // IsConnected returns whether this publication is connected to the driver (not whether it has any Subscriptions)
@@ -164,7 +169,7 @@ func (pub *Publication) backPressureStatus(currentPosition int64, messageLength 
 		return MaxPositionExceeded
 	}
 
-	if pub.IsConnected() {
+	if pub.metaData.IsConnected.Get() == 1 {
 		return BackPressured
 	}
 

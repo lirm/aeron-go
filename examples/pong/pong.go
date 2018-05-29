@@ -65,6 +65,8 @@ func main() {
 	defer publication.Close()
 	logger.Infof("Publication found %v", publication)
 
+	logger.Infof("ChannelStatusID: %v", publication.ChannelStatusID())
+
 	logger.Infof("%v", examples.ExamplesConfig)
 
 	if *examples.ExamplesConfig.ProfilerEnabled {
@@ -96,9 +98,8 @@ func main() {
 			ret := publication.Offer(buffer, offset, length, nil)
 			if ret >= 0 {
 				break
-			}
-			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("Failed to send message of %d bytes due to %d", length, ret)
+				//} else {
+				//	panic(fmt.Sprintf("Failed to send message of %d bytes due to %d", length, ret))
 			}
 		}
 	}

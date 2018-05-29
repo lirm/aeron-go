@@ -60,6 +60,12 @@ func main() {
 	defer publication.Close()
 	logger.Infof("Publication found %v", publication)
 
+	for !publication.IsConnected() {
+		logger.Debug("Publication isn't connected")
+		time.Sleep(time.Millisecond * 300)
+	}
+	logger.Info("Publication connected")
+
 	if *examples.ExamplesConfig.ProfilerEnabled {
 		fname := fmt.Sprintf("ping-%d.pprof", time.Now().Unix())
 		logger.Infof("Profiling enabled. Will use: %s", fname)
@@ -96,30 +102,28 @@ func main() {
 
 		for true {
 			ret := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
-			if logger.IsEnabledFor(logging.DEBUG) {
-				logger.Debugf("Failed offer %d", ret)
-			}
 			if ret > 0 {
 				break
+			} else {
+				panic(fmt.Sprintf("Failed to offer message of %d bytes due to %d", srcBuffer.Capacity(), ret))
 			}
 		}
 
 		for true {
 			ret := subscription.Poll(handler, 10)
-			if logger.IsEnabledFor(logging.DEBUG) {
-				if ret < 0 {
-					logger.Debugf("Poll returned %d", ret)
-				}
-			}
 			if ret > 0 {
 				break
+			} else if ret < 0 {
+				panic(fmt.Sprintf("Failed to poll due to %d", ret))
 			}
 		}
 	}
 	hist.Reset()
 
+	cnt := atomic.Int{}
+
 	logger.Infof("Sending %d messages of %d bytes", *examples.ExamplesConfig.Messages, srcBuffer.Capacity())
-	for i := 0; i < *examples.ExamplesConfig.Messages; i++ {
+	for ; int(cnt.Get()) < *examples.ExamplesConfig.Messages; cnt.Add(1) {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 

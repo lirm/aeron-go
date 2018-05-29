@@ -35,7 +35,7 @@ func main() {
 	if !*examples.ExamplesConfig.LoggingOn {
 		logging.SetLevel(logging.INFO, "aeron")
 		logging.SetLevel(logging.INFO, "memmap")
-		logging.SetLevel(logging.INFO, "driver")
+		logging.SetLevel(logging.DEBUG, "driver")
 		logging.SetLevel(logging.INFO, "counters")
 		logging.SetLevel(logging.INFO, "logbuffers")
 		logging.SetLevel(logging.INFO, "buffer")

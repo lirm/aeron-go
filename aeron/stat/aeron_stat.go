@@ -18,9 +18,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/counters"
+	"time"
 )
+
+var ansiCls = "\u001b[2J"
+var ansiHome = "\u001b[H"
 
 func main() {
 	ctx := aeron.NewContext()
@@ -28,7 +32,11 @@ func main() {
 
 	reader := counters.NewReader(counterFile.ValuesBuf.Get(), counterFile.MetaDataBuf.Get())
 
-	reader.Scan(func(counter counters.Counter) {
-		fmt.Printf("[%d]=%d\t\tlabel:%s\n", counter.Id, counter.Value, counter.Label)
-	})
+	for {
+		fmt.Print(ansiCls + ansiHome)
+		reader.Scan(func(counter counters.Counter) {
+			fmt.Printf("%3d: %20d - %s\n", counter.Id, counter.Value, counter.Label)
+		})
+		time.Sleep(time.Second)
+	}
 }

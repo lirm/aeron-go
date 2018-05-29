@@ -27,7 +27,8 @@ import (
 
 const (
 	// TestChannel is the default channel used for testing
-	TestChannel = "aeron:udp?endpoint=localhost:40123"
+	TestChannel = "aeron:ipc"
+	//TestChannel = "aeron:udp?endpoint=localhost:40123"
 
 	// TestStreamID is the default stream ID used for testing
 	TestStreamID = 10
@@ -244,13 +245,13 @@ func main() {
 
 	testAeronBasics()
 
-	testAeronClose()
+	//testAeronClose()
 
-	testAeronResubscribe()
+	//testAeronResubscribe()
 
 	testAeronSendMultipleMessages()
 
-	testAeronSendMultiplePublications()
+	//testAeronSendMultiplePublications()
 
-	testResubStress()
+	//testResubStress()
 }
