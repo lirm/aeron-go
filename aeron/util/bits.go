@@ -107,6 +107,17 @@ func Memcpy(dest uintptr, src uintptr, length int32) {
 	}
 }
 
+func MemPrint(ptr uintptr, len int) string {
+	var output string
+
+	for i := 0; i < len; i += 1 {
+		ptr := unsafe.Pointer(ptr + uintptr(i))
+		output += fmt.Sprintf("%02x ", *(*int8)(ptr))
+	}
+
+	return output
+}
+
 func Print(bytes []byte) {
 	for i, b := range bytes {
 		if i > 0 && i%16 == 0 && i%32 != 0 {

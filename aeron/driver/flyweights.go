@@ -51,7 +51,7 @@ func (m *errorMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight 
 	pos := offset
 	pos += m.offendingCommandCorrelationID.Wrap(buf, pos)
 	pos += m.errorCode.Wrap(buf, pos)
-	pos += m.errorMessage.Wrap(buf, pos, m)
+	pos += m.errorMessage.Wrap(buf, pos, m, true)
 
 	m.SetSize(pos - offset)
 	return m
@@ -105,7 +105,7 @@ func (m *publicationReady) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywei
 	pos += m.streamID.Wrap(buf, pos)
 	pos += m.publicationLimitOffset.Wrap(buf, pos)
 	pos += m.channelStatusIndicatorID.Wrap(buf, pos)
-	pos += m.logFileName.Wrap(buf, pos, m)
+	pos += m.logFileName.Wrap(buf, pos, m, true)
 
 	m.SetSize(pos - offset)
 	return m
@@ -191,8 +191,8 @@ func (m *imageReadyHeader) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywei
 	pos += m.streamID.Wrap(buf, pos)
 	pos += m.subsRegistrationID.Wrap(buf, pos)
 	pos += m.subsPosID.Wrap(buf, pos)
-	pos += m.logFile.Wrap(buf, pos, m)
-	pos += m.sourceIdentity.Wrap(buf, pos, m)
+	pos += m.logFile.Wrap(buf, pos, m, true)
+	pos += m.sourceIdentity.Wrap(buf, pos, m, true)
 
 	m.SetSize(pos - offset)
 	return m

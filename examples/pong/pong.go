@@ -54,7 +54,10 @@ func main() {
 			logger.Fatalf("Received error: %v", err)
 		})
 
-	a := aeron.Connect(ctx)
+	a, err := aeron.Connect(ctx)
+	if err != nil {
+		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+	}
 	defer a.Close()
 
 	subscription := <-a.AddSubscription(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamID))

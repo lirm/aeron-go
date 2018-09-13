@@ -87,17 +87,23 @@ type StringField struct {
 	fly        Flyweight
 }
 
-func (fld *StringField) Wrap(buffer *atomic.Buffer, offset int, fly Flyweight) int {
-	atomic.BoundsCheck(int32(offset), 4, buffer.Capacity())
+func (fld *StringField) Wrap(buffer *atomic.Buffer, offset int, fly Flyweight, align bool) int {
 
-	fld.lenOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
-	len := *(*int32)(fld.lenOffset)
+	off := int32(offset)
+	if align {
+		off = util.AlignInt32(int32(offset), 4)
+	}
 
-	atomic.BoundsCheck(int32(offset)+4, len, buffer.Capacity())
+	atomic.BoundsCheck(off, 4, buffer.Capacity())
+
+	fld.lenOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(off))
+	l := *(*int32)(fld.lenOffset)
+
+	atomic.BoundsCheck(off+4, l, buffer.Capacity())
 
 	fld.fly = fly
-	fld.dataOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset+4))
-	return 4 + int(len)
+	fld.dataOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(off+4))
+	return 4 + int(l)
 }
 
 func (fld *StringField) Get() string {

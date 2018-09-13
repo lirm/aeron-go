@@ -27,6 +27,8 @@ import (
 	"time"
 )
 
+var logger = logging.MustGetLogger("basic_publisher_claim")
+
 func main() {
 	flag.Parse()
 
@@ -43,7 +45,11 @@ func main() {
 	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
 	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
 
-	a := aeron.Connect(ctx)
+	a, err := aeron.Connect(ctx)
+	if err != nil {
+		logger.Fatalf("Failed to connect to media driver: %s\n", err.Error())
+	}
+	defer a.Close()
 
 	publication := <-a.AddPublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
 	defer publication.Close()

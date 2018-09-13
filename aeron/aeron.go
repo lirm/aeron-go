@@ -53,12 +53,17 @@ type Aeron struct {
 var logger = logging.MustGetLogger("aeron")
 
 // Connect is the factory method used to create a new instance of Aeron based on Context settings
-func Connect(ctx *Context) *Aeron {
+func Connect(ctx *Context) (*Aeron, error) {
 	aeron := new(Aeron)
 	aeron.context = ctx
 	logger.Debugf("Connecting with context: %v", ctx)
 
-	aeron.counters, aeron.cncFile = counters.MapFile(ctx.CncFileName())
+	ctr, cnc, err := counters.MapFile(ctx.CncFileName())
+	if err != nil {
+		return nil, err
+	}
+	aeron.counters = ctr
+	aeron.cncFile = cnc
 
 	aeron.toDriverRingBuffer.Init(aeron.counters.ToDriverBuf.Get())
 
@@ -78,7 +83,7 @@ func Connect(ctx *Context) *Aeron {
 
 	go aeron.conductor.Run(ctx.idleStrategy)
 
-	return aeron
+	return aeron, nil
 }
 
 // Close will terminate client conductor and remove all publications and subscriptions from the media driver

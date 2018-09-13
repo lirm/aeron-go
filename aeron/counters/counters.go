@@ -22,14 +22,15 @@ import (
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 	"github.com/op/go-logging"
-	"log"
+	"errors"
+	"fmt"
 )
 
 var logger = logging.MustGetLogger("counters")
 
 const (
 	CncFile                 = "cnc.dat"
-	CurrentCncVersion int32 = 13
+	CurrentCncVersion int32 = 14
 )
 
 /**
@@ -115,12 +116,12 @@ func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	return m
 }
 
-func MapFile(filename string) (*MetaDataFlyweight, *memmap.File) {
+func MapFile(filename string) (*MetaDataFlyweight, *memmap.File, error) {
 
 	logger.Debugf("Trying to map file: %s", filename)
 	cncMap, err := memmap.MapExisting(filename, 0, 0)
 	if err != nil {
-		log.Fatalf("Failed to map the file %s with %s", filename, err.Error())
+		return nil, nil, err
 	}
 
 	cncBuffer := atomic.MakeBuffer(cncMap.GetMemoryPtr(), cncMap.GetMemorySize())
@@ -131,8 +132,8 @@ func MapFile(filename string) (*MetaDataFlyweight, *memmap.File) {
 	logger.Debugf("Mapped %s for ver %d", filename, cncVer)
 
 	if CurrentCncVersion != cncVer {
-		log.Fatalf("aeron cnc file version not understood: version=%d", cncVer)
+		return nil, nil, errors.New(fmt.Sprintf("aeron cnc file version not understood: version=%d", cncVer))
 	}
 
-	return &meta, cncMap
+	return &meta, cncMap, nil
 }

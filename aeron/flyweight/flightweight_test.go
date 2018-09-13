@@ -29,7 +29,7 @@ type StringFly struct {
 
 func (m *StringFly) Wrap(buf *atomic.Buffer, offset int) Flyweight {
 	pos := offset
-	pos += m.s.Wrap(buf, pos, m)
+	pos += m.s.Wrap(buf, pos, m, false)
 	m.SetSize(pos - offset)
 	return m
 }
@@ -37,6 +37,8 @@ func (m *StringFly) Wrap(buf *atomic.Buffer, offset int) Flyweight {
 func TestStringFlyweight(t *testing.T) {
 	str := "Hello worlds!"
 	buf := atomic.MakeBuffer(make([]byte, 128), 128)
+
+	// TODO Test aligned reads
 
 	var fw StringFly
 	fw.Wrap(buf, 0)

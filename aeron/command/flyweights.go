@@ -49,7 +49,7 @@ func (m *ImageMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight 
 	pos := offset
 	pos += m.CorrelationID.Wrap(buf, pos)
 	pos += m.StreamID.Wrap(buf, pos)
-	pos += m.Channel.Wrap(buf, pos, m)
+	pos += m.Channel.Wrap(buf, pos, m, true)
 
 	m.SetSize(pos - offset)
 	return m
@@ -69,7 +69,7 @@ func (m *PublicationMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyw
 	pos += m.ClientID.Wrap(buf, pos)
 	pos += m.CorrelationID.Wrap(buf, pos)
 	pos += m.StreamID.Wrap(buf, pos)
-	pos += m.Channel.Wrap(buf, pos, m)
+	pos += m.Channel.Wrap(buf, pos, m, true)
 
 	m.SetSize(pos - offset)
 	return m
@@ -91,7 +91,7 @@ func (m *SubscriptionMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Fly
 	pos += m.CorrelationID.Wrap(buf, pos)
 	pos += m.RegistrationCorrelationID.Wrap(buf, pos)
 	pos += m.StreamID.Wrap(buf, pos)
-	pos += m.Channel.Wrap(buf, pos, m)
+	pos += m.Channel.Wrap(buf, pos, m, true)
 
 	m.SetSize(pos - offset)
 	return m

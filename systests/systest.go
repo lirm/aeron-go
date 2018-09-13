@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+	"fmt"
 	"time"
 
 	. "github.com/lirm/aeron-go/aeron"
@@ -25,14 +27,15 @@ import (
 	"github.com/op/go-logging"
 )
 
-const (
-	// TestChannel is the default channel used for testing
-	TestChannel = "aeron:ipc"
-	//TestChannel = "aeron:udp?endpoint=localhost:40123"
-
-	// TestStreamID is the default stream ID used for testing
-	TestStreamID = 10
-)
+var ExamplesConfig = struct {
+	TestChannel  *string
+	TestStreamID *int
+	LoggingOn    *bool
+}{
+	flag.String("c", "aeron:ipc", "test channel"),
+	flag.Int("s", 10, "streamId to use"),
+	flag.Bool("l", false, "enable logging"),
+}
 
 var logger = logging.MustGetLogger("systests")
 
@@ -85,7 +88,7 @@ func receive(n int, sub *Subscription) {
 }
 
 func subAndSend(n int, a *Aeron, pub *Publication) {
-	sub := <-a.AddSubscription(TestChannel, TestStreamID)
+	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
@@ -98,13 +101,22 @@ func subAndSend(n int, a *Aeron, pub *Publication) {
 }
 
 func logtest(flag bool) {
-	if !flag {
+	fmt.Printf("Logging: %@\n", flag)
+	if flag {
+		logging.SetLevel(logging.DEBUG, "aeron")
+		logging.SetLevel(logging.DEBUG, "memmap")
+		logging.SetLevel(logging.DEBUG, "driver")
+		logging.SetLevel(logging.DEBUG, "counters")
+		logging.SetLevel(logging.DEBUG, "logbuffers")
+		logging.SetLevel(logging.DEBUG, "buffer")
+	} else {
 		logging.SetLevel(logging.INFO, "aeron")
 		logging.SetLevel(logging.INFO, "memmap")
 		logging.SetLevel(logging.INFO, "driver")
 		logging.SetLevel(logging.INFO, "counters")
 		logging.SetLevel(logging.INFO, "logbuffers")
 		logging.SetLevel(logging.INFO, "buffer")
+
 	}
 }
 
@@ -113,10 +125,13 @@ func logtest(flag bool) {
 func testAeronBasics() {
 	logger.Debug("Started TestAeronBasics")
 
-	a := Connect(NewContext())
+	a, err := Connect(NewContext())
+	if err != nil {
+		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+	}
 	defer a.Close()
 
-	pub := <-a.AddPublication(TestChannel, TestStreamID)
+	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer pub.Close()
 	//logger.Debugf("Added publication: %v\n", pub)
 
@@ -128,13 +143,16 @@ func testAeronBasics() {
 func testAeronSendMultipleMessages() {
 	logger.Debug("Started TestAeronSendMultipleMessages")
 
-	a := Connect(NewContext())
+	a, err := Connect(NewContext())
+	if err != nil {
+		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+	}
 	defer a.Close()
 
-	pub := <-a.AddPublication(TestChannel, TestStreamID)
+	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer pub.Close()
 
-	sub := <-a.AddSubscription(TestChannel, TestStreamID)
+	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
@@ -164,19 +182,22 @@ func testAeronSendMultiplePublications() {
 	//	}
 	//}()
 
-	a := Connect(NewContext())
+	a, err := Connect(NewContext())
+	if err != nil {
+		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+	}
 	defer a.Close()
 
 	pubCount := 10
 	itCount := 100
 
-	sub := <-a.AddSubscription(TestChannel, TestStreamID)
+	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer sub.Close()
 
 	pubs := make([]*Publication, pubCount)
 
 	for i := 0; i < pubCount; i++ {
-		pub := <-a.AddPublication(TestChannel, TestStreamID)
+		pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 		defer pub.Close()
 
 		pubs[i] = pub
@@ -208,10 +229,13 @@ func testAeronSendMultiplePublications() {
 func testAeronResubscribe() {
 	logger.Debug("Started TestAeronResubscribe")
 
-	a := Connect(NewContext())
+	a, err := Connect(NewContext())
+	if err != nil {
+		logger.Fatal("Failed to connect to driver")
+	}
 	defer a.Close()
 
-	pub := <-a.AddPublication(TestChannel, TestStreamID)
+	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 
 	subAndSend(1, a, pub)
 	subAndSend(1, a, pub)
@@ -221,10 +245,13 @@ func testAeronResubscribe() {
 func testResubStress() {
 	logger.Debug("Started TestAeronResubscribe")
 
-	a := Connect(NewContext())
+	a, err := Connect(NewContext())
+	if err != nil {
+		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+	}
 	defer a.Close()
 
-	pub := <-a.AddPublication(TestChannel, TestStreamID)
+	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	for i := 0; i < 100; i++ {
 		subAndSend(1, a, pub)
 		logger.Debugf("bounce %d", i)
@@ -236,12 +263,17 @@ func testAeronClose() {
 	logger.Debug("Started TestAeronClose")
 
 	ctx := NewContext().MediaDriverTimeout(time.Second * 5)
-	a := Connect(ctx)
+	a, err := Connect(ctx)
+	if err != nil {
+		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+	}
 	a.Close()
 }
 
 func main() {
-	logtest(false)
+	flag.Parse()
+
+	logtest(*ExamplesConfig.LoggingOn)
 
 	testAeronBasics()
 
