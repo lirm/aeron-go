@@ -26,9 +26,7 @@ import (
 	"github.com/lirm/aeron-go/examples"
 	"github.com/op/go-logging"
 	"os"
-	"os/signal"
 	"runtime/pprof"
-	"syscall"
 	"time"
 )
 
@@ -84,13 +82,7 @@ func main() {
 		}
 	}
 
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		done <- true
-	}()
+	done := examples.InstallSignalReporter(publication, subscription, false)
 
 	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		if logger.IsEnabledFor(logging.DEBUG) {
@@ -108,7 +100,7 @@ func main() {
 	}
 
 	go func() {
-		idleStrategy := idlestrategy.Busy{}
+		idleStrategy := idlestrategy.Yielding{}
 		for {
 			fragmentsRead := subscription.Poll(handler, 10)
 			idleStrategy.Idle(fragmentsRead)

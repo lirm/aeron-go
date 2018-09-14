@@ -149,3 +149,9 @@ func IsConnectedTo(sub *Subscription, pub *Publication) bool {
 
 	return false
 }
+
+
+// This method has been added for debugging purposes and should be removed later
+func (sub *Subscription) Images() []Image {
+	return sub.images.Get()
+}

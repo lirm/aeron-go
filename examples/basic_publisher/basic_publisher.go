@@ -75,6 +75,6 @@ func main() {
 		if !publication.IsConnected() {
 			log.Printf("no subscribers detected")
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond * 50)
 	}
 }

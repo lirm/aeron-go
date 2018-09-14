@@ -18,7 +18,11 @@ package examples
 
 import (
 	"flag"
+	"fmt"
 	"github.com/lirm/aeron-go/aeron"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 var ExamplesConfig = struct {
@@ -51,4 +55,32 @@ var PingPongConfig = struct {
 	flag.Int("s", 10, "streamId to use for ping"),
 	flag.String("C", "aeron:ipc", "pong channel"),
 	flag.String("c", "aeron:ipc", "ping channel"),
+}
+
+func InstallSignalReporter(publication *aeron.Publication, subscription *aeron.Subscription, fatal bool) (chan bool) {
+	done := make(chan bool, 1)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigs
+
+		fmt.Printf("SIGNAL: %d\n", sig)
+
+		fmt.Println("Publication status:")
+		fmt.Println("ChannelStatusID: ", publication.ChannelStatusID())
+		fmt.Println("IsClosed: ", publication.IsClosed())
+		fmt.Println("IsConnected: ", publication.IsConnected())
+		fmt.Println("GetTermIndex: ", publication.GetTermIndex())
+		fmt.Println("GetTermOffset: ", publication.GetTermOffset())
+
+		fmt.Println("Subscription status:")
+		fmt.Println("hasImages: ", subscription.HasImages())
+
+		if fatal {
+			os.Exit(-1)
+		}
+		done <- true
+	}()
+
+	return done
 }

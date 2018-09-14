@@ -123,6 +123,8 @@ func main() {
 				panic(fmt.Sprintf("Failed to poll due to %d", ret))
 			}
 		}
+
+		time.Sleep(time.Millisecond)
 	}
 	hist.Reset()
 
@@ -133,11 +135,32 @@ func main() {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
+		for true {
+			ret := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+			if ret > 0 {
+				break
+			} else if ret == aeron.AdminAction {
+				fmt.Println("\nOffer failed due to admin action. Retrying...")
+				time.Sleep(time.Millisecond)
+			} else {
+				panic(fmt.Sprintf("Failed to offer message of %d bytes due to %d", srcBuffer.Capacity(), ret))
+			}
 		}
 
-		for subscription.Poll(handler, 10) <= 0 {
+		for true {
+			ret := subscription.Poll(handler, 10)
+			if ret > 0 {
+				break
+			} else if ret < 0 {
+				panic(fmt.Sprintf("Failed to poll due to %d", ret))
+			}
 		}
+
+		i := cnt.Get()
+		if i%2000 == 0 {
+			fmt.Printf("%d..", i)
+		}
+		//time.Sleep(time.Millisecond)
 	}
 
 	OutputPercentileDistribution(os.Stdout, hist, 1000.0)

@@ -150,6 +150,19 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 	return newPosition
 }
 
+// This method has been added for debugging purposes and should be removed later
+func (pub *Publication) GetTermIndex() int32 {
+	termCount := pub.metaData.ActiveTermCountOff.Get()
+	return termCount % logbuffer.PartitionCount
+}
+
+// This method has been added for debugging purposes and should be removed later
+func (pub *Publication) GetTermOffset() int64 {
+	termAppender := pub.appenders[pub.GetTermIndex()]
+	rawTail := termAppender.RawTail()
+	return rawTail & 0xFFFFFFFF
+}
+
 func (pub *Publication) newPosition(termCount int32, termOffset int64, termId int32, position int64, resultingOffset int64) int64 {
 	if resultingOffset > 0 {
 		return (position - termOffset) + resultingOffset
@@ -184,6 +197,7 @@ func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) int
 
 		limit := pub.pubLimit.get()
 		termCount := pub.metaData.ActiveTermCountOff.Get()
+		// TODO Need to check if this is a bug and termCount needs to modded by logbuffer.PartitionCount
 		termAppender := pub.appenders[termCount]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
