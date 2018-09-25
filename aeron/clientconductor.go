@@ -438,24 +438,22 @@ func (cc *ClientConductor) OnNewExclusivePublication(streamID int32, sessionID i
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	log.Panic("OnNewExclusivePublication: Not supported yet")
+	for _, pubDef := range cc.pubs {
+		if pubDef.regID == regID {
+			pubDef.status = RegistrationStatus.RegisteredMediaDriver
+			pubDef.sessionID = sessionID
+			pubDef.posLimitCounterID = posLimitCounterID
+			pubDef.channelStatusIndicatorID = channelStatusIndicatorID
+			pubDef.buffers = logbuffer.Wrap(logFileName)
+			pubDef.origRegID = origRegID
 
-	//for _, pubDef := range cc.pubs {
-	//	if pubDef.regID == regID {
-	//		pubDef.status = RegistrationStatus.RegisteredMediaDriver
-	//		pubDef.sessionID = sessionID
-	//		pubDef.posLimitCounterID = posLimitCounterID
-	//		pubDef.channelStatusIndicatorID = channelStatusIndicatorID
-	//		pubDef.buffers = logbuffer.Wrap(logFileName)
-	//		pubDef.origRegID = origRegID
-	//
-	//		logger.Debugf("Updated publication: %v", pubDef)
-	//
-	//		if cc.onNewPublicationHandler != nil {
-	//			cc.onNewPublicationHandler(pubDef.channel, streamID, sessionID, regID)
-	//		}
-	//	}
-	//}
+			logger.Debugf("Updated publication: %v", pubDef)
+
+			if cc.onNewPublicationHandler != nil {
+				cc.onNewPublicationHandler(pubDef.channel, streamID, sessionID, regID)
+			}
+		}
+	}
 }
 
 func (cc *ClientConductor) OnAvailableCounter(correlationID int64, counterID int32) {
@@ -465,7 +463,7 @@ func (cc *ClientConductor) OnAvailableCounter(correlationID int64, counterID int
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	log.Panic("OnAvailableCounter: Not supported yet")
+	logger.Warning("OnAvailableCounter: Not supported yet")
 }
 
 func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID int32) {
@@ -475,7 +473,7 @@ func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID i
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	log.Panic("OnUnavailableCounter: Not supported yet")
+	logger.Warning("OnUnavailableCounter: Not supported yet")
 }
 
 func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32) {
