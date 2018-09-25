@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
@@ -101,7 +100,7 @@ func subAndSend(n int, a *Aeron, pub *Publication) {
 }
 
 func logtest(flag bool) {
-	fmt.Printf("Logging: %@\n", flag)
+	fmt.Printf("Logging: %t\n", flag)
 	if flag {
 		logging.SetLevel(logging.DEBUG, "aeron")
 		logging.SetLevel(logging.DEBUG, "memmap")
