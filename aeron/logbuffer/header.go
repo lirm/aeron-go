@@ -17,8 +17,10 @@ limitations under the License.
 package logbuffer
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
 	"unsafe"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 type Header struct {
@@ -33,12 +35,35 @@ func (hdr *Header) Wrap(ptr unsafe.Pointer, length int32) *Header {
 	return hdr
 }
 
+// Position calculates the current position to which the image has advanced on
+// reading this message.
+func (hdr *Header) Position() int64 {
+	resultingOffset := util.AlignInt32(hdr.Offset()+hdr.FrameLength(), FrameAlignment)
+	return computePosition(hdr.TermId(), resultingOffset, hdr.positionBitsToShift, hdr.InitialTermId())
+}
+
 func (hdr *Header) Offset() int32 {
 	return hdr.offset
 }
 
+func (hdr *Header) Flags() uint8 {
+	return GetFlags(&hdr.buffer, hdr.offset)
+}
+
 func (hdr *Header) FrameLength() int32 {
-	return GetFrameLength(&hdr.buffer, lengthOffset(hdr.offset))
+	return GetFrameLength(&hdr.buffer, hdr.offset)
+}
+
+func (hdr *Header) TermId() int32 {
+	return GetTermId(&hdr.buffer, hdr.offset)
+}
+
+func (hdr *Header) SessionId() int32 {
+	return GetSessionId(&hdr.buffer, hdr.offset)
+}
+
+func (hdr *Header) StreamId() int32 {
+	return GetStreamId(&hdr.buffer, hdr.offset)
 }
 
 func (hdr *Header) SetOffset(offset int32) *Header {
@@ -46,7 +71,7 @@ func (hdr *Header) SetOffset(offset int32) *Header {
 	return hdr
 }
 
-func (hdr *Header) TermId() int32 {
+func (hdr *Header) InitialTermId() int32 {
 	return hdr.initialTermID
 }
 
@@ -58,4 +83,10 @@ func (hdr *Header) SetInitialTermID(initialTermID int32) *Header {
 func (hdr *Header) SetPositionBitsToShift(positionBitsToShift int32) *Header {
 	hdr.positionBitsToShift = positionBitsToShift
 	return hdr
+}
+
+// computePosition computes the current position in absolute number of bytes.
+func computePosition(activeTermId int32, termOffset int32, positionBitsToShift int32, initialTermId int32) int64 {
+	termCount := activeTermId - initialTermId // copes with negative activeTermId on rollover
+	return (int64(termCount) << uint32(positionBitsToShift)) + int64(termOffset)
 }
