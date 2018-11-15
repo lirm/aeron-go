@@ -295,16 +295,17 @@ func (cc *ClientConductor) releasePublication(regID int64) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
+	pubcnt := len(cc.pubs)
 	for i, pub := range cc.pubs {
-		if pub.regID == regID {
+		if pub != nil && pub.regID == regID {
 			cc.driverProxy.RemovePublication(regID)
 
-			cc.pubs[i] = cc.pubs[len(cc.pubs)-1]
-			cc.pubs[len(cc.pubs)-1] = nil
-			cc.pubs = cc.pubs[:len(cc.pubs)-1]
+			cc.pubs[i] = cc.pubs[pubcnt-1]
+			cc.pubs[pubcnt-1] = nil
+			pubcnt--
 		}
 	}
-
+	cc.pubs = cc.pubs[:pubcnt]
 }
 
 // AddSubscription sends the add subscription command through the driver proxy
@@ -376,17 +377,18 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 
 	now := time.Now().UnixNano()
 
+	subcnt := len(cc.subs)
 	for i, sub := range cc.subs {
-		if sub.regID == regID {
+		if sub != nil && sub.regID == regID {
 			if logger.IsEnabledFor(logging.DEBUG) {
 				logger.Debugf("Removing subscription: %d; %v", regID, images)
 			}
 
 			cc.driverProxy.RemoveSubscription(regID)
 
-			cc.subs[i] = cc.subs[len(cc.subs)-1]
-			cc.subs[len(cc.subs)-1] = nil
-			cc.subs = cc.subs[:len(cc.subs)-1]
+			cc.subs[i] = cc.subs[subcnt-1]
+			cc.subs[subcnt-1] = nil
+			subcnt--
 
 			for _, image := range images {
 				if cc.onUnavailableImageHandler != nil {
@@ -396,7 +398,7 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 			}
 		}
 	}
-
+	cc.subs = cc.subs[:subcnt]
 }
 
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
