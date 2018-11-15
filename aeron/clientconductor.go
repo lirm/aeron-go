@@ -157,6 +157,9 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	cc.pendingCloses = make(map[int64]chan bool)
 	cc.lingeringResources = make(chan lingerResourse, 1024)
 
+	cc.pubs = make([]*publicationStateDefn, 0)
+	cc.subs = make([]*subscriptionStateDefn, 0)
+
 	return cc
 }
 
