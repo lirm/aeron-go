@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/op/go-logging"
@@ -38,7 +39,7 @@ var ExamplesConfig = struct {
 
 var logger = logging.MustGetLogger("systests")
 
-func send(n int, pub *Publication) {
+func send(n int, pub *aeron.Publication) {
 	message := "this is a message"
 	srcBuffer := atomic.MakeBuffer(([]byte)(message))
 
@@ -55,7 +56,7 @@ func send(n int, pub *Publication) {
 	}
 }
 
-func receive(n int, sub *Subscription) {
+func receive(n int, sub *aeron.Subscription) {
 	counter := 0
 	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		logger.Debugf("    message: %s", string(buffer.GetBytesArray(offset, length)))
@@ -86,12 +87,12 @@ func receive(n int, sub *Subscription) {
 	}
 }
 
-func subAndSend(n int, a *Aeron, pub *Publication) {
+func subAndSend(n int, a *aeron.Aeron, pub *aeron.Publication) {
 	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
-	for !IsConnectedTo(sub, pub) {
+	for !aeron.IsConnectedTo(sub, pub) {
 		time.Sleep(time.Millisecond)
 	}
 
@@ -124,7 +125,7 @@ func logtest(flag bool) {
 func testAeronBasics() {
 	logger.Debug("Started TestAeronBasics")
 
-	a, err := Connect(NewContext())
+	a, err := aeron.Connect(aeron.NewContext())
 	if err != nil {
 		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
 	}
@@ -142,7 +143,7 @@ func testAeronBasics() {
 func testAeronSendMultipleMessages() {
 	logger.Debug("Started TestAeronSendMultipleMessages")
 
-	a, err := Connect(NewContext())
+	a, err := aeron.Connect(aeron.NewContext())
 	if err != nil {
 		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
 	}
@@ -155,7 +156,7 @@ func testAeronSendMultipleMessages() {
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
-	for !IsConnectedTo(sub, pub) {
+	for !aeron.IsConnectedTo(sub, pub) {
 		time.Sleep(time.Millisecond)
 	}
 
@@ -181,7 +182,7 @@ func testAeronSendMultiplePublications() {
 	//	}
 	//}()
 
-	a, err := Connect(NewContext())
+	a, err := aeron.Connect(aeron.NewContext())
 	if err != nil {
 		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
 	}
@@ -193,7 +194,7 @@ func testAeronSendMultiplePublications() {
 	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer sub.Close()
 
-	pubs := make([]*Publication, pubCount)
+	pubs := make([]*aeron.Publication, pubCount)
 
 	for i := 0; i < pubCount; i++ {
 		pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
@@ -202,7 +203,7 @@ func testAeronSendMultiplePublications() {
 		pubs[i] = pub
 
 		// This is basically a requirement since we need to wait
-		for !IsConnectedTo(sub, pub) {
+		for !aeron.IsConnectedTo(sub, pub) {
 			time.Sleep(time.Millisecond)
 		}
 	}
@@ -228,7 +229,7 @@ func testAeronSendMultiplePublications() {
 func testAeronResubscribe() {
 	logger.Debug("Started TestAeronResubscribe")
 
-	a, err := Connect(NewContext())
+	a, err := aeron.Connect(aeron.NewContext())
 	if err != nil {
 		logger.Fatal("Failed to connect to driver")
 	}
@@ -244,7 +245,7 @@ func testAeronResubscribe() {
 func testResubStress() {
 	logger.Debug("Started TestAeronResubscribe")
 
-	a, err := Connect(NewContext())
+	a, err := aeron.Connect(aeron.NewContext())
 	if err != nil {
 		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
 	}
@@ -261,8 +262,8 @@ func testResubStress() {
 func testAeronClose() {
 	logger.Debug("Started TestAeronClose")
 
-	ctx := NewContext().MediaDriverTimeout(time.Second * 5)
-	a, err := Connect(ctx)
+	ctx := aeron.NewContext().MediaDriverTimeout(time.Second * 5)
+	a, err := aeron.Connect(ctx)
 	if err != nil {
 		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
 	}
