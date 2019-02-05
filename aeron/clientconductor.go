@@ -19,17 +19,18 @@ package aeron
 import (
 	"errors"
 	"fmt"
+	"log"
+	"runtime"
+	"sync"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	ctr "github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/op/go-logging"
-	"log"
-	"runtime"
-	"sync"
-	"time"
+	logging "github.com/op/go-logging"
 )
 
 var RegistrationStatus = struct {
@@ -170,16 +171,20 @@ func (cc *ClientConductor) Close() error {
 	var err error
 	if cc.running.CompareAndSet(true, false) {
 		for _, pub := range cc.pubs {
-			err = pub.publication.Close()
-			if err != nil {
-				cc.errorHandler(err)
+			if pub.publication != nil {
+				err = pub.publication.Close()
+				if err != nil {
+					cc.errorHandler(err)
+				}
 			}
 		}
 
 		for _, sub := range cc.subs {
-			err = sub.subscription.Close()
-			if err != nil {
-				cc.errorHandler(err)
+			if sub.subscription != nil {
+				err = sub.subscription.Close()
+				if err != nil {
+					cc.errorHandler(err)
+				}
 			}
 		}
 	}
