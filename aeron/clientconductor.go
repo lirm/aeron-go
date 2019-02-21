@@ -167,6 +167,7 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 // Close will terminate the Run() goroutine body and close all active publications and subscription. Run() can
 // be restarted in a another goroutine.
 func (cc *ClientConductor) Close() error {
+	logger.Debugf("Closing ClientConductor")
 
 	var err error
 	if cc.running.CompareAndSet(true, false) {
@@ -189,6 +190,18 @@ func (cc *ClientConductor) Close() error {
 		}
 	}
 
+	timeoutDuration := 5 * time.Second
+	timeout := time.Now().Add(timeoutDuration)
+	for cc.running.Get() && time.Now().Before(timeout) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if cc.running.Get() {
+		msg := fmt.Sprintf("failed to stop conductor after %v", timeoutDuration)
+		logger.Warning(msg)
+		err = errors.New(msg)
+	}
+
+	logger.Debugf("Closed ClientConductor")
 	return err
 }
 
