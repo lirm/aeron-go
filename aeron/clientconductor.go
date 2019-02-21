@@ -124,8 +124,9 @@ type ClientConductor struct {
 	onUnavailableImageHandler UnavailableImageHandler
 	errorHandler              func(error)
 
-	running      atomic.Bool
-	driverActive atomic.Bool
+	running          atomic.Bool
+	conductorRunning atomic.Bool
+	driverActive     atomic.Bool
 
 	timeOfLastKeepalive             int64
 	timeOfLastCheckManagedResources int64
@@ -192,10 +193,10 @@ func (cc *ClientConductor) Close() error {
 
 	timeoutDuration := 5 * time.Second
 	timeout := time.Now().Add(timeoutDuration)
-	for cc.running.Get() && time.Now().Before(timeout) {
+	for cc.conductorRunning.Get() && time.Now().Before(timeout) {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if cc.running.Get() {
+	if cc.conductorRunning.Get() {
 		msg := fmt.Sprintf("failed to stop conductor after %v", timeoutDuration)
 		logger.Warning(msg)
 		err = errors.New(msg)
@@ -226,7 +227,7 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 		}
 	}()
 
-	cc.running.Set(true)
+	cc.conductorRunning.Set(true)
 	for cc.running.Get() {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
 		workCount += cc.onHeartbeatCheckTimeouts()
@@ -234,7 +235,8 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 		idleStrategy.Idle(workCount)
 	}
 
-	logger.Warning("Shutting down ClientConductor")
+	logger.Infof("ClientConductor done")
+	cc.conductorRunning.Set(false)
 }
 
 func (cc *ClientConductor) verifyDriverIsActive() {
