@@ -19,7 +19,7 @@ package driver
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/command"
-	"github.com/lirm/aeron-go/aeron/ringbuffer"
+	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
 )
 
 // Proxy is a media driver proxy class that is used to send commands
@@ -81,7 +81,7 @@ func (driver *Proxy) RemoveSubscription(registrationID int64) {
 		var message command.RemoveMessage
 		message.Wrap(buffer, 0)
 
-		message.CorrelationID.Set(driver.clientID)
+		message.ClientID.Set(driver.clientID)
 		message.CorrelationID.Set(correlationID)
 		message.RegistrationID.Set(registrationID)
 
@@ -130,7 +130,7 @@ func (driver *Proxy) RemovePublication(registrationID int64) {
 		var message command.RemoveMessage
 		message.Wrap(buffer, 0)
 
-		message.CorrelationID.Set(driver.clientID)
+		message.ClientID.Set(driver.clientID)
 		message.CorrelationID.Set(correlationID)
 		message.RegistrationID.Set(registrationID)
 
