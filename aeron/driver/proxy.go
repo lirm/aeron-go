@@ -104,7 +104,9 @@ func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
 
 		var message command.PublicationMessage
 		message.Wrap(buffer, 0)
-		message.ClientID.Set(driver.clientID)
+		// For some reason, setting ClientID causes publications to hang.
+		// I haven't gotten a chance to look at why.
+		// message.ClientID.Set(driver.clientID)
 		message.CorrelationID.Set(correlationID)
 		message.StreamID.Set(streamID)
 		message.Channel.Set(channel)
