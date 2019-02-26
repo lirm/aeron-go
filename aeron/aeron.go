@@ -15,13 +15,14 @@
 package aeron
 
 import (
+	"time"
+
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
-	"github.com/lirm/aeron-go/aeron/ringbuffer"
+	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"github.com/op/go-logging"
-	"time"
+	logging "github.com/op/go-logging"
 )
 
 // NewPublicationHandler is the handler type for new publication notification from the media driver
@@ -81,7 +82,7 @@ func Connect(ctx *Context) (*Aeron, error) {
 	aeron.conductor.onAvailableImageHandler = ctx.availableImageHandler
 	aeron.conductor.onUnavailableImageHandler = ctx.unavailableImageHandler
 
-	go aeron.conductor.Run(ctx.idleStrategy)
+	aeron.conductor.Start(ctx.idleStrategy)
 
 	return aeron, nil
 }

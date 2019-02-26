@@ -206,9 +206,14 @@ func (cc *ClientConductor) Close() error {
 	return err
 }
 
-// Run is the main execution loop of ClientConductor.
-func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
+// Start begins the main execution loop of ClientConductor on a goroutine.
+func (cc *ClientConductor) Start(idleStrategy idlestrategy.Idler) {
+	cc.running.Set(true)
+	go cc.run(idleStrategy)
+}
 
+// run is the main execution loop of ClientConductor.
+func (cc *ClientConductor) run(idleStrategy idlestrategy.Idler) {
 	now := time.Now().UnixNano()
 	cc.timeOfLastKeepalive = now
 	cc.timeOfLastCheckManagedResources = now
@@ -225,6 +230,8 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 			cc.errorHandler(errors.New(errStr))
 			cc.running.Set(false)
 		}
+		cc.conductorRunning.Set(false)
+		logger.Infof("ClientConductor done")
 	}()
 
 	cc.conductorRunning.Set(true)
@@ -234,9 +241,6 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 
 		idleStrategy.Idle(workCount)
 	}
-
-	logger.Infof("ClientConductor done")
-	cc.conductorRunning.Set(false)
 }
 
 func (cc *ClientConductor) verifyDriverIsActive() {
