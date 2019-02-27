@@ -41,6 +41,11 @@ func (driver *Proxy) TimeOfLastDriverKeepalive() int64 {
 	return driver.toDriverCommandBuffer.ConsumerHeartbeatTime()
 }
 
+// NextCorrelationID generates the next correlation id that is unique for the connected Media Driver.
+func (driver *Proxy) NextCorrelationID() int64 {
+	return driver.toDriverCommandBuffer.NextCorrelationID()
+}
+
 // AddSubscription sends driver command to add new subscription
 func (driver *Proxy) AddSubscription(channel string, streamID int32) int64 {
 

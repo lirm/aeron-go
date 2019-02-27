@@ -500,6 +500,20 @@ func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID i
 	logger.Warning("OnUnavailableCounter: Not supported yet")
 }
 
+func (cc *ClientConductor) OnClientTimeout(clientID int64) {
+	logger.Debugf("OnClientTimeout: clientID=%d", clientID)
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	errStr := fmt.Sprintf("OnClientTimeout for ClientID:%d", clientID)
+	logger.Error(errStr)
+	if cc.errorHandler != nil {
+		cc.errorHandler(errors.New(errStr))
+	}
+	cc.running.Set(false)
+}
+
 func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32) {
 	logger.Debugf("OnSubscriptionReady: correlationID=%d, channelStatusIndicatorID=%d",
 		correlationID, channelStatusIndicatorID)

@@ -144,3 +144,12 @@ func (aeron *Aeron) AddPublication(channel string, streamID int32) chan *Publica
 
 	return ch
 }
+
+// NextCorrelationID generates the next correlation id that is unique for the connected Media Driver.
+// This is useful generating correlation identifiers for pairing requests with responses in a clients own
+// application protocol.
+//
+// This method is thread safe and will work across processes that all use the same media driver.
+func (aeron *Aeron) NextCorrelationID() int64 {
+	return aeron.driverProxy.NextCorrelationID()
+}
