@@ -32,8 +32,13 @@ type Proxy struct {
 func (driver *Proxy) Init(buffer *rb.ManyToOne) *Proxy {
 	driver.toDriverCommandBuffer = buffer
 	driver.clientID = driver.toDriverCommandBuffer.NextCorrelationID()
-
+	logger.Infof("aeron clientID:%d", driver.clientID)
 	return driver
+}
+
+// ClientID returns the client ID for this connection to the driver.
+func (driver *Proxy) ClientID() int64 {
+	return driver.clientID
 }
 
 // TimeOfLastDriverKeepalive gets the time of the last keep alive update sent to media driver
