@@ -17,13 +17,15 @@ limitations under the License.
 package counters
 
 import (
+	"errors"
+	"fmt"
+
+	logging "github.com/op/go-logging"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/flyweight"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"github.com/op/go-logging"
-	"errors"
-	"fmt"
 )
 
 var logger = logging.MustGetLogger("counters")
