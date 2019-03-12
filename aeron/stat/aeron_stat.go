@@ -28,7 +28,7 @@ var ansiHome = "\u001b[H"
 
 func main() {
 	ctx := aeron.NewContext()
-	counterFile, _ := counters.MapFile(ctx.CncFileName())
+	counterFile, _, _ := counters.MapFile(ctx.CncFileName())
 
 	reader := counters.NewReader(counterFile.ValuesBuf.Get(), counterFile.MetaDataBuf.Get())
 

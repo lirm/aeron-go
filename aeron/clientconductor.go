@@ -157,6 +157,9 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 	cc.pendingCloses = make(map[int64]chan bool)
 	cc.lingeringResources = make(chan lingerResourse, 1024)
 
+	cc.pubs = make([]*publicationStateDefn, 0)
+	cc.subs = make([]*subscriptionStateDefn, 0)
+
 	return cc
 }
 
@@ -292,16 +295,17 @@ func (cc *ClientConductor) releasePublication(regID int64) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
+	pubcnt := len(cc.pubs)
 	for i, pub := range cc.pubs {
-		if pub.regID == regID {
+		if pub != nil && pub.regID == regID {
 			cc.driverProxy.RemovePublication(regID)
 
-			cc.pubs[i] = cc.pubs[len(cc.pubs)-1]
-			cc.pubs[len(cc.pubs)-1] = nil
-			cc.pubs = cc.pubs[:len(cc.pubs)-1]
+			cc.pubs[i] = cc.pubs[pubcnt-1]
+			cc.pubs[pubcnt-1] = nil
+			pubcnt--
 		}
 	}
-
+	cc.pubs = cc.pubs[:pubcnt]
 }
 
 // AddSubscription sends the add subscription command through the driver proxy
@@ -373,17 +377,18 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 
 	now := time.Now().UnixNano()
 
+	subcnt := len(cc.subs)
 	for i, sub := range cc.subs {
-		if sub.regID == regID {
+		if sub != nil && sub.regID == regID {
 			if logger.IsEnabledFor(logging.DEBUG) {
 				logger.Debugf("Removing subscription: %d; %v", regID, images)
 			}
 
 			cc.driverProxy.RemoveSubscription(regID)
 
-			cc.subs[i] = cc.subs[len(cc.subs)-1]
-			cc.subs[len(cc.subs)-1] = nil
-			cc.subs = cc.subs[:len(cc.subs)-1]
+			cc.subs[i] = cc.subs[subcnt-1]
+			cc.subs[subcnt-1] = nil
+			subcnt--
 
 			for _, image := range images {
 				if cc.onUnavailableImageHandler != nil {
@@ -393,7 +398,7 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 			}
 		}
 	}
-
+	cc.subs = cc.subs[:subcnt]
 }
 
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
@@ -433,24 +438,22 @@ func (cc *ClientConductor) OnNewExclusivePublication(streamID int32, sessionID i
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	log.Panic("OnNewExclusivePublication: Not supported yet")
+	for _, pubDef := range cc.pubs {
+		if pubDef.regID == regID {
+			pubDef.status = RegistrationStatus.RegisteredMediaDriver
+			pubDef.sessionID = sessionID
+			pubDef.posLimitCounterID = posLimitCounterID
+			pubDef.channelStatusIndicatorID = channelStatusIndicatorID
+			pubDef.buffers = logbuffer.Wrap(logFileName)
+			pubDef.origRegID = origRegID
 
-	//for _, pubDef := range cc.pubs {
-	//	if pubDef.regID == regID {
-	//		pubDef.status = RegistrationStatus.RegisteredMediaDriver
-	//		pubDef.sessionID = sessionID
-	//		pubDef.posLimitCounterID = posLimitCounterID
-	//		pubDef.channelStatusIndicatorID = channelStatusIndicatorID
-	//		pubDef.buffers = logbuffer.Wrap(logFileName)
-	//		pubDef.origRegID = origRegID
-	//
-	//		logger.Debugf("Updated publication: %v", pubDef)
-	//
-	//		if cc.onNewPublicationHandler != nil {
-	//			cc.onNewPublicationHandler(pubDef.channel, streamID, sessionID, regID)
-	//		}
-	//	}
-	//}
+			logger.Debugf("Updated publication: %v", pubDef)
+
+			if cc.onNewPublicationHandler != nil {
+				cc.onNewPublicationHandler(pubDef.channel, streamID, sessionID, regID)
+			}
+		}
+	}
 }
 
 func (cc *ClientConductor) OnAvailableCounter(correlationID int64, counterID int32) {
@@ -460,7 +463,7 @@ func (cc *ClientConductor) OnAvailableCounter(correlationID int64, counterID int
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	log.Panic("OnAvailableCounter: Not supported yet")
+	logger.Warning("OnAvailableCounter: Not supported yet")
 }
 
 func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID int32) {
@@ -470,7 +473,7 @@ func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID i
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	log.Panic("OnUnavailableCounter: Not supported yet")
+	logger.Warning("OnUnavailableCounter: Not supported yet")
 }
 
 func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32) {

@@ -17,12 +17,12 @@ limitations under the License.
 package term
 
 import (
+	"math"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/flyweight"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
-	"math"
-	"unsafe"
 )
 
 const (
@@ -49,7 +49,6 @@ type ReservedValueSupplier func(termBuffer *atomic.Buffer, termOffset int32, len
 type headerWriter struct {
 	sessionID int32
 	streamID  int32
-	buffer    atomic.Buffer
 }
 
 func (header *headerWriter) fill(defaultHdr *atomic.Buffer) {
@@ -60,16 +59,13 @@ func (header *headerWriter) fill(defaultHdr *atomic.Buffer) {
 func (header *headerWriter) write(termBuffer *atomic.Buffer, offset, length, termID int32) {
 	termBuffer.PutInt32Ordered(offset, -length)
 
-	headerPtr := uintptr(termBuffer.Ptr()) + uintptr(offset)
-	header.buffer.Wrap(unsafe.Pointer(headerPtr), logbuffer.DataFrameHeader.Length)
-
-	header.buffer.PutInt8(logbuffer.DataFrameHeader.VersionFieldOffset, logbuffer.DataFrameHeader.CurrentVersion)
-	header.buffer.PutUInt8(logbuffer.DataFrameHeader.FlagsFieldOffset, unfragmented)
-	header.buffer.PutUInt16(logbuffer.DataFrameHeader.TypeFieldOffset, logbuffer.DataFrameHeader.TypeData)
-	header.buffer.PutInt32(logbuffer.DataFrameHeader.TermOffsetFieldOffset, offset)
-	header.buffer.PutInt32(logbuffer.DataFrameHeader.SessionIDFieldOffset, header.sessionID)
-	header.buffer.PutInt32(logbuffer.DataFrameHeader.StreamIDFieldOffset, header.streamID)
-	header.buffer.PutInt32(logbuffer.DataFrameHeader.TermIDFieldOffset, termID)
+	termBuffer.PutInt8(offset+logbuffer.DataFrameHeader.VersionFieldOffset, logbuffer.DataFrameHeader.CurrentVersion)
+	termBuffer.PutUInt8(offset+logbuffer.DataFrameHeader.FlagsFieldOffset, unfragmented)
+	termBuffer.PutUInt16(offset+logbuffer.DataFrameHeader.TypeFieldOffset, logbuffer.DataFrameHeader.TypeData)
+	termBuffer.PutInt32(offset+logbuffer.DataFrameHeader.TermOffsetFieldOffset, offset)
+	termBuffer.PutInt32(offset+logbuffer.DataFrameHeader.SessionIDFieldOffset, header.sessionID)
+	termBuffer.PutInt32(offset+logbuffer.DataFrameHeader.StreamIDFieldOffset, header.streamID)
+	termBuffer.PutInt32(offset+logbuffer.DataFrameHeader.TermIDFieldOffset, termID)
 }
 
 // Appender type is the term writer
