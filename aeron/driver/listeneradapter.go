@@ -44,6 +44,8 @@ var Events = struct {
 	OnCounterReady int32
 	/** inform clients of removal of counter */
 	OnUnavailableCounter int32
+	/** inform clients of client timeout */
+	OnClientTimeout int32
 }{
 	0x0F01,
 	0x0F02,
@@ -54,6 +56,7 @@ var Events = struct {
 	0x0F07,
 	0x0F08,
 	0x0F09,
+	0x0F0A,
 }
 
 type SubscriberPosition struct {
@@ -203,6 +206,9 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			msg.Wrap(buffer, int(offset))
 
 			adapter.listener.OnUnavailableCounter(msg.correlationID.Get(), msg.counterID.Get())
+		case Events.OnClientTimeout:
+			logger.Infof("received ON_CLIENT_TIMEOUT")
+			// TODO Proper handling
 		default:
 			logger.Fatalf("received unhandled %d", msgTypeID)
 		}
