@@ -33,7 +33,7 @@ func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, 
 	capacity := termBuffer.Capacity()
 
 	var fragmentsRead int
-	for fragmentsRead < fragmentsLimit {
+	for fragmentsRead < fragmentsLimit && termOffset < capacity {
 		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
 		if frameLength <= 0 {
 			break
@@ -49,10 +49,6 @@ func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, 
 				frameLength-logbuffer.DataFrameHeader.Length, header)
 
 			fragmentsRead++
-		}
-
-		if termOffset >= capacity {
-			break
 		}
 	}
 
