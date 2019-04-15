@@ -17,10 +17,11 @@ limitations under the License.
 package broadcast
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/ringbuffer"
-	"github.com/lirm/aeron-go/aeron/util"
 	"log"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
+	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 var BufferDescriptor = struct {
