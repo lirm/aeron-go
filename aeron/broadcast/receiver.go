@@ -119,6 +119,8 @@ func (recv *Receiver) receiveNext() bool {
 		if rb.RecordDescriptor.PaddingMsgTypeID == recv.buffer.GetInt32(rb.TypeOffset(recordOffset)) {
 			recordOffset = 0
 			recv.cursor = recv.nextRecord
+			length := recv.buffer.GetInt32(rb.LengthOffset(recordOffset))
+			alignedLength := int64(util.AlignInt32(length, rb.RecordDescriptor.RecordAlignment))
 			recv.nextRecord += alignedLength
 		}
 
