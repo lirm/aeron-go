@@ -145,6 +145,28 @@ func (aeron *Aeron) AddPublication(channel string, streamID int32) chan *Publica
 	return ch
 }
 
+// AddExclusivePublication will add a new exclusive publication to the driver. If such publication already
+// exists within ClientConductor the same instance will be returned.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
+func (aeron *Aeron) AddExclusivePublication(channel string, streamID int32) chan *Publication {
+	ch := make(chan *Publication, 1)
+
+	regID := aeron.conductor.AddExclusivePublication(channel, streamID)
+	go func() {
+		publication := aeron.conductor.FindPublication(regID)
+		for publication == nil {
+			publication = aeron.conductor.FindPublication(regID)
+			if publication == nil {
+				aeron.context.idleStrategy.Idle(0)
+			}
+		}
+		ch <- publication
+		close(ch)
+	}()
+
+	return ch
+}
+
 // NextCorrelationID generates the next correlation id that is unique for the connected Media Driver.
 // This is useful generating correlation identifiers for pairing requests with responses in a clients own
 // application protocol.

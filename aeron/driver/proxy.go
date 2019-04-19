@@ -130,6 +130,33 @@ func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
 	return correlationID
 }
 
+// AddExclusivePublication sends driver command to add new publication
+func (driver *Proxy) AddExclusivePublication(channel string, streamID int32) int64 {
+
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.AddExclusivePublication: clientId=%d correlationId=%d",
+		driver.clientID, correlationID)
+
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
+
+		var message command.PublicationMessage
+		message.Wrap(buffer, 0)
+		message.ClientID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationID)
+		message.StreamID.Set(streamID)
+		message.Channel.Set(channel)
+
+		*length = message.Size()
+
+		return command.AddExclusivePublication
+	}
+
+	driver.writeCommandToDriver(filler)
+
+	return correlationID
+}
+
 // RemovePublication sends driver command to remove publication
 func (driver *Proxy) RemovePublication(registrationID int64) {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()

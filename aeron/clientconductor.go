@@ -276,6 +276,33 @@ func (cc *ClientConductor) AddPublication(channel string, streamID int32) int64 
 	return regID
 }
 
+// AddExclusivePublication sends the add publication command through the driver proxy
+func (cc *ClientConductor) AddExclusivePublication(channel string, streamID int32) int64 {
+	logger.Debugf("AddExclusivePublication: channel=%s, streamId=%d", channel, streamID)
+
+	cc.verifyDriverIsActive()
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	for _, pub := range cc.pubs {
+		if pub.streamID == streamID && pub.channel == channel {
+			return pub.regID
+		}
+	}
+
+	now := time.Now().UnixNano()
+
+	regID := cc.driverProxy.AddExclusivePublication(channel, streamID)
+
+	pubState := new(publicationStateDefn)
+	pubState.Init(channel, regID, streamID, now)
+
+	cc.pubs = append(cc.pubs, pubState)
+
+	return regID
+}
+
 func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 
 	cc.adminLock.Lock()
