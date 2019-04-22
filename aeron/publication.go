@@ -18,11 +18,12 @@ package aeron
 
 import (
 	"fmt"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/util"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 const (
@@ -83,8 +84,42 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	return pub
 }
 
+// ChannelStatusID returns the counter used to represent the channel status
+// for this publication.
 func (pub *Publication) ChannelStatusID() int32 {
 	return pub.channelStatusIndicatorID
+}
+
+// RegistrationID returns the registration id.
+func (pub *Publication) RegistrationID() int64 {
+	return pub.regID
+}
+
+// OriginalRegistrationID returns the original registration id.
+func (pub *Publication) OriginalRegistrationID() int64 {
+	return pub.originalRegID
+}
+
+// Channel returns the media address for delivery to the channel.
+func (pub *Publication) Channel() string {
+	return pub.channel
+}
+
+// StreamID returna Stream identity for scoping within the channel media address.
+func (pub *Publication) StreamID() int32 {
+	return pub.streamID
+}
+
+// SessionID returns the session id for this publication.
+func (pub *Publication) SessionID() int32 {
+	return pub.sessionID
+}
+
+// InitialTermID returns the initial term id assigned when this publication was
+// created. This can be used to determine how many terms have passed since
+// creation.
+func (pub *Publication) InitialTermID() int32 {
+	return pub.initialTermID
 }
 
 // IsConnected returns whether this publication is connected to the driver (not whether it has any Subscriptions)
@@ -95,6 +130,11 @@ func (pub *Publication) IsConnected() bool {
 // IsClosed returns whether this Publication has been closed
 func (pub *Publication) IsClosed() bool {
 	return pub.isClosed.Get()
+}
+
+// IsOriginal return true if this instance is the first added otherwise false.
+func (pub *Publication) IsOriginal() bool {
+	return pub.originalRegID == pub.regID
 }
 
 // Close will close this publication with the driver. This is a blocking call.

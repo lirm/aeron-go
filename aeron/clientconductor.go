@@ -322,6 +322,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 					publication.conductor = cc
 					publication.channel = pub.channel
 					publication.regID = regID
+					publication.originalRegID = pub.origRegID
 					publication.streamID = pub.streamID
 					publication.sessionID = pub.sessionID
 					publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
