@@ -175,3 +175,8 @@ func (aeron *Aeron) AddExclusivePublication(channel string, streamID int32) chan
 func (aeron *Aeron) NextCorrelationID() int64 {
 	return aeron.driverProxy.NextCorrelationID()
 }
+
+// ClientID returns the client identity that has been allocated for communicating with the media driver.
+func (aeron *Aeron) ClientID() int64 {
+	return aeron.driverProxy.ClientID()
+}
