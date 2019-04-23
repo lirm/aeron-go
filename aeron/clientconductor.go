@@ -595,14 +595,14 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 	}
 }
 
-func (cc *ClientConductor) OnUnavailableImage(streamID int32, corrID int64) {
-	logger.Debugf("OnUnavailableImage: streamID=%d, corrID=%d", streamID, corrID)
+func (cc *ClientConductor) OnUnavailableImage(corrID int64, subscriptionRegistrationID int64) {
+	logger.Debugf("OnUnavailableImage: corrID=%d subscriptionRegistrationID=%d", corrID, subscriptionRegistrationID)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	for _, sub := range cc.subs {
-		if sub.streamID == streamID {
+		if sub.regID == subscriptionRegistrationID {
 			if sub.subscription != nil {
 				image := sub.subscription.removeImage(corrID)
 				if cc.onUnavailableImageHandler != nil {
