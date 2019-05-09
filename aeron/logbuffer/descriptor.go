@@ -168,21 +168,26 @@ func TermID(rawTail int64) int32 {
 	return int32(rawTail >> 32)
 }
 
+func indexByTermCount(termCount int32) int32 {
+	return termCount % PartitionCount
+}
+
 func RotateLog(logMetaDataBuffer *LogBufferMetaData, currentTermCount int32, currentTermId int32) {
 	nextTermId := currentTermId + 1
 	nextTermCount := currentTermCount + 1
-	nextIndex := nextTermCount % PartitionCount
+	nextIndex := indexByTermCount(nextTermCount)
 	expectedTermId := nextTermId - PartitionCount
-
+	newRawTail := int64(nextTermId) * (int64(1) << 32)
 	tail := logMetaDataBuffer.TailCounter[nextIndex]
-	rawTail := tail.Get()
-	if expectedTermId == TermID(rawTail) {
-		for !tail.CAS(rawTail, int64(nextTermId)<<32) {
 
+	for {
+		rawTail := tail.Get()
+		if expectedTermId != TermID(rawTail) {
+			break
+		}
+		if tail.CAS(rawTail, newRawTail) {
+			break
 		}
 	}
-
-	// This should be CAS
-	// LogBufferDescriptor::casActiveTermCount(logMetaDataBuffer, currentTermCount, nextTermCount)
-	logMetaDataBuffer.ActiveTermCountOff.Set(nextTermCount)
+	logMetaDataBuffer.ActiveTermCountOff.CAS(currentTermCount, nextTermCount)
 }

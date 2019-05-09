@@ -50,6 +50,11 @@ func (fld *Int32Field) Set(value int32) {
 	*(*int32)(fld.offset) = value
 }
 
+func (fld *Int32Field) CAS(curValue, newValue int32) bool {
+	n := syncatomic.CompareAndSwapInt32((*int32)(fld.offset), curValue, newValue)
+	return n
+}
+
 // Int64Field is int64 field for flyweight
 type Int64Field struct {
 	offset unsafe.Pointer
