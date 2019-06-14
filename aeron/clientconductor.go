@@ -19,17 +19,18 @@ package aeron
 import (
 	"errors"
 	"fmt"
+	"log"
+	"runtime"
+	"sync"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	ctr "github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/op/go-logging"
-	"log"
-	"runtime"
-	"sync"
-	"time"
+	logging "github.com/op/go-logging"
 )
 
 var RegistrationStatus = struct {
@@ -123,8 +124,9 @@ type ClientConductor struct {
 	onUnavailableImageHandler UnavailableImageHandler
 	errorHandler              func(error)
 
-	running      atomic.Bool
-	driverActive atomic.Bool
+	running          atomic.Bool
+	conductorRunning atomic.Bool
+	driverActive     atomic.Bool
 
 	timeOfLastKeepalive             int64
 	timeOfLastCheckManagedResources int64
@@ -166,30 +168,52 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 // Close will terminate the Run() goroutine body and close all active publications and subscription. Run() can
 // be restarted in a another goroutine.
 func (cc *ClientConductor) Close() error {
+	logger.Debugf("Closing ClientConductor")
 
 	var err error
 	if cc.running.CompareAndSet(true, false) {
 		for _, pub := range cc.pubs {
-			err = pub.publication.Close()
-			if err != nil {
-				cc.errorHandler(err)
+			if pub.publication != nil {
+				err = pub.publication.Close()
+				if err != nil {
+					cc.errorHandler(err)
+				}
 			}
 		}
 
 		for _, sub := range cc.subs {
-			err = sub.subscription.Close()
-			if err != nil {
-				cc.errorHandler(err)
+			if sub.subscription != nil {
+				err = sub.subscription.Close()
+				if err != nil {
+					cc.errorHandler(err)
+				}
 			}
 		}
 	}
 
+	timeoutDuration := 5 * time.Second
+	timeout := time.Now().Add(timeoutDuration)
+	for cc.conductorRunning.Get() && time.Now().Before(timeout) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if cc.conductorRunning.Get() {
+		msg := fmt.Sprintf("failed to stop conductor after %v", timeoutDuration)
+		logger.Warning(msg)
+		err = errors.New(msg)
+	}
+
+	logger.Debugf("Closed ClientConductor")
 	return err
 }
 
-// Run is the main execution loop of ClientConductor.
-func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
+// Start begins the main execution loop of ClientConductor on a goroutine.
+func (cc *ClientConductor) Start(idleStrategy idlestrategy.Idler) {
+	cc.running.Set(true)
+	go cc.run(idleStrategy)
+}
 
+// run is the main execution loop of ClientConductor.
+func (cc *ClientConductor) run(idleStrategy idlestrategy.Idler) {
 	now := time.Now().UnixNano()
 	cc.timeOfLastKeepalive = now
 	cc.timeOfLastCheckManagedResources = now
@@ -206,17 +230,17 @@ func (cc *ClientConductor) Run(idleStrategy idlestrategy.Idler) {
 			cc.errorHandler(errors.New(errStr))
 			cc.running.Set(false)
 		}
+		cc.conductorRunning.Set(false)
+		logger.Infof("ClientConductor done")
 	}()
 
-	cc.running.Set(true)
+	cc.conductorRunning.Set(true)
 	for cc.running.Get() {
 		workCount := cc.driverListenerAdapter.ReceiveMessages()
 		workCount += cc.onHeartbeatCheckTimeouts()
 
 		idleStrategy.Idle(workCount)
 	}
-
-	logger.Warning("Shutting down ClientConductor")
 }
 
 func (cc *ClientConductor) verifyDriverIsActive() {
@@ -252,6 +276,33 @@ func (cc *ClientConductor) AddPublication(channel string, streamID int32) int64 
 	return regID
 }
 
+// AddExclusivePublication sends the add publication command through the driver proxy
+func (cc *ClientConductor) AddExclusivePublication(channel string, streamID int32) int64 {
+	logger.Debugf("AddExclusivePublication: channel=%s, streamId=%d", channel, streamID)
+
+	cc.verifyDriverIsActive()
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	for _, pub := range cc.pubs {
+		if pub.streamID == streamID && pub.channel == channel {
+			return pub.regID
+		}
+	}
+
+	now := time.Now().UnixNano()
+
+	regID := cc.driverProxy.AddExclusivePublication(channel, streamID)
+
+	pubState := new(publicationStateDefn)
+	pubState.Init(channel, regID, streamID, now)
+
+	cc.pubs = append(cc.pubs, pubState)
+
+	return regID
+}
+
 func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 
 	cc.adminLock.Lock()
@@ -271,6 +322,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 					publication.conductor = cc
 					publication.channel = pub.channel
 					publication.regID = regID
+					publication.originalRegID = pub.origRegID
 					publication.streamID = pub.streamID
 					publication.sessionID = pub.sessionID
 					publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
@@ -476,6 +528,22 @@ func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID i
 	logger.Warning("OnUnavailableCounter: Not supported yet")
 }
 
+func (cc *ClientConductor) OnClientTimeout(clientID int64) {
+	logger.Debugf("OnClientTimeout: clientID=%d", clientID)
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	if clientID == cc.driverProxy.ClientID() {
+		errStr := fmt.Sprintf("OnClientTimeout for ClientID:%d", clientID)
+		logger.Error(errStr)
+		if cc.errorHandler != nil {
+			cc.errorHandler(errors.New(errStr))
+		}
+		cc.running.Set(false)
+	}
+}
+
 func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32) {
 	logger.Debugf("OnSubscriptionReady: correlationID=%d, channelStatusIndicatorID=%d",
 		correlationID, channelStatusIndicatorID)
@@ -527,14 +595,14 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 	}
 }
 
-func (cc *ClientConductor) OnUnavailableImage(streamID int32, corrID int64) {
-	logger.Debugf("OnUnavailableImage: streamID=%d, corrID=%d", streamID, corrID)
+func (cc *ClientConductor) OnUnavailableImage(corrID int64, subscriptionRegistrationID int64) {
+	logger.Debugf("OnUnavailableImage: corrID=%d subscriptionRegistrationID=%d", corrID, subscriptionRegistrationID)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
 	for _, sub := range cc.subs {
-		if sub.streamID == streamID {
+		if sub.regID == subscriptionRegistrationID {
 			if sub.subscription != nil {
 				image := sub.subscription.removeImage(corrID)
 				if cc.onUnavailableImageHandler != nil {

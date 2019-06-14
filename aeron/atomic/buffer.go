@@ -17,12 +17,14 @@ limitations under the License.
 package atomic
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/util"
 	"log"
 	"reflect"
 	"sync/atomic"
 	"unsafe"
+
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 // Buffer is the equivalent of AtomicBuffer used by Aeron Java and C++ implementations. It provides
@@ -262,6 +264,18 @@ func (buf *Buffer) GetBytesArray(offset int32, length int32) []byte {
 	}
 
 	return bArr
+}
+
+// WriteBytes writes data from offset and length to the given dest buffer. This will
+// grow the buffer as needed.
+func (buf *Buffer) WriteBytes(dest *bytes.Buffer, offset int32, length int32) {
+	BoundsCheck(offset, length, buf.length)
+	// grow the buffer all at once to prevent additional allocations.
+	dest.Grow(int(length))
+	for ix := 0; ix < int(length); ix++ {
+		uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset) + uintptr(ix))
+		dest.WriteByte(*(*uint8)(uptr))
+	}
 }
 
 func (buf *Buffer) PutBytesArray(index int32, arr *[]byte, srcint32 int32, length int32) {

@@ -17,10 +17,11 @@ limitations under the License.
 package driver
 
 import (
+	logging "github.com/op/go-logging"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/command"
-	"github.com/op/go-logging"
 )
 
 var logger = logging.MustGetLogger("driver")
@@ -79,12 +80,13 @@ type Listener interface {
 		logFileName string, correlationID int64, registrationID int64)
 	OnAvailableImage(streamID int32, sessionID int32, logFilename string, sourceIdentity string,
 		subscriberPositionID int32, subsRegID int64, correlationID int64)
-	OnUnavailableImage(streamID int32, correlationID int64)
+	OnUnavailableImage(correlationID int64, subscriptionRegistrationID int64)
 	OnOperationSuccess(correlationID int64)
 	OnErrorResponse(offendingCommandCorrelationID int64, errorCode int32, errorMessage string)
 	OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32)
 	OnAvailableCounter(correlationID int64, counterID int32)
 	OnUnavailableCounter(correlationID int64, counterID int32)
+	OnClientTimeout(clientID int64)
 }
 
 type ListenerAdapter struct {
@@ -180,10 +182,10 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			var msg command.ImageMessage
 			msg.Wrap(buffer, int(offset))
 
-			streamID := msg.StreamID.Get()
 			correlationID := msg.CorrelationID.Get()
+			subscriptionRegistrationID := msg.SubscriptionRegistrationID.Get()
 
-			adapter.listener.OnUnavailableImage(streamID, correlationID)
+			adapter.listener.OnUnavailableImage(correlationID, subscriptionRegistrationID)
 		case Events.OnError:
 			logger.Debugf("received ON_ERROR")
 
@@ -207,8 +209,12 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 
 			adapter.listener.OnUnavailableCounter(msg.correlationID.Get(), msg.counterID.Get())
 		case Events.OnClientTimeout:
-			logger.Infof("received ON_CLIENT_TIMEOUT")
-			// TODO Proper handling
+			logger.Debugf("received ON_CLIENT_TIMEOUT")
+
+			var msg clientTimeout
+			msg.Wrap(buffer, int(offset))
+
+			adapter.listener.OnClientTimeout(msg.clientID.Get())
 		default:
 			logger.Fatalf("received unhandled %d", msgTypeID)
 		}

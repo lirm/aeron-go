@@ -225,3 +225,27 @@ func (m *counterUpdate) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight
 	m.SetSize(pos - offset)
 	return m
 }
+
+/**
+ * Indicate a client has timed out by the driver.
+ *
+ * 0                   1                   2                   3
+ * 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                         Client Id                             |
+ * |                                                               |
+ * +---------------------------------------------------------------+
+ */
+type clientTimeout struct {
+	flyweight.FWBase
+
+	clientID flyweight.Int64Field
+}
+
+func (m *clientTimeout) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.clientID.Wrap(buf, pos)
+
+	m.SetSize(pos - offset)
+	return m
+}

@@ -17,16 +17,18 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/examples"
-	"github.com/op/go-logging"
-	"log"
-	"time"
+	logging "github.com/op/go-logging"
 )
 
 var logger = logging.MustGetLogger("basic_subscriber")
@@ -56,10 +58,13 @@ func main() {
 	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
 
+	tmpBuf := &bytes.Buffer{}
 	counter := 1
 	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
-		fmt.Printf("%8.d: Gots me a fragment offset:%d length: %d payload: %s\n", counter, offset, length, string(bytes))
+		tmpBuf.Reset()
+		buffer.WriteBytes(tmpBuf, offset, length)
+		fmt.Printf("%8.d: Gots me a fragment offset:%d length: %d payload: %s (buf:%s)\n", counter, offset, length, string(bytes), string(tmpBuf.Next(int(length))))
 
 		counter++
 	}

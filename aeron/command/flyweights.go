@@ -40,14 +40,16 @@ func (m *CorrelatedMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 type ImageMessage struct {
 	flyweight.FWBase
 
-	CorrelationID flyweight.Int64Field
-	StreamID      flyweight.Int32Field
-	Channel       flyweight.StringField
+	CorrelationID              flyweight.Int64Field
+	SubscriptionRegistrationID flyweight.Int64Field
+	StreamID                   flyweight.Int32Field
+	Channel                    flyweight.StringField
 }
 
 func (m *ImageMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
 	pos := offset
 	pos += m.CorrelationID.Wrap(buf, pos)
+	pos += m.SubscriptionRegistrationID.Wrap(buf, pos)
 	pos += m.StreamID.Wrap(buf, pos)
 	pos += m.Channel.Wrap(buf, pos, m, true)
 

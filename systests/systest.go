@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"time"
 
+	logging "github.com/op/go-logging"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/op/go-logging"
 )
 
 var ExamplesConfig = struct {
@@ -148,6 +149,13 @@ func testAeronSendMultipleMessages() {
 		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
 	}
 	defer a.Close()
+
+	for i := 0; i < 3; i++ {
+		logger.Debugf("NextCorrelationID = %d", a.NextCorrelationID())
+	}
+	if a.NextCorrelationID() == 0 {
+		panic("invalid zero NextCorrelationID")
+	}
 
 	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer pub.Close()
