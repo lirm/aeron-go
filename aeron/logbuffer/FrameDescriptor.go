@@ -53,6 +53,10 @@ func typeOffset(frameOffset int32) int32 {
 	return frameOffset + DataFrameHeader.TypeFieldOffset
 }
 
+func reservedValueOffset(frameOffset int32) int32 {
+	return frameOffset + DataFrameHeader.ReservedValueFieldOffset
+}
+
 func GetFlags(logBuffer *atomic.Buffer, frameOffset int32) uint8 {
 	offset := flagsOffset(frameOffset)
 	return logBuffer.GetUInt8(offset)
@@ -76,6 +80,11 @@ func GetStreamId(logBuffer *atomic.Buffer, frameOffset int32) int32 {
 func GetFrameLength(logBuffer *atomic.Buffer, frameOffset int32) int32 {
 	offset := lengthOffset(frameOffset)
 	return logBuffer.GetInt32Volatile(offset)
+}
+
+func GetReservedValue(logBuffer *atomic.Buffer, frameOffset int32) int64 {
+	offset := reservedValueOffset(frameOffset)
+	return logBuffer.GetInt64Volatile(offset)
 }
 
 func SetFrameLength(logBuffer *atomic.Buffer, frameOffset int32, frameLength int32) {

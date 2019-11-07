@@ -126,6 +126,23 @@ func TestLogBuffers_BufferFail(t *testing.T) {
 	t.Fail()
 }
 
+func TestHeader_ReservedValue(t *testing.T) {
+	bytes := make([]byte, 1000)
+	buffer := atomic.MakeBuffer(bytes)
+	if buffer.Capacity() != 1000 {
+		t.Error("Buffer capacity should be 1000")
+	}
+	var header Header
+	header.Wrap(buffer.Ptr(), 1000)
+	if header.GetReservedValue() != 0 {
+		t.Error("Reserved value should be 0")
+	}
+	header.SetReservedValue(123)
+	if header.GetReservedValue() != 123 {
+		t.Error("Reserved value should be 123")
+	}
+}
+
 func TestLogBuffers_Meta(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
