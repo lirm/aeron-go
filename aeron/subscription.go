@@ -135,6 +135,23 @@ func (sub *Subscription) HasImages() bool {
 	return len(images) > 0
 }
 
+// ImageCount count of images associated with this subscription.
+func (sub *Subscription) ImageCount() int {
+	images := sub.images.Get()
+	return len(images)
+}
+
+// ImageBySessionId returns the associated with the given sessionId.
+func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
+	img := sub.images.Get()
+	for _, image := range img {
+		if image.sessionID == sessionID {
+			return &image
+		}
+	}
+	return nil
+}
+
 // IsConnectedTo is a helper function used primarily by tests, which is used within the same process to verify that
 // subscription is connected to a specific publication.
 func IsConnectedTo(sub *Subscription, pub *Publication) bool {

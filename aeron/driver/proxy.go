@@ -161,7 +161,8 @@ func (driver *Proxy) AddExclusivePublication(channel string, streamID int32) int
 func (driver *Proxy) RemovePublication(registrationID int64) {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
-	logger.Debugf("driver.RemovePublication: correlationId=%d (pudId=%d)", correlationID, registrationID)
+	logger.Debugf("driver.RemovePublication: clientId=%d correlationId=%d (regId=%d)",
+		driver.clientID, correlationID, registrationID)
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {
 

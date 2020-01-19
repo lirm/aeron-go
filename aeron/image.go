@@ -126,6 +126,11 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	return result
 }
 
+// Position returns the position this Image has been consumed to by the subscriber.
+func (image *Image) Position() int64 {
+	return image.subscriberPosition.get()
+}
+
 // Close the image and mappings. The image becomes unusable after closing.
 func (image *Image) Close() error {
 	var err error
