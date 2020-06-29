@@ -266,6 +266,16 @@ func (buf *Buffer) GetBytesArray(offset int32, length int32) []byte {
 	return bArr
 }
 
+func (buf *Buffer) GetBytes(offset int32, b []byte) {
+	length := len(b)
+	BoundsCheck(offset, int32(length), buf.length)
+
+	for ix := 0; ix < length; ix++ {
+		uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset) + uintptr(ix))
+		b[ix] = *(*uint8)(uptr)
+	}
+}
+
 // WriteBytes writes data from offset and length to the given dest buffer. This will
 // grow the buffer as needed.
 func (buf *Buffer) WriteBytes(dest *bytes.Buffer, offset int32, length int32) {
