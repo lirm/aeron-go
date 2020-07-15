@@ -45,7 +45,7 @@ type Context struct {
 func NewContext() *Context {
 	ctx := new(Context)
 
-	ctx.aeronDir = DefaultAeronDir
+	ctx.aeronDir = DefaultAeronDir + "/aeron-" + UserName
 
 	ctx.errorHandler = func(err error) { logger.Error(err) }
 
@@ -113,5 +113,5 @@ func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
 
 // CncFileName returns the name of the Counters file
 func (ctx *Context) CncFileName() string {
-	return ctx.aeronDir + "/aeron-" + UserName + "/" + counters.CncFile
+	return ctx.aeronDir + "/" + counters.CncFile
 }
