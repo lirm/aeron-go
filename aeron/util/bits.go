@@ -41,7 +41,7 @@ func AlignInt32(value, alignment int32) int32 {
 }
 
 // NumberOfTrailingZeroes is HD recipe for determining the number of leading zeros on 32 bit integer
-func NumberOfTrailingZeroes(value int32) uint8 {
+func NumberOfTrailingZeroes(value uint32) uint8 {
 	table := [32]uint8{
 		0, 1, 2, 24, 3, 19, 6, 25,
 		22, 4, 20, 10, 16, 7, 12, 26,

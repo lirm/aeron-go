@@ -18,6 +18,7 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -79,6 +80,21 @@ func prepareCnc(t *testing.T) (string, *counters.MetaDataFlyweight) {
 	t.Logf("meta data: %v", meta)
 
 	return counterFileName, &meta
+}
+
+func TestNumberOfZeros(t *testing.T) {
+	if x := util.NumberOfTrailingZeroes(65536); x != 16 {
+		t.Logf("trailing zeroes: %d", x)
+		t.Fail()
+	}
+	if x := util.NumberOfTrailingZeroes(131072); x != 17 {
+		t.Logf("trailing zeroes: %d", x)
+		t.Fail()
+	}
+	if x := util.NumberOfTrailingZeroes(4194304); x != 22 {
+		t.Logf("trailing zeroes: %d", x)
+		t.Fail()
+	}
 }
 
 func TestNewPublication(t *testing.T) {

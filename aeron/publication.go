@@ -70,7 +70,7 @@ func NewPublication(logBuffers *logbuffer.LogBuffers) *Publication {
 	pub.initialTermID = pub.metaData.InitTermID.Get()
 	pub.maxPayloadLength = pub.metaData.MTULen.Get() - logbuffer.DataFrameHeader.Length
 	pub.maxMessageLength = logbuffer.ComputeMaxMessageLength(termBufferCapacity)
-	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(termBufferCapacity))
+	pub.positionBitsToShift = int32(util.NumberOfTrailingZeroes(uint32(termBufferCapacity)))
 	pub.maxPossiblePosition = int64(termBufferCapacity) * (1 << 31)
 
 	pub.isClosed.Set(false)
