@@ -32,7 +32,7 @@ var logger = logging.MustGetLogger("counters")
 
 const (
 	CncFile                 = "cnc.dat"
-	CurrentCncVersion int32 = 512
+	CurrentCncVersion int32 = 512 // util.SemanticVersionCompose(0, 2, 0)
 )
 
 /**
@@ -55,7 +55,7 @@ const (
  *  +-----------------------------+
  * </pre>
  * <p>
- * Meta Data Layout (CnC Version 7)
+ * Meta Data Layout (CnC Version 0.2.0 => 512)
  * <pre>
  *   0                   1                   2                   3
  *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -75,19 +75,29 @@ const (
  *  |                   Client Liveness Timeout                     |
  *  |                                                               |
  *  +---------------------------------------------------------------+
+ *  |                    Driver Start Timestamp                     |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
+ *  |                         Driver PID                            |
+ *  |                                                               |
+ *  +---------------------------------------------------------------+
  * </pre>
+ *
+ * See also <a href="https://github.com/real-logic/aeron/blob/master/aeron-client/src/main/cpp/CncFileDescriptor.h">CncFileDescriptor.h</a>.
  */
 type MetaDataFlyweight struct {
 	flyweight.FWBase
 
 	CncVersion flyweight.Int32Field
 
-	ToDriverBufLen   flyweight.Int32Field
-	ToClientBufLen   flyweight.Int32Field
-	metadataBuLen    flyweight.Int32Field
-	valuesBufLen     flyweight.Int32Field
-	errorLogLen      flyweight.Int32Field
-	ClientLivenessTo flyweight.Int64Field
+	ToDriverBufLen       flyweight.Int32Field
+	ToClientBufLen       flyweight.Int32Field
+	metadataBuLen        flyweight.Int32Field
+	valuesBufLen         flyweight.Int32Field
+	errorLogLen          flyweight.Int32Field
+	ClientLivenessTo     flyweight.Int64Field
+	DriverStartTimestamp flyweight.Int64Field
+	DriverPid            flyweight.Int64Field
 
 	ToDriverBuf  flyweight.RawDataField
 	ToClientsBuf flyweight.RawDataField
@@ -105,6 +115,8 @@ func (m *MetaDataFlyweight) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	pos += m.valuesBufLen.Wrap(buf, pos)
 	pos += m.errorLogLen.Wrap(buf, pos)
 	pos += m.ClientLivenessTo.Wrap(buf, pos)
+	pos += m.DriverStartTimestamp.Wrap(buf, pos)
+	pos += m.DriverPid.Wrap(buf, pos)
 
 	pos = int(util.AlignInt32(int32(pos), util.CacheLineLength*2))
 
