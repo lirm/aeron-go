@@ -129,6 +129,11 @@ func (sub *Subscription) removeImage(correlationID int64) *Image {
 	return nil
 }
 
+// RegistrationID returns the registration id.
+func (sub *Subscription) RegistrationID() int64 {
+	return sub.registrationID
+}
+
 // HasImages is a helper method checking whether this subscription has any images associated with it.
 func (sub *Subscription) HasImages() bool {
 	images := sub.images.Get()
