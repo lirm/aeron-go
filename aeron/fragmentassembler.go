@@ -25,15 +25,16 @@ import (
 )
 
 const (
-	DefaultFragmentAssemblyBufferLength = int32(0)
+	DefaultFragmentAssemblyBufferLength = int32(4096)
 
 	beginFrag    uint8 = 0x80
 	endFrag      uint8 = 0x40
 	unfragmented uint8 = 0x80 | 0x40
 )
 
-// FragmentAssember that sits in a chain-of-responsibility pattern that reassembles fragmented messages
+// FragmentAssembler that sits in a chain-of-responsibility pattern that reassembles fragmented messages
 // so that the next handler in the chain only sees whole messages.
+//
 // Unfragmented messages are delegated without copy. Fragmented messages are copied to a temporary
 // buffer for reassembly before delegation.
 //
@@ -56,30 +57,30 @@ func NewFragmentAssembler(delegate term.FragmentHandler, initialBufferLength int
 }
 
 // OnFragment reassembles and forwards whole messages to the delegate.
-func (self *FragmentAssembler) OnFragment(
+func (f *FragmentAssembler) OnFragment(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
 	header *logbuffer.Header) {
 	flags := header.Flags()
 	if (flags & unfragmented) == unfragmented {
-		self.delegate(buffer, offset, length, header)
+		f.delegate(buffer, offset, length, header)
 	} else {
 		if (flags & beginFrag) == beginFrag {
-			builder, ok := self.builderBySessionIdMap[header.SessionId()]
+			builder, ok := f.builderBySessionIdMap[header.SessionId()]
 			if !ok {
 				builder = &bytes.Buffer{}
-				self.builderBySessionIdMap[header.SessionId()] = builder
+				f.builderBySessionIdMap[header.SessionId()] = builder
 			}
 			builder.Reset()
 			buffer.WriteBytes(builder, offset, length)
 		} else {
-			builder, ok := self.builderBySessionIdMap[header.SessionId()]
+			builder, ok := f.builderBySessionIdMap[header.SessionId()]
 			if ok && builder.Len() != 0 {
 				buffer.WriteBytes(builder, offset, length)
 				if (flags & endFrag) == endFrag {
 					msgLength := builder.Len()
-					self.delegate(
+					f.delegate(
 						atomic.MakeBuffer(builder.Bytes(), msgLength),
 						int32(0),
 						int32(msgLength),
