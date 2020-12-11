@@ -85,9 +85,9 @@ Send the message, by calling `publication.Offer`
 ```go
 ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
 switch ret {
-case aeron.NOT_CONNECTED:
+case aeron.NotConnected:
     log.Print("not connected yet")
-case aeron.BACK_PRESSURED:
+case aeron.BackPressured:
     log.Print("back pressured")
 default:
     if ret < 0 {
