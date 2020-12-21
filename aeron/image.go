@@ -25,10 +25,6 @@ import (
 
 type ControlledPollFragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
 
-const (
-	ImageClosed int = -1
-)
-
 var ControlledPollAction = struct {
 	/**
 	 * Abort the current polling operation and do not advance the position for this fragment.
@@ -59,23 +55,22 @@ var ControlledPollAction = struct {
 }
 
 type Image struct {
-	termBuffers [logbuffer.PartitionCount]*atomic.Buffer
-	header      logbuffer.Header
-
+	sourceIdentity     string
+	logBuffers         *logbuffer.LogBuffers
+	exceptionHandler   func(error)
+	termBuffers        [logbuffer.PartitionCount]*atomic.Buffer
 	subscriberPosition Position
+	header             logbuffer.Header
+	isClosed           atomic.Bool
+	isEos              bool
 
-	logBuffers *logbuffer.LogBuffers
-
-	sourceIdentity string
-	isClosed       atomic.Bool
-
-	exceptionHandler func(error)
-
-	correlationID              int64
-	subscriptionRegistrationID int64
-	sessionID                  int32
 	termLengthMask             int32
 	positionBitsToShift        uint8
+	sessionID                  int32
+	joinPosition               int64
+	finalPosition              int64
+	subscriptionRegistrationID int64
+	correlationID              int64
 }
 
 // NewImage wraps around provided LogBuffers setting up the structures for polling
@@ -91,7 +86,7 @@ func NewImage(sessionID int32, correlationID int64, logBuffers *logbuffer.LogBuf
 	}
 	capacity := logBuffers.Buffer(0).Capacity()
 	image.termLengthMask = capacity - 1
-	image.positionBitsToShift = util.NumberOfTrailingZeroes(capacity)
+	image.positionBitsToShift = util.NumberOfTrailingZeroes(uint32(capacity))
 	image.header.SetInitialTermID(logBuffers.Meta().InitTermID.Get())
 	image.header.SetPositionBitsToShift(int32(image.positionBitsToShift))
 	image.isClosed.Set(false)
@@ -105,31 +100,62 @@ func (image *Image) IsClosed() bool {
 }
 
 func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
-
-	result := ImageClosed
-
-	if !image.IsClosed() {
-		position := image.subscriberPosition.get()
-		termOffset := int32(position) & image.termLengthMask
-		index := indexByPosition(position, image.positionBitsToShift)
-		termBuffer := image.termBuffers[index]
-
-		var offset int32
-		offset, result = term.Read(termBuffer, termOffset, handler, fragmentLimit, &image.header)
-
-		newPosition := position + int64(offset-termOffset)
-		if newPosition > position {
-			image.subscriberPosition.set(newPosition)
-		}
+	if image.IsClosed() {
+		return 0
 	}
 
+	position := image.subscriberPosition.get()
+	termOffset := int32(position) & image.termLengthMask
+	index := indexByPosition(position, image.positionBitsToShift)
+	termBuffer := image.termBuffers[index]
+
+	offset, result := term.Read(termBuffer, termOffset, handler, fragmentLimit, &image.header)
+
+	newPosition := position + int64(offset-termOffset)
+	if newPosition > position {
+		image.subscriberPosition.set(newPosition)
+	}
 	return result
+}
+
+// Position returns the position this Image has been consumed to by the subscriber.
+func (image *Image) Position() int64 {
+	if image.IsClosed() {
+		return image.finalPosition
+	}
+	return image.subscriberPosition.get()
+}
+
+// IsEndOfStream returns if the current consumed position at the end of the stream?
+func (image *Image) IsEndOfStream() bool {
+	if image.IsClosed() {
+		return image.isEos
+	}
+	return image.subscriberPosition.get() >= image.logBuffers.Meta().EndOfStreamPosOff.Get()
+}
+
+// SessionID returns the sessionId for the steam of messages.
+func (image *Image) SessionID() int32 {
+	return image.sessionID
+}
+
+// CorrelationID returns the correlationId for identification of the image with the media driver.
+func (image *Image) CorrelationID() int64 {
+	return image.correlationID
+}
+
+// SubscriptionRegistrationID returns the registrationId for the Subscription of the Image.
+func (image *Image) SubscriptionRegistrationID() int64 {
+	return image.subscriptionRegistrationID
 }
 
 // Close the image and mappings. The image becomes unusable after closing.
 func (image *Image) Close() error {
 	var err error
 	if image.isClosed.CompareAndSet(false, true) {
+		image.finalPosition = image.subscriberPosition.get()
+		image.isEos = image.finalPosition >=
+			image.logBuffers.Meta().EndOfStreamPosOff.Get()
 		logger.Debugf("Closing %v", image)
 		err = image.logBuffers.Close()
 	}

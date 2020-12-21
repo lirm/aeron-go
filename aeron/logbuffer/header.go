@@ -66,6 +66,10 @@ func (hdr *Header) StreamId() int32 {
 	return GetStreamId(&hdr.buffer, hdr.offset)
 }
 
+func (hdr *Header) GetReservedValue() int64 {
+	return GetReservedValue(&hdr.buffer, hdr.offset)
+}
+
 func (hdr *Header) SetOffset(offset int32) *Header {
 	hdr.offset = offset
 	return hdr
@@ -82,6 +86,11 @@ func (hdr *Header) SetInitialTermID(initialTermID int32) *Header {
 
 func (hdr *Header) SetPositionBitsToShift(positionBitsToShift int32) *Header {
 	hdr.positionBitsToShift = positionBitsToShift
+	return hdr
+}
+
+func (hdr *Header) SetReservedValue(reservedValue int64) *Header {
+	hdr.buffer.PutInt64(reservedValueOffset(hdr.offset), reservedValue)
 	return hdr
 }
 

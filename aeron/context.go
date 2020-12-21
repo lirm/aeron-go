@@ -17,9 +17,10 @@ limitations under the License.
 package aeron
 
 import (
+	"time"
+
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	"time"
 )
 
 // Context configuration options are located here https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
@@ -114,4 +115,11 @@ func (ctx *Context) UnavailableImageHandler(handler func(*Image)) *Context {
 // CncFileName returns the name of the Counters file
 func (ctx *Context) CncFileName() string {
 	return ctx.aeronDir + "/" + counters.CncFile
+}
+
+// IdleStrategy provides an IdleStrategy for the thread responsible for communicating
+// with the Aeron Media Driver.
+func (ctx *Context) IdleStrategy(idleStrategy idlestrategy.Idler) *Context {
+	ctx.idleStrategy = idleStrategy
+	return ctx
 }
