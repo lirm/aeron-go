@@ -54,11 +54,6 @@ func (sub *Subscription) Channel() string {
 	return sub.channel
 }
 
-// RegistrationID returns the registration id.
-func (sub *Subscription) RegistrationID() int64 {
-	return sub.registrationID
-}
-
 // StreamID returns Stream identity for scoping within the channel media address.
 func (sub *Subscription) StreamID() int32 {
 	return sub.streamID
