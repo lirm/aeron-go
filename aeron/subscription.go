@@ -49,6 +49,16 @@ func NewSubscription(conductor *ClientConductor, channel string, registrationID 
 	return sub
 }
 
+// Channel returns the media address for delivery to the channel.
+func (sub *Subscription) Channel() string {
+	return sub.channel
+}
+
+// StreamID returns Stream identity for scoping within the channel media address.
+func (sub *Subscription) StreamID() int32 {
+	return sub.streamID
+}
+
 // IsClosed returns whether this subscription has been closed.
 func (sub *Subscription) IsClosed() bool {
 	return sub.isClosed.Get()

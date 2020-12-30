@@ -105,7 +105,7 @@ func (pub *Publication) Channel() string {
 	return pub.channel
 }
 
-// StreamID returna Stream identity for scoping within the channel media address.
+// StreamID returns Stream identity for scoping within the channel media address.
 func (pub *Publication) StreamID() int32 {
 	return pub.streamID
 }
@@ -151,7 +151,7 @@ func (pub *Publication) Close() error {
 func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
 
 	newPosition := PublicationClosed
-	
+
 	if reservedValueSupplier == nil {
 		reservedValueSupplier = term.DefaultReservedValueSupplier
 	}
