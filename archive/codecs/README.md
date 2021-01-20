@@ -15,3 +15,6 @@ needs to be done as it needs to know the locations of the additional
 tools of simple-binary-encoding and agrona.
 
 The current versions were built using `SBE-1.20.4` and `Agrona-1.9.0`.
+
+Should the protocol version change you will need to update the
+semantic version in [semanticversion.go](./semanticversion.go)
