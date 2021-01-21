@@ -100,6 +100,18 @@ func (ctx *Context) PublicationConnectionTimeout(to time.Duration) *Context {
 	return ctx
 }
 
+// newSubscriptionHandler sets an optional callback for new subscriptions
+func (ctx *Context) NewSubscriptionHandler(handler func(string, int32, int64)) *Context {
+	ctx.newSubscriptionHandler = handler
+	return ctx
+}
+
+// newPublicationHandler sets an optional callback for new publications
+func (ctx *Context) NewPublicationHandler(handler func(string, int32, int32, int64)) *Context {
+	ctx.newPublicationHandler = handler
+	return ctx
+}
+
 // AvailableImageHandler sets an optional callback for available image notifications
 func (ctx *Context) AvailableImageHandler(handler func(*Image)) *Context {
 	ctx.availableImageHandler = handler

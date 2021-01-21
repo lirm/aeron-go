@@ -81,6 +81,8 @@ func Connect(ctx *Context) (*Aeron, error) {
 
 	aeron.conductor.onAvailableImageHandler = ctx.availableImageHandler
 	aeron.conductor.onUnavailableImageHandler = ctx.unavailableImageHandler
+	aeron.conductor.onNewPublicationHandler = ctx.newPublicationHandler
+	aeron.conductor.onNewSubscriptionHandler = ctx.newSubscriptionHandler
 
 	aeron.conductor.Start(ctx.idleStrategy)
 
