@@ -46,7 +46,7 @@ func (archive *Archive) StartRecordingRequestPacket(channel string, stream int32
 	return buffer, nil
 }
 
-// Create and marshal a connext request
+// Create and marshal a connect request
 func (archive *Archive) ConnectRequestPacket(responseChannel string, responseStream int32) (*bytes.Buffer, error) {
 	var request codecs.ConnectRequest
 
