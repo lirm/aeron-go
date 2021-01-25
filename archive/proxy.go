@@ -91,7 +91,7 @@ func (proxy *Proxy) StartRecordingRequest(channel string, stream int32, correlat
 	}
 
 	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
-		return fmt.Errorf("Publication.Offer failed: %d")
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
 	}
 
 	return nil
@@ -107,7 +107,7 @@ func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32,
 	}
 
 	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
-		return fmt.Errorf("Publication.Offer failed: %d")
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
 	}
 
 	return nil
