@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package codecs
+package archive
 
-import ()
-
-// Arguably the codecs should generate this for you
 func SemanticVersion() int32 {
-	major := int32(5)
-	minor := int32(2)
+	major := int32(1)
+	minor := int32(5)
 	patch := int32(0)
 
 	return (major << 16) + (minor << 8) + patch
