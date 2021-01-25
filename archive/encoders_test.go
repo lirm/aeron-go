@@ -19,8 +19,8 @@ import (
 	"testing"
 )
 
-var channel = *TestConfig.Channel
-var stream = int32(*TestConfig.Stream)
+var channel = *TestConfig.RequestChannel
+var stream = int32(*TestConfig.RequestStream)
 
 // Execute all the encoders as a sanity check
 func TestEncoders(t *testing.T) {
@@ -29,7 +29,7 @@ func TestEncoders(t *testing.T) {
 		t.Log("ConnectRequestPacket() failed")
 		t.Fail()
 	}
-	if len(packet) != 62 {
+	if len(packet) != 61 { // Look for unexepected change
 		t.Logf("ConnectRequestPacket failed length check: %d", len(packet))
 		t.Fail()
 	}
@@ -39,7 +39,7 @@ func TestEncoders(t *testing.T) {
 		t.Log("StartRecordingRequestPacket() failed")
 		t.Fail()
 	}
-	if len(packet) != 70 {
+	if len(packet) != 69 { // Look for unexepected change
 		t.Logf("StartRecordingRequestPacket() failed length check: %d", len(packet))
 		t.Fail()
 	}
