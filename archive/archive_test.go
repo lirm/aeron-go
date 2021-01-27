@@ -34,14 +34,16 @@ func init() {
 // This should always pass
 func TestConnection(t *testing.T) {
 	if archive == nil {
-		t.Log("Skipping test connection")
+		t.Log("Skipping as not connected to archive-media-driver ")
+		return
 	}
 }
 
 // Test adding a recording
 func TestRecordedPublication(t *testing.T) {
 	if archive == nil {
-		t.Log("Skipping test connection")
+		t.Log("Skipping as not connected to archive-media-driver ")
+		return
 	}
 
 	time.Sleep(time.Second) // FIXME: delay
