@@ -83,7 +83,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	control.StartControlSubscriptionPoller()
 
 	// Create the publication half and the proxy that looks after sending requests on that
-	control.Publication = <-archive.aeron.AddPublication(control.RequestChannel, control.RequestStream)
+	control.Publication = <-archive.aeron.AddExclusivePublication(control.RequestChannel, control.RequestStream)
 	logger.Debugf("Control request publication: %#v", control.Publication)
 	archive.proxy = NewProxy(control.Publication, context.IdleStrategy, control.SessionID)
 
@@ -97,7 +97,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	correlationID := <-ID64
 	correlations[correlationID] = control // Add it to our map so we can find it
 	if err := archive.proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationID); err != nil {
-		logger.Error("ConnectRequest failed: %s\n", err)
+		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}
 	// Wait for the response
