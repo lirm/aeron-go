@@ -26,21 +26,23 @@ import (
 
 // Proxy class for encapsulating encoding and sending of control protocol messages to an archive
 type Proxy struct {
-	Publication  aeron.Publication
+	Publication  *aeron.Publication
 	Marshaller   *codecs.SbeGoMarshaller
+	SessionID    int64
 	IdleStrategy idlestrategy.Idler
 	Timeout      time.Duration
 	Retries      int
 }
 
 // Create a proxy with default settings
-func NewProxy(publication aeron.Publication, idleStrategy idlestrategy.Idler) *Proxy {
+func NewProxy(publication *aeron.Publication, idleStrategy idlestrategy.Idler, sessionID int64) *Proxy {
 	proxy := new(Proxy)
 	proxy.Publication = publication
 	proxy.IdleStrategy = idleStrategy
 	proxy.Marshaller = codecs.NewSbeGoMarshaller()
-	proxy.Timeout = defaults.ControlTimeout
-	proxy.Retries = defaults.ControlRetries
+	proxy.Timeout = ArchiveDefaults.ControlTimeout
+	proxy.Retries = ArchiveDefaults.ControlRetries
+	proxy.SessionID = sessionID
 
 	return proxy
 }
@@ -82,10 +84,11 @@ func (proxy *Proxy) Offer(buf bytes.Buffer) int64 {
 
 }
 
-// Start a Recorded Publication
-func (proxy *Proxy) StartRecordingRequest(channel string, stream int32, correlationID int64, sourceLocation codecs.SourceLocationEnum) error {
+// Make a Connect Request
+func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32, correlationID int64) error {
 
-	bytes, err := StartRecordingRequestPacket(channel, stream, correlationID, sourceLocation)
+	// Create a packet and send it
+	bytes, err := ConnectRequestPacket(responseChannel, responseStream, correlationID)
 	if err != nil {
 		return err
 	}
@@ -97,11 +100,10 @@ func (proxy *Proxy) StartRecordingRequest(channel string, stream int32, correlat
 	return nil
 }
 
-// Make a Connect Request
-func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32, correlationID int64) error {
+// Start a Recorded Publication
+func (proxy *Proxy) StartRecordingRequest(channel string, stream int32, correlationID int64, sourceLocation codecs.SourceLocationEnum) error {
 
-	// Create a packet and send it
-	bytes, err := ConnectRequestPacket(responseChannel, responseStream, correlationID)
+	bytes, err := StartRecordingRequestPacket(channel, stream, correlationID, sourceLocation)
 	if err != nil {
 		return err
 	}

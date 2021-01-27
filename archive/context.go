@@ -28,10 +28,6 @@ type ArchiveResponseHandler func(string, int32, int32, int64)
 type ArchiveContext struct {
 	aeron                   *aeron.Aeron
 	aeronContext            *aeron.Context
-	ResponseChannel         string
-	ResponseStream          int32
-	RequestChannel          string
-	RequestStream           int32
 	ResponseHandler         ArchiveResponseHandler
 	RecordingEventsChannel  string
 	RecordingEventsStreamID int32
@@ -57,14 +53,6 @@ func NewArchiveContext() *ArchiveContext {
 	// Archive specific additional context
 	// FIXME: Add methods to set all of these and make a suitable place for the defaults
 	// FIXME: Java/C++ try and work out a response channel
-
-	// For subscription
-	context.ResponseChannel = "aeron:udp?endpoint=localhost:8020"
-	context.ResponseStream = 20
-
-	// For publication
-	context.RequestChannel = "aeron:udp?endpoint=localhost:8010"
-	context.RequestStream = 10
 
 	context.ResponseHandler = func(string, int32, int32, int64) {}
 

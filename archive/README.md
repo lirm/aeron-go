@@ -16,20 +16,23 @@ The library should be fully reentrant.
 Questions
 ===
 
-Can we assume a 1-1 mapping of archive instance to Control pair?
+Can we assume a 1-1 mapping of archive instance to Control pair? I'm assuming not.
 
 Sync APIs built on top of Async via channel design choice?
 
 Testing:
- * Look for local archive and exec? Test and not run for Travis?
+ * Look for local archive and exec? Test and not run for Travis? Mock? Add jars to repo and fetch?
 
-Reentrancy choices (e.g.,
+
 
 Backlog
 ===
-37 FIXMEs
+Known bugs:
+ * Duplicate connection controlresponse
 
-SessionID and CorrelationID
+29 FIXMEs
+
+CorrelationID
 
 Simplest straight line basic recorded publisher and basic subscriber
 

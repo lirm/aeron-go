@@ -16,6 +16,7 @@ package archive
 
 import (
 	"testing"
+	"time"
 )
 
 // Rather than mock or spawn an archive-media-driver we're just seeing
@@ -26,16 +27,30 @@ var archive *Archive
 
 func init() {
 	context = NewArchiveContext()
-	context.RequestChannel = *TestConfig.RequestChannel
-	context.RequestStream = int32(*TestConfig.RequestStream)
 	context.AeronDir(*TestConfig.AeronPrefix)
 	archive, _ = ArchiveConnect(context)
 }
 
-// An archive version of basic_publisher in test format
-// FIXME: requires a subscriber
+// This should always pass
 func TestConnection(t *testing.T) {
 	if archive == nil {
 		t.Log("Skipping test connection")
 	}
+}
+
+// Test adding a recording
+func TestRecordedPublication(t *testing.T) {
+	if archive == nil {
+		t.Log("Skipping test connection")
+	}
+
+	time.Sleep(time.Second) // FIXME: delay
+
+	pub, err := archive.AddRecordedPublication(*TestConfig.RecordingChannel, int32(*TestConfig.RecordingStream))
+	if err != nil {
+		t.Fail()
+	}
+	t.Logf("pub:%#v", pub)
+
+	time.Sleep(time.Second) // FIXME: delay
 }

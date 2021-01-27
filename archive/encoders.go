@@ -37,7 +37,7 @@ func ConnectRequestPacket(responseChannel string, responseStream int32, correlat
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
 	}
-	if err := request.Encode(marshaller, buffer, defaults.RangeChecking); err != nil {
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
 		return nil, err
 	}
 
@@ -48,7 +48,7 @@ func ConnectRequestPacket(responseChannel string, responseStream int32, correlat
 func StartRecordingRequestPacket(channel string, stream int32, correlationID int64, sourceLocation codecs.SourceLocationEnum) ([]byte, error) {
 	var request codecs.StartRecordingRequest
 
-	request.ControlSessionId = controlSessionID.Inc()
+	request.ControlSessionId = <-ID64
 	request.CorrelationId = correlationID
 	request.StreamId = stream
 	request.SourceLocation = sourceLocation
@@ -60,7 +60,7 @@ func StartRecordingRequestPacket(channel string, stream int32, correlationID int
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
 	}
-	if err := request.Encode(marshaller, buffer, defaults.RangeChecking); err != nil {
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
 		return nil, err
 	}
 

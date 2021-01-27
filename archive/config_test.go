@@ -26,21 +26,25 @@ func getuser() string {
 }
 
 var TestConfig = struct {
-	RequestStream   *int
-	RequestChannel  *string
-	ResponseStream  *int
-	ResponseChannel *string
-	AeronPrefix     *string
-	ProfilerEnabled *bool
-	Timeout         *int64
-	Messages        *int
-	Payload         *int
-	Verbose         *bool
+	RequestStream    *int
+	RequestChannel   *string
+	ResponseStream   *int
+	ResponseChannel  *string
+	RecordingStream  *int
+	RecordingChannel *string
+	AeronPrefix      *string
+	ProfilerEnabled  *bool
+	Timeout          *int64
+	Messages         *int
+	Payload          *int
+	Verbose          *bool
 }{
 	flag.Int("requeststream", 10, "default request control stream to use"),
 	flag.String("requestchannel", "aeron:udp?endpoint=localhost:8010", "default request control channel to publish to"),
 	flag.Int("responsestream", 21, "default response control stream to use"),
 	flag.String("responsechannel", "aeron:udp?endpoint=localhost:8020", "default response control channel to publish to"),
+	flag.Int("recordingstream", 111, "default response control stream to use"),
+	flag.String("recordingchannel", "aeron:udp?endpoint=localhost:11111", "default response control channel to publish to"),
 	flag.String("prefix", "dev/shm//aeron-"+aeron.UserName, "root directory for aeron driver file"),
 	flag.Bool("profile", false, "enable CPU profiling"),
 	flag.Int64("timeout", 10000, "driver liveliness timeout in ms"),
