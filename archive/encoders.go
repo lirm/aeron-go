@@ -48,7 +48,7 @@ func ConnectRequestPacket(responseChannel string, responseStream int32, correlat
 func StartRecordingRequestPacket(channel string, stream int32, correlationID int64, sourceLocation codecs.SourceLocationEnum) ([]byte, error) {
 	var request codecs.StartRecordingRequest
 
-	request.ControlSessionId = <-ID64
+	request.ControlSessionId = NextCorrelationID() // FIXME: Get from connectionReply
 	request.CorrelationId = correlationID
 	request.StreamId = stream
 	request.SourceLocation = sourceLocation

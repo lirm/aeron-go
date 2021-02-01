@@ -18,8 +18,10 @@ package archive
 import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
+	"time"
 )
 
 // Archive is the primary interface to the media driver for managing archiving
@@ -32,6 +34,12 @@ type Archive struct {
 
 // Globals
 var logger = logging.MustGetLogger("archive")
+var _correlationID atomic.Long
+
+// Inititialization
+func init() {
+	_correlationID.Set(time.Now().UnixNano())
+}
 
 func ArchiveAvailableImageHandler(*aeron.Image) {
 	logger.Infof("Archive NewAvailableImageHandler\n")
@@ -94,8 +102,12 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 
 	// And intitiate the connection
 	control.State.state = ControlStateConnectRequestSent
-	correlationID := <-ID64
+	correlationID := NextCorrelationID()
 	correlations[correlationID] = control // Add it to our map so we can find it
+
+	// FIXME: we should retry instead of waiting
+	time.Sleep(time.Second)
+
 	if err := archive.proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationID); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
@@ -119,7 +131,6 @@ func (archive *Archive) Close() error {
 // AddSubscription will add a new subscription to the driver.
 // Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
 func (archive *Archive) AddSubscription(channel string, streamID int32) chan *aeron.Subscription {
-
 	return archive.aeron.AddSubscription(channel, streamID)
 }
 
@@ -128,7 +139,6 @@ func (archive *Archive) AddSubscription(channel string, streamID int32) chan *ae
 // will be returned.  Returns a channel, which can be used for either
 // blocking or non-blocking want for media driver confirmation
 func (archive *Archive) AddPublication(channel string, streamID int32) chan *aeron.Publication {
-
 	return archive.aeron.AddPublication(channel, streamID)
 }
 
@@ -160,7 +170,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 		return nil, fmt.Errorf("publication already added for channel=%s stream=%d", channel, stream)
 	}
 
-	correlationID := <-ID64
+	correlationID := NextCorrelationID()
 	correlations[correlationID] = archive.Control // Add it to our map so we can find it
 	fmt.Printf("Start recording correlationId:%d\n", correlationID)
 	if err := archive.proxy.StartRecordingRequest(channel, stream, correlationID, codecs.SourceLocation.LOCAL); err != nil {
@@ -169,4 +179,9 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	}
 
 	return publication, nil
+}
+
+// Get a new correlation ID
+func NextCorrelationID() int64 {
+	return _correlationID.Inc()
 }
