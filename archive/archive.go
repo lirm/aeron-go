@@ -108,7 +108,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 
 	start := time.Now()
 	for control.State.state != ControlStateConnected && control.State.err == nil {
-		fragments := archive.Control.Poll(ControlFragmentHandler, 10)
+		fragments := archive.Control.Poll(ControlFragmentHandler, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragments\n", fragments)
 		}
