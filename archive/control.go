@@ -107,8 +107,8 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		// Look it up
 		control, ok := correlations[controlResponse.CorrelationId]
 		if !ok {
-			logger.Error("Failed to correlate control response correlationID=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
-			fmt.Printf("correlations:\n%#v\n", correlations)
+			logger.Info("Uncorrelated control response correlationID=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
+			return
 		}
 
 		// Check result
