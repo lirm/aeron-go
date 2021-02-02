@@ -20,28 +20,27 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/archive/codecs"
-	"time"
 )
 
 // Control contains everything required for the archive control pub/sub request/response pair
 type Control struct {
-	ResponseChannel             string
-	ResponseStream              int32
-	RequestChannel              string
-	RequestStream               int32
-	Subscription                *aeron.Subscription
-	Publication                 *aeron.Publication
-	State                       ControlState
-	ConnectionChange            chan ControlState // Invoked on connect, disconnect, and error
-	PolledBytes                 chan []byte       // Public for returning data from poller
-	terminateSubscriptionPoller chan bool         // Internal for stopping the poller
-	marshaller                  *codecs.SbeGoMarshaller
-	RangeChecking               bool
-	challengeSessionID          int64 // FIXME: Todo
-	SessionID                   int64
-	CorrelationID               int64 // FIXME: we'll want overlapping operations
+	ResponseChannel    string
+	ResponseStream     int32
+	RequestChannel     string
+	RequestStream      int32
+	Subscription       *aeron.Subscription
+	Publication        *aeron.Publication
+	State              ControlState
+	IdleStrategy       idlestrategy.Idler
+	marshaller         *codecs.SbeGoMarshaller
+	RangeChecking      bool
+	challengeSessionID int64 // FIXME: Todo
+	SessionID          int64
+	CorrelationID      int64 // FIXME: we'll want overlapping operations
 }
 
 // An archive "connection" involves some to and fro
@@ -50,7 +49,7 @@ const ControlStateNew = 0
 const ControlStateConnectRequestSent = 1
 const ControlStateConnectRequestOk = 2
 const ControlStateConnected = 3
-const ControlStateDisconnected = 4
+const ControlStateTimedOut = 4
 
 type ControlState struct {
 	state int
@@ -64,14 +63,12 @@ var correlations = make(map[int64]*Control) // Map of correlationID so we can co
 func NewControl() *Control {
 	control := new(Control)
 	control.RangeChecking = ArchiveDefaults.RangeChecking
-	control.ConnectionChange = make(chan ControlState)
-	control.PolledBytes = make(chan []byte)
-	control.terminateSubscriptionPoller = make(chan bool)
-	control.marshaller = codecs.NewSbeGoMarshaller()
+	control.IdleStrategy = ArchiveDefaults.ControlIdleStrategy
 	control.ResponseChannel = ArchiveDefaults.ResponseChannel
 	control.ResponseStream = ArchiveDefaults.ResponseStream
 	control.RequestChannel = ArchiveDefaults.RequestChannel
 	control.RequestStream = ArchiveDefaults.RequestStream
+	control.marshaller = codecs.NewSbeGoMarshaller()
 
 	return control
 }
@@ -83,14 +80,13 @@ func ArchiveNewSubscriptionHandler(string, int32, int64) {
 
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via a channel
-func ControlSubscriptionHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 	var controlResponse = new(codecs.ControlResponse)
 
 	buf := new(bytes.Buffer)
-	_ = buffer.GetBytesArray(offset, length)
 	buffer.WriteBytes(buf, offset, length)
 
 	marshaller := codecs.NewSbeGoMarshaller()
@@ -133,7 +129,6 @@ func ControlSubscriptionHandler(buffer *atomic.Buffer, offset int32, length int3
 		control.State.state = ControlStateConnected
 		control.State.err = nil
 		control.SessionID = controlResponse.ControlSessionId
-		control.ConnectionChange <- control.State
 
 	default:
 		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
@@ -142,35 +137,7 @@ func ControlSubscriptionHandler(buffer *atomic.Buffer, offset int32, length int3
 	return
 }
 
-// Start the control response subscription poller.
-func (control *Control) StartControlSubscriptionPoller() {
-	control.terminateSubscriptionPoller = make(chan bool, 1)
-	go control.ControlSubscriptionPoller()
-}
-
-// Stop the control response subscription poller.
-func (control *Control) StopControlSubscriptionPoller() {
-	close(control.terminateSubscriptionPoller)
-}
-
-// The control response poller itself which invokes the handler when data is available
-func (control *Control) ControlSubscriptionPoller() {
-	fmt.Printf("ControlSubscriptionPoller starting\n")
-	for {
-		fragments := control.Subscription.Poll(ControlSubscriptionHandler, 10)
-		if fragments > 0 {
-			logger.Debugf("Read %d fragments\n", fragments)
-		}
-
-		// Check for exit
-		select {
-		case res, ok := <-control.terminateSubscriptionPoller:
-			if res || !ok {
-				fmt.Printf("Exiting ControlSubscriptionPoller\n")
-				return
-			}
-		case <-time.After(ArchiveDefaults.ControlIdleTime):
-			// timed out
-		}
-	}
+// The control response poller wraps the aeron subscription handler
+func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+	return control.Subscription.Poll(handler, fragmentLimit)
 }

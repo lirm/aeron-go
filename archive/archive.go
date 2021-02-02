@@ -87,16 +87,11 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	control.Subscription = <-archive.aeron.AddSubscription(control.ResponseChannel, control.ResponseStream)
 	logger.Debugf("Control response subscription: %#v", control.Subscription)
 
-	// Start the control response subscription poller
-	control.StartControlSubscriptionPoller()
-
 	// Create the publication half and the proxy that looks after sending requests on that
 	control.Publication = <-archive.aeron.AddExclusivePublication(control.RequestChannel, control.RequestStream)
 	logger.Debugf("Control request publication: %#v", control.Publication)
 	archive.proxy = NewProxy(control.Publication, context.IdleStrategy, control.SessionID)
 
-	// FIXME: For now we're just fobbing this off to the control handler but we'll want the original exhange
-	// to be special
 	// FIXME: Java can somehow use an ephemeral port looked up here ...
 	// FIXME: Java and C++ use AUTH and Challenge/Response
 
@@ -105,22 +100,38 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	correlationID := NextCorrelationID()
 	correlations[correlationID] = control // Add it to our map so we can find it
 
-	// FIXME: we should retry instead of waiting
-	time.Sleep(time.Second)
-
+	// Send the request and poll for the reply, giving up if we hit our timeout
 	if err := archive.proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationID); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}
-	// Wait for the response
-	ControlState := <-control.ConnectionChange // FIXME: time this out
-	if ControlState.err != nil || ControlState.state != ControlStateConnected {
-		logger.Error("Connect failed: %s\n", err)
-		return nil, err
-	}
-	// FIXME: delete(correlations, correlationID) // remove it from map
 
-	return archive, nil
+	start := time.Now()
+	for control.State.state != ControlStateConnected && control.State.err == nil {
+		fragments := archive.Control.Poll(ControlFragmentHandler, 10)
+		if fragments > 0 {
+			logger.Debugf("Read %d fragments\n", fragments)
+		}
+
+		// Check for timeout
+		if time.Since(start) > ArchiveDefaults.ControlTimeout {
+			control.State.state = ControlStateTimedOut
+			delete(correlations, correlationID) // remove it from map
+
+		} else {
+			control.IdleStrategy.Idle(0)
+		}
+	}
+
+	if control.State.err != nil {
+		logger.Errorf("Connect failed: %s\n", err)
+	}
+	if control.State.state != ControlStateConnected {
+		logger.Error("Connect failed\n")
+	}
+
+	// FIXME: Return the archive with the control intact, not sure if this the right thing to do
+	return archive, control.State.err
 }
 
 // Close will terminate client conductor and remove all publications and subscriptions from the media driver

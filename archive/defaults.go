@@ -15,29 +15,30 @@
 package archive
 
 import (
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"time"
 )
 
 // FIXME: Provide a method to return the defaults and initialize with parameterised version
 
 type Defaults struct {
-	ControlTimeout  time.Duration // How long to try sending control messages [see Proxy.Timeout]
-	ControlIdleTime time.Duration // Idlestrategy is always a Duration as we `select <- time.After`
-	ControlRetries  int           // How many retries for control messages [see Proxy.Retries] // FIXME: use
-	RangeChecking   bool          // Turn on range checking for control protocol marshalling
-	ResponseChannel string        // control response subscription channel
-	ResponseStream  int32         // and stream
-	RequestChannel  string        // control request publication channel
-	RequestStream   int32         // and stream
+	ControlTimeout      time.Duration      // How long to try sending control messages [see Proxy.Timeout]
+	ControlIdleStrategy idlestrategy.Idler // Idlestrategy as for aeron itself
+	ControlRetries      int                // How many retries for control messages [see Proxy.Retries] // FIXME: use
+	RangeChecking       bool               // Turn on range checking for control protocol marshalling
+	ResponseChannel     string             // control response subscription channel
+	ResponseStream      int32              // and stream
+	RequestChannel      string             // control request publication channel
+	RequestStream       int32              // and stream
 }
 
 var ArchiveDefaults Defaults = Defaults{
-	ControlTimeout:  time.Second * 5,
-	ControlIdleTime: time.Millisecond * 50,
-	ControlRetries:  4,
-	RangeChecking:   true, // FIXME: turn off
-	ResponseChannel: "aeron:udp?endpoint=localhost:8020",
-	ResponseStream:  20,
-	RequestChannel:  "aeron:udp?endpoint=localhost:8010",
-	RequestStream:   10,
+	ControlTimeout:      time.Second * 5,
+	ControlIdleStrategy: idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
+	ControlRetries:      4,
+	RangeChecking:       true, // FIXME: turn off
+	ResponseChannel:     "aeron:udp?endpoint=localhost:8020",
+	ResponseStream:      20,
+	RequestChannel:      "aeron:udp?endpoint=localhost:8010",
+	RequestStream:       10,
 }
