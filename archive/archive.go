@@ -55,14 +55,14 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	var err error
 
 	// FIXME: Provide options
-	logging.SetLevel(logging.INFO, "aeron")
-	logging.SetLevel(logging.DEBUG, "archive")
-	logging.SetLevel(logging.INFO, "memmap")
-	logging.SetLevel(logging.INFO, "driver")
-	logging.SetLevel(logging.INFO, "counters")
-	logging.SetLevel(logging.INFO, "logbuffers")
-	logging.SetLevel(logging.INFO, "buffer")
-	logging.SetLevel(logging.INFO, "rb")
+	logging.SetLevel(ArchiveDefaults.ArchiveLoglevel, "archive")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "aeron")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "memmap")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "driver")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "counters")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "logbuffers")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "buffer")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "rb")
 
 	archive := new(Archive)
 	archive.aeron = new(aeron.Aeron)
