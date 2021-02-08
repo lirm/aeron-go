@@ -29,16 +29,23 @@ type Archive struct {
 	aeron   *aeron.Aeron
 	context *ArchiveContext
 	proxy   *Proxy
-	Control *Control // FIXME: one-to-one and merge in?
+	Control *Control
 }
 
 // Globals
 var logger = logging.MustGetLogger("archive")
 var _correlationID atomic.Long
+var sessionsMap map[int64]*Control    // Used for recording signal sessionId lookup
+var connectionsMap map[int64]*Control // Used for connection establishment and commands, correlationId lookup
+var recordingsMap map[int64]*Control  // Used for recordings, recordingId lookup
 
 // Inititialization
 func init() {
 	_correlationID.Set(time.Now().UnixNano())
+
+	sessionsMap = make(map[int64]*Control)
+	connectionsMap = make(map[int64]*Control)
+	recordingsMap = make(map[int64]*Control)
 }
 
 func ArchiveAvailableImageHandler(*aeron.Image) {
@@ -90,7 +97,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	// Create the publication half and the proxy that looks after sending requests on that
 	control.Publication = <-archive.aeron.AddExclusivePublication(control.RequestChannel, control.RequestStream)
 	logger.Debugf("Control request publication: %#v", control.Publication)
-	archive.proxy = NewProxy(control.Publication, context.IdleStrategy, control.SessionID)
+	archive.proxy = NewProxy(control.Publication, context.IdleStrategy, control.SessionId)
 
 	// FIXME: Java can somehow use an ephemeral port looked up here ...
 	// FIXME: Java and C++ use AUTH and Challenge/Response
@@ -98,7 +105,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	// And intitiate the connection
 	control.State.state = ControlStateConnectRequestSent
 	correlationID := NextCorrelationID()
-	correlations[correlationID] = control // Add it to our map so we can find it
+	connectionsMap[correlationID] = control // Add it to our map so we can find it
 
 	// Send the request and poll for the reply, giving up if we hit our timeout
 	if err := archive.proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationID); err != nil {
@@ -108,7 +115,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 
 	start := time.Now()
 	for control.State.state != ControlStateConnected && control.State.err == nil {
-		fragments := archive.Control.Poll(ControlFragmentHandler, 1)
+		fragments := archive.Control.Poll(ConnectionControlFragmentHandler, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragments\n", fragments)
 		}
@@ -116,7 +123,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 		// Check for timeout
 		if time.Since(start) > ArchiveDefaults.ControlTimeout {
 			control.State.state = ControlStateTimedOut
-			delete(correlations, correlationID) // remove it from map
+			delete(connectionsMap, correlationID) // remove it from map
 
 		} else {
 			control.IdleStrategy.Idle(0)
@@ -130,7 +137,10 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 		logger.Error("Connect failed\n")
 	}
 
-	// FIXME: Return the archive with the control intact, not sure if this the right thing to do
+	logger.Infof("Archive connection established for sessionID:%d\n", control.SessionId)
+	sessionsMap[archive.Control.SessionId] = archive.Control // Add it to our map so we can look it up
+
+	// FIXME: Return the archive with the control intact, not sure if this the right thing to do on failure
 	return archive, control.State.err
 }
 
@@ -174,7 +184,7 @@ func (archive *Archive) ClientID() int64 {
 // FIXME: Formalize the error handling
 func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*aeron.Publication, error) {
 
-	// FIXME: can that fail?
+	// FIXME: check failure
 	publication := <-archive.AddPublication(channel, stream)
 	if !publication.IsOriginal() {
 		// FIXME: cleanup
@@ -182,7 +192,6 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	}
 
 	correlationID := NextCorrelationID()
-	correlations[correlationID] = archive.Control // Add it to our map so we can find it
 	fmt.Printf("Start recording correlationId:%d\n", correlationID)
 	if err := archive.proxy.StartRecordingRequest(channel, stream, correlationID, codecs.SourceLocation.LOCAL); err != nil {
 		// FIXME: cleanup

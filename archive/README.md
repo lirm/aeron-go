@@ -27,16 +27,15 @@ Testing:
 
 Backlog
 ===
-Known bugs:
- * Duplicate connection controlresponse
+Ephemeral port usage
 
 29 FIXMEs
 
-CorrelationID
-
 Simplest straight line basic recorded publisher and basic subscriber
 
-Async Connection establishment
+Sync API
+
+Then think about Async but not necessarily.
 
 AuthConnect, Challenge/Response
 
@@ -49,4 +48,3 @@ OnAvailableCounter: Not supported yet?
 Defaults settings and setting
 
 Testing:
- * Start with connection establishment

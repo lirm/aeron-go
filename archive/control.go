@@ -24,6 +24,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/archive/codecs"
+	"time"
 )
 
 // Control contains everything required for the archive control pub/sub request/response pair
@@ -38,9 +39,17 @@ type Control struct {
 	IdleStrategy       idlestrategy.Idler
 	marshaller         *codecs.SbeGoMarshaller
 	RangeChecking      bool
-	challengeSessionID int64 // FIXME: Todo
-	SessionID          int64
-	CorrelationID      int64 // FIXME: we'll want overlapping operations
+	challengeSessionId int64 // FIXME: Todo
+	SessionId          int64
+
+	// These pieces are filled out by the ResponsePoller which will set IsPollComplete to true
+	FragmentLimit   int
+	CorrelationId   int64                   // FIXME: we may want overlapping operations
+	ControlResponse *codecs.ControlResponse // FIXME: We may want a queue here
+	IsPollComplete  bool
+
+	EncodedChallenge []byte // FIXME: auth
+	rsa              RecordingSignalAdapter
 }
 
 // An archive "connection" involves some to and fro
@@ -55,9 +64,6 @@ type ControlState struct {
 	state int
 	err   error
 }
-
-// Globals
-var correlations = make(map[int64]*Control) // Map of correlationID so we can correlate responses
 
 // Create a new initialized control. Note that a control does require inititializtion for it's channels
 func NewControl() *Control {
@@ -91,7 +97,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
-		// FIXME: Should we use an ErrorHandler?
+		// FIXME: We should use an ErrorHandler/Listener
 		logger.Error("Failed to decode control message header", err) // Not much to be done here as we can't correlate
 
 	}
@@ -105,9 +111,54 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		logger.Debugf("ControlResponse: %#v\n", controlResponse)
 
 		// Look it up
-		control, ok := correlations[controlResponse.CorrelationId]
+		control, ok := connectionsMap[controlResponse.CorrelationId]
 		if !ok {
-			logger.Info("Uncorrelated control response correlationID=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
+			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
+			return
+		}
+
+		// Set our state to let the caller of Poll() which triggered this know they have something
+		control.ControlResponse = controlResponse
+		control.IsPollComplete = true
+
+	default:
+		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
+	}
+
+	return
+}
+
+// The current subscription handler doesn't provide a mechanism for passing a rock
+// so we return data via a channel
+// FIXME: This is what the connection establishment currently uses, switch it over
+func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v\n", offset, length, header)
+
+	var hdr codecs.SbeGoMessageHeader
+	var controlResponse = new(codecs.ControlResponse)
+
+	buf := new(bytes.Buffer)
+	buffer.WriteBytes(buf, offset, length)
+
+	marshaller := codecs.NewSbeGoMarshaller()
+	if err := hdr.Decode(marshaller, buf); err != nil {
+		// FIXME: We should use an ErrorHandler/Listener
+		logger.Error("Failed to decode control message header", err) // Not much to be done here as we can't correlate
+
+	}
+
+	switch hdr.TemplateId {
+	case controlResponse.SbeTemplateId():
+		logger.Debugf("Received controlResponse: length %d", buf.Len())
+		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, ArchiveDefaults.RangeChecking); err != nil {
+			logger.Error("Failed to decode control response", err) // Not much to be done here as we can't correlate
+		}
+		logger.Debugf("ControlResponse: %#v\n", controlResponse)
+
+		// Look it up
+		control, ok := connectionsMap[controlResponse.CorrelationId]
+		if !ok {
+			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
 			return
 		}
 
@@ -128,7 +179,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		// Looking good
 		control.State.state = ControlStateConnected
 		control.State.err = nil
-		control.SessionID = controlResponse.ControlSessionId
+		control.SessionId = controlResponse.ControlSessionId
 
 	default:
 		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
@@ -137,7 +188,81 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	return
 }
 
-// The control response poller wraps the aeron subscription handler
+// The control response poller uses local state to pass back information from the underlying subscription
+func (control *Control) ErrorHandler(err error) {
+	// FIXME: for now I'm just logging
+	logger.Errorf(err.Error())
+}
+
+// The control response poller uses local state to pass back information from the underlying subscription
 func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+	control.ControlResponse = nil
+	control.IsPollComplete = false
+
+	// FIXME: check what controlledPoll might do instead
 	return control.Subscription.Poll(handler, fragmentLimit)
+}
+
+func (control *Control) PollNextResponse(correlationId int64) error {
+
+	start := time.Now()
+
+	for {
+		fragments := control.Poll(ControlFragmentHandler, 1)
+
+		if control.IsPollComplete {
+			return nil
+		}
+
+		if fragments > 0 {
+			continue
+		}
+
+		if !control.Subscription.IsClosed() {
+			return fmt.Errorf("response channel from archive is not connected")
+		}
+
+		if time.Since(start) > ArchiveDefaults.ControlTimeout {
+			return fmt.Errorf("timeout waiting for correlationId %d", correlationId)
+		}
+		control.IdleStrategy.Idle(0)
+
+		//
+		// private final AgentInvoker aeronClientInvoker;                             // AeronArchive.java
+		// aeronClientInvoker = aeron.conductorAgentInvoker();                       // AeronArchive.java
+		//   conductorAgentInvoker() {return conductorInvoker;}                      // Aeron.java
+		// conductorInvoker = new AgentInvoker(ctx.errorHandler(), null, conductor); // Aeron.java
+		// InvokeAeronClient() // calls           aeronClientInvoker.invoke()
+		control.ErrorHandler(fmt.Errorf("FIXME: InvokeAeronClient()"))
+	}
+
+	return nil
+}
+
+// Poll for a specific correlationId
+// Returns nil on success, error otherwise, with detail passed back via Control.ControlResponse
+func (control *Control) PollForResponse(correlationId int64) error {
+
+	for {
+		// Check for error
+		if err := control.PollNextResponse(correlationId); err != nil {
+			return err
+		}
+
+		// Check we're on the right session
+		if control.ControlResponse.ControlSessionId != control.SessionId {
+			// FIXME: Other than log?
+			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.ControlResponse.ControlSessionId, control.SessionId))
+			continue
+		}
+
+		// Check we've got the right correlationId
+		if control.ControlResponse.CorrelationId != correlationId {
+			// FIXME: Other than log?
+			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.ControlResponse.CorrelationId))
+			continue
+		}
+
+		return nil
+	}
 }
