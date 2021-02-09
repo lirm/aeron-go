@@ -33,13 +33,12 @@ func TestEncoders(t *testing.T) {
 		t.Logf("ConnectRequestPacket failed length check: %d", len(packet))
 		t.Fail()
 	}
-
-	packet, err = StartRecordingRequestPacket(channel, stream, 1, codecs.SourceLocation.LOCAL)
+	packet, err = StartRecordingRequest2Packet(channel, stream, codecs.SourceLocation.LOCAL, true, 1234, 5678)
 	if err != nil {
 		t.Log("StartRecordingRequestPacket() failed")
 		t.Fail()
 	}
-	if len(packet) != 69 { // Look for unexepected change
+	if len(packet) != 73 { // Look for unexpected change
 		t.Logf("StartRecordingRequestPacket() failed length check: %d", len(packet))
 		t.Fail()
 	}

@@ -28,20 +28,20 @@ import (
 type Archive struct {
 	aeron   *aeron.Aeron
 	context *ArchiveContext
-	proxy   *Proxy
+	Proxy   *Proxy
 	Control *Control
 }
 
 // Globals
 var logger = logging.MustGetLogger("archive")
-var _correlationID atomic.Long
+var _correlationId atomic.Long
 var sessionsMap map[int64]*Control    // Used for recording signal sessionId lookup
 var connectionsMap map[int64]*Control // Used for connection establishment and commands, correlationId lookup
 var recordingsMap map[int64]*Control  // Used for recordings, recordingId lookup
 
 // Inititialization
 func init() {
-	_correlationID.Set(time.Now().UnixNano())
+	_correlationId.Set(time.Now().UnixNano())
 
 	sessionsMap = make(map[int64]*Control)
 	connectionsMap = make(map[int64]*Control)
@@ -97,18 +97,18 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	// Create the publication half and the proxy that looks after sending requests on that
 	control.Publication = <-archive.aeron.AddExclusivePublication(control.RequestChannel, control.RequestStream)
 	logger.Debugf("Control request publication: %#v", control.Publication)
-	archive.proxy = NewProxy(control.Publication, context.IdleStrategy, control.SessionId)
+	archive.Proxy = NewProxy(control.Publication, context.IdleStrategy, control.SessionId)
 
 	// FIXME: Java can somehow use an ephemeral port looked up here ...
 	// FIXME: Java and C++ use AUTH and Challenge/Response
 
 	// And intitiate the connection
 	control.State.state = ControlStateConnectRequestSent
-	correlationID := NextCorrelationID()
-	connectionsMap[correlationID] = control // Add it to our map so we can find it
+	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = control // Add it to our map so we can find it
 
 	// Send the request and poll for the reply, giving up if we hit our timeout
-	if err := archive.proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationID); err != nil {
+	if err := archive.Proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationId); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 		// Check for timeout
 		if time.Since(start) > ArchiveDefaults.ControlTimeout {
 			control.State.state = ControlStateTimedOut
-			delete(connectionsMap, correlationID) // remove it from map
+			delete(connectionsMap, correlationId) // remove it from map
 
 		} else {
 			control.IdleStrategy.Idle(0)
@@ -137,7 +137,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 		logger.Error("Connect failed\n")
 	}
 
-	logger.Infof("Archive connection established for sessionID:%d\n", control.SessionId)
+	logger.Infof("Archive connection established for sessionId:%d\n", control.SessionId)
 	sessionsMap[archive.Control.SessionId] = archive.Control // Add it to our map so we can look it up
 
 	// FIXME: Return the archive with the control intact, not sure if this the right thing to do on failure
@@ -151,28 +151,47 @@ func (archive *Archive) Close() error {
 
 // AddSubscription will add a new subscription to the driver.
 // Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
-func (archive *Archive) AddSubscription(channel string, streamID int32) chan *aeron.Subscription {
-	return archive.aeron.AddSubscription(channel, streamID)
+func (archive *Archive) AddSubscription(channel string, streamId int32) chan *aeron.Subscription {
+	return archive.aeron.AddSubscription(channel, streamId)
 }
 
 // AddPublication will add a new publication to the driver. If such
 // publication already exists within ClientConductor the same instance
 // will be returned.  Returns a channel, which can be used for either
 // blocking or non-blocking want for media driver confirmation
-func (archive *Archive) AddPublication(channel string, streamID int32) chan *aeron.Publication {
-	return archive.aeron.AddPublication(channel, streamID)
+func (archive *Archive) AddPublication(channel string, streamId int32) chan *aeron.Publication {
+	return archive.aeron.AddPublication(channel, streamId)
 }
 
 // AddExclusivePublication will add a new exclusive publication to the driver. If such publication already
 // exists within ClientConductor the same instance will be returned.
 // Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
-func (archive *Archive) AddExclusivePublication(channel string, streamID int32) chan *aeron.Publication {
-	return archive.aeron.AddExclusivePublication(channel, streamID)
+func (archive *Archive) AddExclusivePublication(channel string, streamId int32) chan *aeron.Publication {
+	return archive.aeron.AddExclusivePublication(channel, streamId)
 }
 
-// ClientID returns the client identity that has been allocated for communicating with the media driver.
-func (archive *Archive) ClientID() int64 {
+// ClientId returns the client identity that has been allocated for communicating with the media driver.
+func (archive *Archive) ClientId() int64 {
 	return archive.aeron.ClientID()
+}
+
+// Start recording a channel/stream
+// Returns relevantId on success, explanatory error otherwise
+func (archive *Archive) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool) (int64, error) {
+
+	logger.Debugf("StartRecording(%s:%d)\n", channel, stream)
+	// FIXME: locking
+	// FIXME: check open
+
+	correlationId := NextCorrelationId()
+	if err := archive.Proxy.StartRecording(channel, stream, sourceLocation, autoStop, correlationId, archive.Control.SessionId); err != nil {
+		return 0, err
+	}
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+	fmt.Printf("StartRecording:ControlResponse is %v\n", archive.Control.ControlResponse)
+	return 0, nil
 }
 
 // Add a Recorded Publication and set it up to be recorded.
@@ -191,9 +210,10 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 		return nil, fmt.Errorf("publication already added for channel=%s stream=%d", channel, stream)
 	}
 
-	correlationID := NextCorrelationID()
-	fmt.Printf("Start recording correlationId:%d\n", correlationID)
-	if err := archive.proxy.StartRecordingRequest(channel, stream, correlationID, codecs.SourceLocation.LOCAL); err != nil {
+	correlationId := NextCorrelationId()
+	fmt.Printf("Start recording correlationId:%d\n", correlationId)
+	// FIXME: semantics of autoStop here?
+	if err := archive.Proxy.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, false, correlationId, archive.Control.SessionId); err != nil {
 		// FIXME: cleanup
 		return nil, err
 	}
@@ -201,7 +221,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	return publication, nil
 }
 
-// Get a new correlation ID
-func NextCorrelationID() int64 {
-	return _correlationID.Inc()
+// Get a new correlation Id
+func NextCorrelationId() int64 {
+	return _correlationId.Inc()
 }

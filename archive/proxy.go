@@ -28,21 +28,21 @@ import (
 type Proxy struct {
 	Publication  *aeron.Publication
 	Marshaller   *codecs.SbeGoMarshaller
-	SessionID    int64
+	SessionId    int64
 	IdleStrategy idlestrategy.Idler
 	Timeout      time.Duration
 	Retries      int
 }
 
 // Create a proxy with default settings
-func NewProxy(publication *aeron.Publication, idleStrategy idlestrategy.Idler, sessionID int64) *Proxy {
+func NewProxy(publication *aeron.Publication, idleStrategy idlestrategy.Idler, sessionId int64) *Proxy {
 	proxy := new(Proxy)
 	proxy.Publication = publication
 	proxy.IdleStrategy = idleStrategy
 	proxy.Marshaller = codecs.NewSbeGoMarshaller()
 	proxy.Timeout = ArchiveDefaults.ControlTimeout
 	proxy.Retries = ArchiveDefaults.ControlRetries
-	proxy.SessionID = sessionID
+	proxy.SessionId = sessionId
 
 	return proxy
 }
@@ -85,10 +85,10 @@ func (proxy *Proxy) Offer(buf bytes.Buffer) int64 {
 }
 
 // Make a Connect Request
-func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32, correlationID int64) error {
+func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32, correlationId int64) error {
 
 	// Create a packet and send it
-	bytes, err := ConnectRequestPacket(responseChannel, responseStream, correlationID)
+	bytes, err := ConnectRequestPacket(responseChannel, responseStream, correlationId)
 	if err != nil {
 		return err
 	}
@@ -101,9 +101,9 @@ func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32,
 }
 
 // Start a Recorded Publication
-func (proxy *Proxy) StartRecordingRequest(channel string, stream int32, correlationID int64, sourceLocation codecs.SourceLocationEnum) error {
+func (proxy *Proxy) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, correlationId int64, sessionId int64) error {
 
-	bytes, err := StartRecordingRequestPacket(channel, stream, correlationID, sourceLocation)
+	bytes, err := StartRecordingRequest2Packet(channel, stream, sourceLocation, autoStop, correlationId, sessionId)
 	if err != nil {
 		return err
 	}

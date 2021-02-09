@@ -23,7 +23,7 @@ Sync APIs built on top of Async via channel design choice?
 Testing:
  * Look for local archive and exec? Test and not run for Travis? Mock? Add jars to repo and fetch?
 
-
+StartRecordingRequest2 only I think
 
 Backlog
 ===

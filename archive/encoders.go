@@ -45,14 +45,17 @@ func ConnectRequestPacket(responseChannel string, responseStream int32, correlat
 }
 
 // Create and marshal a StartRecordingRequest
-func StartRecordingRequestPacket(channel string, stream int32, correlationID int64, sourceLocation codecs.SourceLocationEnum) ([]byte, error) {
-	var request codecs.StartRecordingRequest
+func StartRecordingRequest2Packet(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, correlationId int64, sessionId int64) ([]byte, error) {
+	var request codecs.StartRecordingRequest2
 
-	request.ControlSessionId = NextCorrelationID() // FIXME: Get from connectionReply
-	request.CorrelationId = correlationID
+	request.Channel = []uint8(channel)
 	request.StreamId = stream
 	request.SourceLocation = sourceLocation
-	request.Channel = []uint8(channel)
+	if autoStop {
+		request.AutoStop = codecs.BooleanType.TRUE
+	} // else FALSE by default
+	request.CorrelationId = correlationId
+	request.ControlSessionId = correlationId
 
 	// Marshal it
 	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
