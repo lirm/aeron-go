@@ -87,7 +87,7 @@ func ArchiveNewSubscriptionHandler(string, int32, int64) {
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via a channel
 func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v\n", offset, length, header)
+	logger.Debugf("ControlFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 	var controlResponse = new(codecs.ControlResponse)
@@ -97,8 +97,9 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
-		// FIXME: We should use an ErrorHandler/Listener
-		logger.Error("Failed to decode control message header", err) // Not much to be done here as we can't correlate
+		// Not much to be done here as we can't correlate
+		// FIXME: Wef could use an ErrorHandler/Listener
+		logger.Error("Failed to decode control message header", err)
 
 	}
 
@@ -106,7 +107,8 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	case controlResponse.SbeTemplateId():
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, ArchiveDefaults.RangeChecking); err != nil {
-			logger.Error("Failed to decode control response", err) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			logger.Error("Failed to decode control response", err)
 		}
 		logger.Debugf("ControlResponse: %#v\n", controlResponse)
 
@@ -143,7 +145,8 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// FIXME: We should use an ErrorHandler/Listener
-		logger.Error("Failed to decode control message header", err) // Not much to be done here as we can't correlate
+		// Not much to be done here as we can't correlate
+		logger.Error("Failed to decode control message header", err)
 
 	}
 
@@ -151,7 +154,8 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	case controlResponse.SbeTemplateId():
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, ArchiveDefaults.RangeChecking); err != nil {
-			logger.Error("Failed to decode control response", err) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			logger.Error("Failed to decode control response", err)
 		}
 		logger.Debugf("ControlResponse: %#v\n", controlResponse)
 
@@ -203,14 +207,16 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 	return control.Subscription.Poll(handler, fragmentLimit)
 }
 
+// Poll for a matching ControlReponse
 func (control *Control) PollNextResponse(correlationId int64) error {
+	logger.Debugf("PollNextResponse(%d) start", correlationId)
 
 	start := time.Now()
-
 	for {
 		fragments := control.Poll(ControlFragmentHandler, 1)
 
 		if control.IsPollComplete {
+			logger.Debugf("PollNextResponse(%d) complete", correlationId)
 			return nil
 		}
 
@@ -218,7 +224,7 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 			continue
 		}
 
-		if !control.Subscription.IsClosed() {
+		if control.Subscription.IsClosed() {
 			return fmt.Errorf("response channel from archive is not connected")
 		}
 
@@ -226,14 +232,6 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 			return fmt.Errorf("timeout waiting for correlationId %d", correlationId)
 		}
 		control.IdleStrategy.Idle(0)
-
-		//
-		// private final AgentInvoker aeronClientInvoker;                             // AeronArchive.java
-		// aeronClientInvoker = aeron.conductorAgentInvoker();                       // AeronArchive.java
-		//   conductorAgentInvoker() {return conductorInvoker;}                      // Aeron.java
-		// conductorInvoker = new AgentInvoker(ctx.errorHandler(), null, conductor); // Aeron.java
-		// InvokeAeronClient() // calls           aeronClientInvoker.invoke()
-		control.ErrorHandler(fmt.Errorf("FIXME: InvokeAeronClient()"))
 	}
 
 	return nil
@@ -242,6 +240,7 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 // Poll for a specific correlationId
 // Returns nil on success, error otherwise, with detail passed back via Control.ControlResponse
 func (control *Control) PollForResponse(correlationId int64) error {
+	logger.Debugf("PollForResponse(%d)", correlationId)
 
 	for {
 		// Check for error
@@ -253,16 +252,20 @@ func (control *Control) PollForResponse(correlationId int64) error {
 		if control.ControlResponse.ControlSessionId != control.SessionId {
 			// FIXME: Other than log?
 			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.ControlResponse.ControlSessionId, control.SessionId))
-			continue
+			control.IsPollComplete = true
+			return nil
 		}
 
 		// Check we've got the right correlationId
 		if control.ControlResponse.CorrelationId != correlationId {
 			// FIXME: Other than log?
 			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.ControlResponse.CorrelationId))
-			continue
+			// Need to read it?
+			control.IsPollComplete = true
+			return nil
 		}
 
+		control.IsPollComplete = true
 		return nil
 	}
 }

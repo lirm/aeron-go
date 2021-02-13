@@ -15,44 +15,43 @@
 package archive
 
 import (
+	"github.com/lirm/aeron-go/archive/codecs"
 	"testing"
-	"time"
 )
 
 // Rather than mock or spawn an archive-media-driver we're just seeing
 // if we can connect to one and if we can we'll run some tests. If the
 // init fails to connect then we'll skip the tests
+// FIXME: this plan fails as aeron-go calls log.Fatalf() !!!
 var context *ArchiveContext
 var archive *Archive
+var connectionError error
 
 func init() {
 	context = NewArchiveContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
-	archive, _ = ArchiveConnect(context)
+	archive, connectionError = ArchiveConnect(context)
 }
 
 // This should always pass
 func TestConnection(t *testing.T) {
-	if archive == nil {
-		t.Log("Skipping as not connected to archive-media-driver ")
+	if connectionError != nil || archive == nil {
+		t.Log("Skipping as not connected to archive-media-driver")
 		return
 	}
 }
 
 // Test adding a recording
-func TestRecordedPublication(t *testing.T) {
-	if archive == nil {
-		t.Log("Skipping as not connected to archive-media-driver ")
+func TestStartRecording(t *testing.T) {
+	if connectionError != nil || archive == nil {
+		t.Log("Skipping as not connected to archive-media-driver")
 		return
 	}
 
-	time.Sleep(time.Second) // FIXME: delay
-
-	pub, err := archive.AddRecordedPublication(*TestConfig.RecordingChannel, int32(*TestConfig.RecordingStream))
+	pub, err := archive.StartRecording("aeron:udp?endpoint=localhost:20121", 1001, codecs.SourceLocation.LOCAL, true)
 	if err != nil {
+		t.Log(err)
 		t.Fail()
 	}
 	t.Logf("pub:%#v", pub)
-
-	time.Sleep(time.Second) // FIXME: delay
 }

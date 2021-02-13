@@ -190,8 +190,8 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
 		return 0, err
 	}
-	fmt.Printf("StartRecording:ControlResponse is %v\n", archive.Control.ControlResponse)
-	return 0, nil
+	// fmt.Printf("StartRecording:ControlResponse is %#v\n", archive.Control.ControlResponse)
+	return archive.Control.ControlResponse.RelevantId, nil
 }
 
 // Add a Recorded Publication and set it up to be recorded.
