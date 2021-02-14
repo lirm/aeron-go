@@ -30,8 +30,8 @@ var ExamplesConfig = struct {
 	ProfilerEnabled *bool
 	DriverTimeout   *int64
 	Messages        *int
-	Size            *int
-	LoggingOn       *bool
+	Payload         *int
+	Verbose         *bool
 }{
 	flag.Int("requeststream", 10, "default request control stream to use"),
 	flag.String("requestchannel", "aeron:udp?endpoint=localhost:8010", "default request control channel to publish to"),
