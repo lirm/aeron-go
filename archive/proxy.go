@@ -114,3 +114,19 @@ func (proxy *Proxy) StartRecording(channel string, stream int32, sourceLocation 
 
 	return nil
 }
+
+// Start a Recorded Publication
+func (proxy *Proxy) ListRecordingsForUri(sessionId int64, correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) error {
+
+	bytes, err := ListRecordingsForUriRequestPacket(sessionId, correlationId, fromRecordingId, recordCount, stream, channel)
+
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}

@@ -20,15 +20,11 @@ import (
 	"time"
 )
 
-// ArchiveResponseHandler is the handler type for archive operations from the media driver
-type ArchiveResponseHandler func(string, int32, int32, int64)
-
 // FIXME: ArchiveContext configuration options are located here:
 // https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-archive-client-options
 type ArchiveContext struct {
 	aeron                   *aeron.Aeron
 	aeronContext            *aeron.Context
-	ResponseHandler         ArchiveResponseHandler
 	RecordingEventsChannel  string
 	RecordingEventsStreamID int32
 	MessageTimeouts         time.Duration
@@ -53,8 +49,6 @@ func NewArchiveContext() *ArchiveContext {
 	// Archive specific additional context
 	// FIXME: Add methods to set all of these and make a suitable place for the defaults
 	// FIXME: Java/C++ try and work out a response channel
-
-	context.ResponseHandler = func(string, int32, int32, int64) {}
 
 	context.MessageTimeouts = 5 * 1000 * 1000 * 1000                             // 5 seconds in Nanos
 	context.IdleStrategy = idlestrategy.Sleeping{SleepFor: time.Millisecond * 5} // FIXME: load from defaults

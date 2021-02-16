@@ -16,6 +16,7 @@ package archive
 
 import (
 	"github.com/lirm/aeron-go/archive/codecs"
+	logging "github.com/op/go-logging"
 	"testing"
 )
 
@@ -26,6 +27,17 @@ import (
 var context *ArchiveContext
 var archive *Archive
 var connectionError error
+
+type TestCases struct {
+	sampleStream  int32
+	sampleChannel string
+	replayStream  int32
+	replayChannel string
+}
+
+var testCases = []TestCases{
+	{int32(*TestConfig.SampleStream), *TestConfig.SampleChannel, int32(*TestConfig.ReplayStream), *TestConfig.ReplayChannel},
+}
 
 func init() {
 	context = NewArchiveContext()
@@ -48,10 +60,28 @@ func TestStartRecording(t *testing.T) {
 		return
 	}
 
-	pub, err := archive.StartRecording("aeron:udp?endpoint=localhost:20121", 1001, codecs.SourceLocation.LOCAL, true)
+	pub, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
 	if err != nil {
 		t.Log(err)
 		t.Fail()
 	}
 	t.Logf("pub:%#v", pub)
+}
+
+// Test adding a recording
+func TestListRecordingsForUri(t *testing.T) {
+	if connectionError != nil || archive == nil {
+		t.Log("Skipping as not connected to archive-media-driver")
+		return
+	}
+
+	if testing.Verbose() {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	t.Logf("count:%d", count)
 }

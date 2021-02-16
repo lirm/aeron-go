@@ -55,7 +55,29 @@ func StartRecordingRequest2Packet(channel string, stream int32, sourceLocation c
 		request.AutoStop = codecs.BooleanType.TRUE
 	} // else FALSE by default
 	request.CorrelationId = correlationId
-	request.ControlSessionId = correlationId
+	request.ControlSessionId = sessionId
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func ListRecordingsForUriRequestPacket(sessionId int64, correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) ([]byte, error) {
+	var request codecs.ListRecordingsForUriRequest
+	request.ControlSessionId = sessionId
+	request.CorrelationId = correlationId
+	request.FromRecordingId = fromRecordingId
+	request.RecordCount = recordCount
+	request.StreamId = stream
+	request.Channel = []uint8(channel)
 
 	// Marshal it
 	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}

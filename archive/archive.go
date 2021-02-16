@@ -124,7 +124,6 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 		if time.Since(start) > ArchiveDefaults.ControlTimeout {
 			control.State.state = ControlStateTimedOut
 			delete(connectionsMap, correlationId) // remove it from map
-
 		} else {
 			control.IdleStrategy.Idle(0)
 		}
@@ -225,4 +224,44 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 // Get a new correlation Id
 func NextCorrelationId() int64 {
 	return _correlationId.Inc()
+}
+
+// List up to recordCount recording descriptors from fromRecordingId
+// with a limit of recordCount for a given channel and stream
+// returning the number of descriptors consumed.  If fromRecordingId
+// is greater than we return 0.
+func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount int32, channelFragment string, stream int32) (int, error) {
+
+	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+
+	if err := archive.Proxy.ListRecordingsForUri(archive.Control.SessionId, correlationId, fromRecordingId, recordCount, stream, channelFragment); err != nil {
+		return 0, err
+	}
+
+	archive.Control.ControlResponse = nil
+	archive.Control.RecordingDescriptors = nil
+	if err := archive.Control.PollForDescriptors(correlationId, recordCount); err != nil {
+		return 0, err
+	}
+	connectionsMap[correlationId] = nil // Clear the lookup
+
+	// If there's a ControlResponse let's see what transpired
+	response := archive.Control.ControlResponse
+	if response != nil {
+		switch response.Code {
+		case codecs.ControlResponseCode.ERROR:
+			return 0, fmt.Errorf("Response for correlationId %d (relevantId %d) failed %s", response.CorrelationId, response.CorrelationId, response.ErrorMessage)
+
+		case codecs.ControlResponseCode.RECORDING_UNKNOWN:
+			return len(archive.Control.RecordingDescriptors), nil
+
+		default:
+			return 0, fmt.Errorf("Response for correlationId %d (relevantId %d) unexpected code: %d", response.Code, response.CorrelationId, response.ErrorMessage)
+		}
+	}
+
+	// Otherwise we cam return our results
+	return len(archive.Control.RecordingDescriptors), nil
+
 }

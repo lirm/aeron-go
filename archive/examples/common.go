@@ -21,11 +21,13 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 )
 
-var ExamplesConfig = struct {
+var Config = struct {
 	RequestStream   *int
 	RequestChannel  *string
 	ResponseStream  *int
 	ResponseChannel *string
+	SampleStream    *int
+	SampleChannel   *string
 	AeronPrefix     *string
 	ProfilerEnabled *bool
 	DriverTimeout   *int64
@@ -37,6 +39,8 @@ var ExamplesConfig = struct {
 	flag.String("requestchannel", "aeron:udp?endpoint=localhost:8010", "default request control channel to publish to"),
 	flag.Int("responsestream", 21, "default response control stream to use"),
 	flag.String("responsechannel", "aeron:udp?endpoint=localhost:8020", "default response control channel to publish to"),
+	flag.Int("samplestream", 1001, "default response control stream to use"),
+	flag.String("samplechannel", "aeron:udp?endpoint=localhost:20121", "default response control channel to publish to"),
 	flag.String("prefix", aeron.DefaultAeronDir+"/aeron-"+aeron.UserName, "root directory for aeron driver file"),
 	flag.Bool("profile", false, "enable CPU profiling"),
 	flag.Int64("timeout", 10000, "driver liveliness timeout in ms"),
