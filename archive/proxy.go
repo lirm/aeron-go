@@ -115,7 +115,7 @@ func (proxy *Proxy) StartRecording(channel string, stream int32, sourceLocation 
 	return nil
 }
 
-// Start a Recorded Publication
+// List up to recordCount recordings that match the channel and stream
 func (proxy *Proxy) ListRecordingsForUri(sessionId int64, correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) error {
 
 	bytes, err := ListRecordingsForUriRequestPacket(sessionId, correlationId, fromRecordingId, recordCount, stream, channel)

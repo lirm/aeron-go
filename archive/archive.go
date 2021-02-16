@@ -105,7 +105,8 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	// And intitiate the connection
 	control.State.state = ControlStateConnectRequestSent
 	correlationId := NextCorrelationId()
-	connectionsMap[correlationId] = control // Add it to our map so we can find it
+	connectionsMap[correlationId] = control  // Add it to our map so we can find it
+	defer connectionsMapClean(correlationId) // Clear the lookup
 
 	// Send the request and poll for the reply, giving up if we hit our timeout
 	if err := archive.Proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationId); err != nil {
@@ -123,7 +124,6 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 		// Check for timeout
 		if time.Since(start) > ArchiveDefaults.ControlTimeout {
 			control.State.state = ControlStateTimedOut
-			delete(connectionsMap, correlationId) // remove it from map
 		} else {
 			control.IdleStrategy.Idle(0)
 		}
@@ -174,6 +174,11 @@ func (archive *Archive) ClientId() int64 {
 	return archive.aeron.ClientID()
 }
 
+// Clear the connections map of a correlationId. Done by a function so it can defer'ed
+func connectionsMapClean(correlationId int64) {
+	connectionsMap[correlationId] = nil
+}
+
 // Start recording a channel/stream
 // Returns relevantId on success, explanatory error otherwise
 func (archive *Archive) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool) (int64, error) {
@@ -183,6 +188,9 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	// FIXME: check open
 
 	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
+
 	if err := archive.Proxy.StartRecording(channel, stream, sourceLocation, autoStop, correlationId, archive.Control.SessionId); err != nil {
 		return 0, err
 	}
@@ -190,7 +198,6 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 		return 0, err
 	}
 
-	// fmt.Printf("StartRecording:ControlResponse is %#v\n", archive.Control.ControlResponse)
 	return archive.Control.ControlResponse.RelevantId, nil
 }
 
@@ -211,6 +218,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	}
 
 	correlationId := NextCorrelationId()
+	defer connectionsMapClean(correlationId) // Clear the lookup
 	fmt.Printf("Start recording correlationId:%d\n", correlationId)
 	// FIXME: semantics of autoStop here?
 	if err := archive.Proxy.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, false, correlationId, archive.Control.SessionId); err != nil {
@@ -234,6 +242,7 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 
 	correlationId := NextCorrelationId()
 	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
 
 	if err := archive.Proxy.ListRecordingsForUri(archive.Control.SessionId, correlationId, fromRecordingId, recordCount, stream, channelFragment); err != nil {
 		return 0, err
@@ -244,7 +253,6 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 	if err := archive.Control.PollForDescriptors(correlationId, recordCount); err != nil {
 		return 0, err
 	}
-	connectionsMap[correlationId] = nil // Clear the lookup
 
 	// If there's a ControlResponse let's see what transpired
 	response := archive.Control.ControlResponse
