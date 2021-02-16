@@ -130,3 +130,19 @@ func (proxy *Proxy) ListRecordingsForUri(sessionId int64, correlationId int64, f
 
 	return nil
 }
+
+// Start a replay
+func (proxy *Proxy) ReplayRequest(sessionId int64, correlationId int64, recordingId int64, position int64, length int64, replayChannel string, replayStream int32) error {
+
+	// Create a packet and send it
+	bytes, err := ReplayRequestPacket(sessionId, correlationId, recordingId, position, length, replayStream, replayChannel)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}

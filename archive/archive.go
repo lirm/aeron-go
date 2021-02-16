@@ -176,7 +176,6 @@ func (archive *Archive) ClientId() int64 {
 
 // Clear the connections map of a correlationId. Done by a function so it can defer'ed
 func connectionsMapClean(correlationId int64) {
-	logger.Debugf("clean connectionsMap[%d]\n", correlationId)
 	connectionsMap[correlationId] = nil
 }
 
@@ -267,7 +266,42 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 		}
 	}
 
-	// Otherwise we cam return our results
+	// Otherwise we can return our results
 	return len(archive.Control.RecordingDescriptors), nil
+
+}
+
+// Start a replay for a length in bytes of a recording from a position.
+//
+// If the position is FIXME: Java NULL_POSITION (-1) then the stream will
+// be replayed from the start.
+//
+// If the length is FIXME: Java MAX_VALUE (2^31-1) the replay will follow a
+// live recording.
+//
+// If the length is FIXME: Java NULL_LENGTH (-1) the replay will
+// replay the whole stream of unknown length.
+//
+// The lower 32-bits of the returned value contains the ImageSessionId() of the received replay. All
+// 64-bits are required to uniquely identify the replay when calling StopReplay(). The lower 32-bits
+// can be obtained by casting the int64 value to an int32. (FIXME: provide a mechanism)
+//
+// Returns the id of the replay session which will be the same as the Image sessionId of the received
+// replay for correlation with the matching channel and stream id in the lower 32 bits
+func (archive *Archive) StartReplay(recordingId int64, position int64, length int64, replayChannel string, replayStream int32) (int64, error) {
+
+	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.ReplayRequest(archive.Control.SessionId, correlationId, recordingId, position, length, replayChannel, replayStream); err != nil {
+		return 0, err
+	}
+
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.ControlResponse.RelevantId, nil
 
 }

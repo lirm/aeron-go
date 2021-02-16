@@ -85,3 +85,35 @@ func TestListRecordingsForUri(t *testing.T) {
 	}
 	t.Logf("count:%d", count)
 }
+
+// Test starting a replay
+func TestStartReplay(t *testing.T) {
+	if connectionError != nil || archive == nil {
+		t.Log("Skipping as not connected to archive-media-driver")
+		return
+	}
+
+	if testing.Verbose() {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+
+	if count == 0 {
+		t.Log("FIXME:No recordings to start")
+		t.Fail()
+	}
+
+	recordingId := archive.Control.RecordingDescriptors[count-1].RecordingId
+	replayId, err := archive.StartReplay(recordingId, 0, -1, testCases[0].replayChannel, testCases[0].replayStream)
+	if err != nil {
+		t.Log("StartReplay failed:", err.Error())
+		t.Fail()
+	}
+
+	t.Logf("FIXME:TODO implement(recordingId:%d, replayId:%d", recordingId, replayId)
+	t.Fail()
+}

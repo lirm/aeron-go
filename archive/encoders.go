@@ -91,3 +91,25 @@ func ListRecordingsForUriRequestPacket(sessionId int64, correlationId int64, fro
 
 	return buffer.Bytes(), nil
 }
+
+func ReplayRequestPacket(sessionId int64, correlationId int64, recordingId int64, position int64, length int64, replayStream int32, replayChannel string) ([]byte, error) {
+	var request codecs.ReplayRequest
+	request.ControlSessionId = sessionId
+	request.CorrelationId = correlationId
+	request.RecordingId = recordingId
+	request.Position = position
+	request.ReplayStreamId = replayStream
+	request.ReplayChannel = []uint8(replayChannel)
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}

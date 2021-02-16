@@ -330,7 +330,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		control.IsPollComplete = true
 
 	default:
-		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
+		logger.Debugf("Insert decoder for type: %d\n", hdr.TemplateId)
 	}
 
 	return
