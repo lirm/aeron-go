@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package archive provides API access to Aeron's archive-media-driver
-
+// An example recorded publisher
 package main
 
 import (
@@ -25,7 +24,6 @@ import (
 	"github.com/lirm/aeron-go/archive/codecs"
 	"github.com/lirm/aeron-go/archive/examples"
 	"github.com/op/go-logging"
-	"log"
 	"os"
 	"time"
 )
@@ -35,7 +33,7 @@ var logger = logging.MustGetLogger("basic_recording_publisher")
 func main() {
 	flag.Parse()
 
-	if !*examples.ExamplesConfig.Verbose {
+	if !*examples.Config.Verbose {
 		logging.SetLevel(logging.INFO, "aeron")    // FIXME
 		logging.SetLevel(logging.DEBUG, "archive") // FIXME
 		logging.SetLevel(logging.INFO, "memmap")
@@ -46,13 +44,13 @@ func main() {
 		logging.SetLevel(logging.INFO, "rb")
 	}
 
-	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTimeout)
+	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.Config.DriverTimeout)
 	context := archive.NewArchiveContext()
-	archive.ArchiveDefaults.RequestChannel = *examples.ExamplesConfig.RequestChannel
-	archive.ArchiveDefaults.RequestStream = int32(*examples.ExamplesConfig.RequestStream)
-	archive.ArchiveDefaults.ResponseChannel = *examples.ExamplesConfig.ResponseChannel
-	archive.ArchiveDefaults.ResponseStream = int32(*examples.ExamplesConfig.ResponseStream)
-	context.AeronDir(*examples.ExamplesConfig.AeronPrefix)
+	archive.ArchiveDefaults.RequestChannel = *examples.Config.RequestChannel
+	archive.ArchiveDefaults.RequestStream = int32(*examples.Config.RequestStream)
+	archive.ArchiveDefaults.ResponseChannel = *examples.Config.ResponseChannel
+	archive.ArchiveDefaults.ResponseStream = int32(*examples.Config.ResponseStream)
+	context.AeronDir(*examples.Config.AeronPrefix)
 	context.MediaDriverTimeout(timeout)
 
 	archive, err := archive.ArchiveConnect(context)
@@ -61,46 +59,40 @@ func main() {
 	}
 	defer archive.Close()
 
-	// Java example:  aeron:udp?endpoint=localhost:20121 on stream id 1001
-	// FIXME: configuration and args
-	channel := "aeron:udp?endpoint=localhost:20121"
-	stream := int32(1001)
-	log.Printf("Calling archive.StartRecording\n")
+	channel := *examples.Config.SampleChannel
+	stream := int32(*examples.Config.SampleStream)
+
 	id, err := archive.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true)
 	if err != nil {
-		log.Printf("StartRecording failed: %s\n", err.Error())
+		logger.Infof("StartRecording failed: %s\n", err.Error())
 	}
-	log.Printf("StartRecording succeeded: id:%d\n", id)
+	logger.Infof("StartRecording succeeded: id:%d\n", id)
 
 	publication := <-archive.AddPublication(channel, stream)
-	log.Printf("Publication found %v", publication)
+	logger.Infof("Publication found %v", publication)
 	defer publication.Close()
 
-	for counter := 0; counter < *examples.ExamplesConfig.Messages; counter++ {
+	for counter := 0; counter < *examples.Config.Messages; counter++ {
 		message := fmt.Sprintf("this is a message %d", counter)
 		srcBuffer := atomic.MakeBuffer(([]byte)(message))
 		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
 		switch ret {
 		case aeron.NotConnected:
-			log.Printf("%d: not connected yet", counter)
+			logger.Infof("%d: not connected yet", counter)
 		case aeron.BackPressured:
-			log.Printf("%d: back pressured", counter)
+			logger.Infof("%d: back pressured", counter)
 		default:
 			if ret < 0 {
-				log.Printf("%d: Unrecognized code: %d", counter, ret)
+				logger.Infof("%d: Unrecognized code: %d", counter, ret)
 			} else {
-				log.Printf("%d: success!", counter)
+				logger.Infof("%d: success!", counter)
 			}
 		}
 
 		if !publication.IsConnected() {
-			log.Printf("no subscribers detected")
+			logger.Infof("no subscribers detected")
 		}
 		time.Sleep(time.Second)
 	}
 	os.Exit(1)
-
-	fmt.Printf("sleep(1)\n")
-	time.Sleep(time.Second)
-
 }
