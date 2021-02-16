@@ -314,7 +314,9 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			// Not much to be done here as we can't correlate
 			logger.Error("Failed to decode control response", err)
 		}
-		logger.Debugf("ControlResponse: %#v\n", controlResponse)
+		if controlResponse.Code != codecs.ControlResponseCode.OK {
+			logger.Debugf("ControlResponse error: %s\n", controlResponse.ErrorMessage)
+		}
 
 		// Look it up
 		control, ok := connectionsMap[controlResponse.CorrelationId]
@@ -323,7 +325,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			return
 		}
 
-		// Return the control response
+		// Return (via the control) the control response
 		control.ControlResponse = controlResponse
 		control.IsPollComplete = true
 
@@ -344,7 +346,7 @@ func (control *Control) PollNextDescriptor(correlationId int64) error {
 		fragmentsWanted -= control.Poll(DescriptorFragmentHandler, fragmentsWanted)
 
 		if fragmentsWanted <= 0 {
-			logger.Debugf("PollNextDescriptor(%d) all fragments received")
+			logger.Debugf("PollNextDescriptor(%d) all fragments received", fragmentsWanted)
 			control.IsPollComplete = true
 		}
 

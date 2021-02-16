@@ -176,6 +176,7 @@ func (archive *Archive) ClientId() int64 {
 
 // Clear the connections map of a correlationId. Done by a function so it can defer'ed
 func connectionsMapClean(correlationId int64) {
+	logger.Debugf("clean connectionsMap[%d]\n", correlationId)
 	connectionsMap[correlationId] = nil
 }
 
@@ -218,7 +219,8 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	}
 
 	correlationId := NextCorrelationId()
-	defer connectionsMapClean(correlationId) // Clear the lookup
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
 	fmt.Printf("Start recording correlationId:%d\n", correlationId)
 	// FIXME: semantics of autoStop here?
 	if err := archive.Proxy.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, false, correlationId, archive.Control.SessionId); err != nil {
@@ -248,8 +250,6 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 		return 0, err
 	}
 
-	archive.Control.ControlResponse = nil
-	archive.Control.RecordingDescriptors = nil
 	if err := archive.Control.PollForDescriptors(correlationId, recordCount); err != nil {
 		return 0, err
 	}
@@ -264,8 +264,6 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 		case codecs.ControlResponseCode.RECORDING_UNKNOWN:
 			return len(archive.Control.RecordingDescriptors), nil
 
-		default:
-			return 0, fmt.Errorf("Response for correlationId %d (relevantId %d) unexpected code: %d", response.Code, response.CorrelationId, response.ErrorMessage)
 		}
 	}
 
