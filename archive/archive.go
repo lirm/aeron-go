@@ -46,6 +46,17 @@ func init() {
 	sessionsMap = make(map[int64]*Control)
 	connectionsMap = make(map[int64]*Control)
 	recordingsMap = make(map[int64]*Control)
+
+	// FIXME: Provide options
+	logging.SetLevel(ArchiveDefaults.ArchiveLoglevel, "archive")
+	logging.SetLevel(logging.DEBUG, "aeron")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "memmap")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "driver")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "counters")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "logbuffers")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "buffer")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "rb")
+
 }
 
 func ArchiveAvailableImageHandler(*aeron.Image) {
@@ -60,16 +71,6 @@ func ArchiveUnavailableImageHandler(*aeron.Image) {
 // ArchiveConnect factory method to create a Archive instance from the ArchiveContext settings
 func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	var err error
-
-	// FIXME: Provide options
-	logging.SetLevel(ArchiveDefaults.ArchiveLoglevel, "archive")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "aeron")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "memmap")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "driver")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "counters")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "logbuffers")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "buffer")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "rb")
 
 	archive := new(Archive)
 	archive.aeron = new(aeron.Aeron)
