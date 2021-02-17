@@ -27,6 +27,16 @@ import (
 	"time"
 )
 
+// The polling mechanism is not parameterizsed so we need to set state for the results as we go
+// These pieces are filled out by various ResponsePollers all of which will set IsPollComplete to true
+type ControlResults struct {
+	FragmentLimit        int
+	CorrelationId        int64                         // FIXME: we may want overlapping operations
+	ControlResponse      *codecs.ControlResponse       // FIXME: We may want a queue here
+	RecordingDescriptors []*codecs.RecordingDescriptor // FIXME: ditto
+	IsPollComplete       bool                          // FIXME: Consider making this atomic
+}
+
 // Control contains everything required for the archive control pub/sub request/response pair
 type Control struct {
 	ResponseChannel    string
@@ -42,12 +52,8 @@ type Control struct {
 	challengeSessionId int64 // FIXME: Todo
 	SessionId          int64
 
-	// These pieces are filled out by various ResponsePollers which will set IsPollComplete to true
-	FragmentLimit        int
-	CorrelationId        int64                         // FIXME: we may want overlapping operations
-	ControlResponse      *codecs.ControlResponse       // FIXME: We may want a queue here
-	RecordingDescriptors []*codecs.RecordingDescriptor // FIXME: ditto
-	IsPollComplete       bool                          // FIXME: Consider making this atomic
+	// Polling results
+	Results ControlResults
 
 	// FIXME: auth
 	EncodedChallenge []byte
@@ -122,8 +128,8 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		}
 
 		// Set our state to let the caller of Poll() which triggered this know they have something
-		control.ControlResponse = controlResponse
-		control.IsPollComplete = true
+		control.Results.ControlResponse = controlResponse
+		control.Results.IsPollComplete = true
 
 	default:
 		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
@@ -202,8 +208,8 @@ func (control *Control) ErrorHandler(err error) {
 
 // The control response poller uses local state to pass back information from the underlying subscription
 func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) int {
-	control.ControlResponse = nil
-	control.IsPollComplete = false
+	control.Results.ControlResponse = nil
+	control.Results.IsPollComplete = false
 
 	// FIXME: check what controlledPoll might do instead
 	return control.Subscription.Poll(handler, fragmentLimit)
@@ -219,7 +225,7 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 	for {
 		fragmentsWanted -= control.Poll(ControlFragmentHandler, fragmentsWanted)
 
-		if control.IsPollComplete {
+		if control.Results.IsPollComplete {
 			logger.Debugf("PollNextResponse(%d) complete", correlationId)
 			return nil
 		}
@@ -249,22 +255,22 @@ func (control *Control) PollForResponse(correlationId int64) error {
 		}
 
 		// Check we're on the right session
-		if control.ControlResponse.ControlSessionId != control.SessionId {
+		if control.Results.ControlResponse.ControlSessionId != control.SessionId {
 			// FIXME: Other than log?
-			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.ControlResponse.ControlSessionId, control.SessionId))
-			control.IsPollComplete = true
+			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.SessionId))
+			control.Results.IsPollComplete = true
 			return nil
 		}
 
 		// Check we've got the right correlationId
-		if control.ControlResponse.CorrelationId != correlationId {
+		if control.Results.ControlResponse.CorrelationId != correlationId {
 			// FIXME: Other than log?
-			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.ControlResponse.CorrelationId))
-			control.IsPollComplete = true
+			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId))
+			control.Results.IsPollComplete = true
 			return nil
 		}
 
-		control.IsPollComplete = true
+		control.Results.IsPollComplete = true
 		return nil
 	}
 }
@@ -306,7 +312,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		}
 
 		// Set our state to let the caller of Poll() which triggered this know they have something
-		control.RecordingDescriptors = append(control.RecordingDescriptors, recordingDescriptor)
+		control.Results.RecordingDescriptors = append(control.Results.RecordingDescriptors, recordingDescriptor)
 
 	case controlResponse.SbeTemplateId():
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
@@ -322,8 +328,8 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId)
 			return
 		}
-		control.ControlResponse = controlResponse
-		control.IsPollComplete = true
+		control.Results.ControlResponse = controlResponse
+		control.Results.IsPollComplete = true
 
 		if controlResponse.Code != codecs.ControlResponseCode.RECORDING_UNKNOWN {
 			logger.Debugf("ControlResponse error UNKNOWN: %s\n", controlResponse.ErrorMessage)
@@ -346,19 +352,19 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 	logger.Debugf("PollNextDescriptor(%d) start", correlationId)
 	start := time.Now()
 
-	for !control.IsPollComplete {
+	for !control.Results.IsPollComplete {
 		fragmentsWanted -= control.Poll(DescriptorFragmentHandler, fragmentsWanted)
 
 		if fragmentsWanted <= 0 {
 			logger.Debugf("PollNextDescriptor(%d) all fragments received", fragmentsWanted)
-			control.IsPollComplete = true
+			control.Results.IsPollComplete = true
 		}
 
 		if control.Subscription.IsClosed() {
 			return fmt.Errorf("response channel from archive is not connected")
 		}
 
-		if control.IsPollComplete {
+		if control.Results.IsPollComplete {
 			logger.Debugf("PollNextDescriptor(%d) complete", correlationId)
 			return nil
 		}
@@ -384,28 +390,28 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 	for {
 		// Check for error
 		if err := control.PollNextDescriptor(correlationId, int(fragmentsWanted)); err != nil {
-			control.IsPollComplete = true
+			control.Results.IsPollComplete = true
 			return err
 		}
 
-		if control.IsPollComplete {
+		if control.Results.IsPollComplete {
 			logger.Debugf("PollNextResponse(%d) complete", correlationId)
 			return nil
 		}
 
 		// Check we're on the right session
-		if control.ControlResponse.ControlSessionId != control.SessionId {
+		if control.Results.ControlResponse.ControlSessionId != control.SessionId {
 			// FIXME: Other than log?1
-			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.ControlResponse.ControlSessionId, control.SessionId))
-			control.IsPollComplete = true
+			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.SessionId))
+			control.Results.IsPollComplete = true
 			return nil
 		}
 
 		// Check we've got the right correlationId
-		if control.ControlResponse.CorrelationId != correlationId {
+		if control.Results.ControlResponse.CorrelationId != correlationId {
 			// FIXME: Other than log?
-			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.ControlResponse.CorrelationId))
-			control.IsPollComplete = true
+			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId))
+			control.Results.IsPollComplete = true
 			return nil
 		}
 	}
