@@ -198,7 +198,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 		return 0, err
 	}
 
-	return archive.Control.ControlResponse.RelevantId, nil
+	return archive.Control.Results.ControlResponse.RelevantId, nil
 }
 
 // Add a Recorded Publication and set it up to be recorded.
@@ -254,20 +254,20 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 	}
 
 	// If there's a ControlResponse let's see what transpired
-	response := archive.Control.ControlResponse
+	response := archive.Control.Results.ControlResponse
 	if response != nil {
 		switch response.Code {
 		case codecs.ControlResponseCode.ERROR:
 			return 0, fmt.Errorf("Response for correlationId %d (relevantId %d) failed %s", response.CorrelationId, response.CorrelationId, response.ErrorMessage)
 
 		case codecs.ControlResponseCode.RECORDING_UNKNOWN:
-			return len(archive.Control.RecordingDescriptors), nil
+			return len(archive.Control.Results.RecordingDescriptors), nil
 
 		}
 	}
 
 	// Otherwise we can return our results
-	return len(archive.Control.RecordingDescriptors), nil
+	return len(archive.Control.Results.RecordingDescriptors), nil
 
 }
 
@@ -302,6 +302,6 @@ func (archive *Archive) StartReplay(recordingId int64, position int64, length in
 		return 0, err
 	}
 
-	return archive.Control.ControlResponse.RelevantId, nil
+	return archive.Control.Results.ControlResponse.RelevantId, nil
 
 }
