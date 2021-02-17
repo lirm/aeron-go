@@ -101,9 +101,9 @@ func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32,
 }
 
 // Start a Recorded Publication
-func (proxy *Proxy) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, correlationId int64, sessionId int64) error {
+func (proxy *Proxy) StartRecording(sessionId int64, correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
 
-	bytes, err := StartRecordingRequest2Packet(channel, stream, sourceLocation, autoStop, correlationId, sessionId)
+	bytes, err := StartRecordingRequest2Packet(sessionId, correlationId, stream, sourceLocation, autoStop, channel)
 	if err != nil {
 		return err
 	}

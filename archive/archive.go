@@ -49,14 +49,13 @@ func init() {
 
 	// FIXME: Provide options
 	logging.SetLevel(ArchiveDefaults.ArchiveLoglevel, "archive")
-	logging.SetLevel(logging.DEBUG, "aeron")
+	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "aeron")
 	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "memmap")
 	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "driver")
 	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "counters")
 	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "logbuffers")
 	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "buffer")
 	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "rb")
-
 }
 
 func ArchiveAvailableImageHandler(*aeron.Image) {
@@ -192,7 +191,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	connectionsMap[correlationId] = archive.Control // Set the lookup
 	defer connectionsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StartRecording(channel, stream, sourceLocation, autoStop, correlationId, archive.Control.SessionId); err != nil {
+	if err := archive.Proxy.StartRecording(archive.Control.SessionId, correlationId, stream, sourceLocation, autoStop, channel); err != nil {
 		return 0, err
 	}
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
@@ -223,7 +222,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	defer connectionsMapClean(correlationId)        // Clear the lookup
 	fmt.Printf("Start recording correlationId:%d\n", correlationId)
 	// FIXME: semantics of autoStop here?
-	if err := archive.Proxy.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, false, correlationId, archive.Control.SessionId); err != nil {
+	if err := archive.Proxy.StartRecording(archive.Control.SessionId, correlationId, stream, codecs.SourceLocation.LOCAL, false, channel); err != nil {
 		// FIXME: cleanup
 		return nil, err
 	}

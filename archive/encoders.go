@@ -19,10 +19,14 @@ import (
 	"github.com/lirm/aeron-go/archive/codecs"
 )
 
+// Encoders for all the protocol packets Each of these functions
+// creates a []byte suitable for sending over the wire by using the
+// generated encoders created using the simple-binary-encosing
+
 // FIXME: Reentrancy options: a) giant lock, b) parameterise, c) allocate on fly
+
 var marshaller *codecs.SbeGoMarshaller = codecs.NewSbeGoMarshaller()
 
-// Create and marshal a connect request
 func ConnectRequestPacket(responseChannel string, responseStream int32, correlationID int64) ([]byte, error) {
 	var request codecs.ConnectRequest
 
@@ -44,8 +48,12 @@ func ConnectRequestPacket(responseChannel string, responseStream int32, correlat
 	return buffer.Bytes(), nil
 }
 
-// Create and marshal a StartRecordingRequest
-func StartRecordingRequest2Packet(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, correlationId int64, sessionId int64) ([]byte, error) {
+// deprecated
+func StartRecordingRequestPacket(sessionId int64, correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, channel string) ([]byte, error) {
+	return StartRecordingRequest2Packet(sessionId, correlationId, stream, sourceLocation, false, channel)
+}
+
+func StartRecordingRequest2Packet(sessionId int64, correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) ([]byte, error) {
 	var request codecs.StartRecordingRequest2
 
 	request.Channel = []uint8(channel)
@@ -56,6 +64,27 @@ func StartRecordingRequest2Packet(channel string, stream int32, sourceLocation c
 	} // else FALSE by default
 	request.CorrelationId = correlationId
 	request.ControlSessionId = sessionId
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func StopRecordingRequestPacket(sessionId int64, correlationId int64, stream int32, channel string) ([]byte, error) {
+	var request codecs.StopRecordingRequest
+
+	request.ControlSessionId = sessionId
+	request.CorrelationId = correlationId
+	request.StreamId = stream
+	request.Channel = []uint8(channel)
 
 	// Marshal it
 	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
@@ -100,6 +129,25 @@ func ReplayRequestPacket(sessionId int64, correlationId int64, recordingId int64
 	request.Position = position
 	request.ReplayStreamId = replayStream
 	request.ReplayChannel = []uint8(replayChannel)
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func StopReplayRequestPacket(sessionId int64, correlationId int64, replaySessionId int64) ([]byte, error) {
+	var request codecs.StopReplayRequest
+	request.ControlSessionId = sessionId
+	request.CorrelationId = correlationId
+	request.ReplaySessionId = replaySessionId
 
 	// Marshal it
 	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}

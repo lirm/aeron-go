@@ -12,30 +12,25 @@ Finally golang idioms are used where reasonable.
 
 The library should be fully reentrant.
 
+Each Archive instance has it's won aeron instance running a proxy
+(outgoing/producer) and control (incoming/subscriber) pair.
 
-Questions
+Questions/Issues
 ===
 
-Can we assume a 1-1 mapping of archive instance to Control pair? I'm assuming not.
-
-Sync APIs built on top of Async via channel design choice?
+Sync APIs built on top of Async via channel design choice? For now just sync as we get things working.
 
 Testing:
  * Look for local archive and exec? Test and not run for Travis? Mock? Add jars to repo and fetch?
 
-StartRecordingRequest2 only I think
 
 Backlog
 ===
 Ephemeral port usage
 
-29 FIXMEs
-
 Simplest straight line basic recorded publisher and basic subscriber
 
-Sync API
-
-Then think about Async but not necessarily.
+Now up to 58 FIXMEs
 
 AuthConnect, Challenge/Response
 
@@ -43,8 +38,7 @@ Close/Disconnect
 
 Improve the Error handling
 
-OnAvailableCounter: Not supported yet?
+OnAvailableCounter: Not supported yet? 
 
 Defaults settings and setting
 
-Testing:

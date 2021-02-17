@@ -100,6 +100,7 @@ func TestStartReplay(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 		t.Fail()
+		return
 	}
 
 	if count == 0 {
@@ -114,6 +115,7 @@ func TestStartReplay(t *testing.T) {
 		t.Fail()
 	}
 
-	t.Logf("FIXME:TODO implement(recordingId:%d, replayId:%d", recordingId, replayId)
+	sessionId := int32(replayId)
+	t.Logf("FIXME:TODO implement(recordingId:%d, replayId:%d sessionId:%d", recordingId, replayId, sessionId)
 	t.Fail()
 }
