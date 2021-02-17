@@ -314,20 +314,25 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			// Not much to be done here as we can't correlate
 			logger.Error("Failed to decode control response", err)
 		}
-		if controlResponse.Code != codecs.ControlResponseCode.OK {
-			logger.Debugf("ControlResponse error: %s\n", controlResponse.ErrorMessage)
-		}
 
 		// Look it up
 		control, ok := connectionsMap[controlResponse.CorrelationId]
 		if !ok {
-			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId)
 			return
 		}
-
-		// Return (via the control) the control response
 		control.ControlResponse = controlResponse
 		control.IsPollComplete = true
+
+		if controlResponse.Code != codecs.ControlResponseCode.RECORDING_UNKNOWN {
+			logger.Debugf("ControlResponse error UNKNOWN: %s\n", controlResponse.ErrorMessage)
+			return
+		}
+		if controlResponse.Code != codecs.ControlResponseCode.ERROR {
+			logger.Debugf("ControlResponse error ERROR: %s\n", controlResponse.ErrorMessage)
+			return
+		}
 
 	default:
 		logger.Debugf("Insert decoder for type: %d\n", hdr.TemplateId)
@@ -337,10 +342,9 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 }
 
 // Poll for a fragmentLimit of Descriptors
-func (control *Control) PollNextDescriptor(correlationId int64) error {
+func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted int) error {
 	logger.Debugf("PollNextDescriptor(%d) start", correlationId)
 	start := time.Now()
-	fragmentsWanted := 10 // FIXME: make an option
 
 	for !control.IsPollComplete {
 		fragmentsWanted -= control.Poll(DescriptorFragmentHandler, fragmentsWanted)
@@ -350,6 +354,10 @@ func (control *Control) PollNextDescriptor(correlationId int64) error {
 			control.IsPollComplete = true
 		}
 
+		if control.Subscription.IsClosed() {
+			return fmt.Errorf("response channel from archive is not connected")
+		}
+
 		if control.IsPollComplete {
 			logger.Debugf("PollNextDescriptor(%d) complete", correlationId)
 			return nil
@@ -357,10 +365,6 @@ func (control *Control) PollNextDescriptor(correlationId int64) error {
 
 		if fragmentsWanted > 0 {
 			continue
-		}
-
-		if control.Subscription.IsClosed() {
-			return fmt.Errorf("response channel from archive is not connected")
 		}
 
 		// FIXME: maybe a separate timeout, this could legitimately be a while
@@ -374,12 +378,12 @@ func (control *Control) PollNextDescriptor(correlationId int64) error {
 }
 
 // Poll for recording descriptors, adding them to the set in the control
-func (control *Control) PollForDescriptors(correlationId int64, count int32) error {
+func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted int32) error {
 	logger.Debugf("PollForDescriptors(%d)", correlationId)
 
 	for {
 		// Check for error
-		if err := control.PollNextDescriptor(correlationId); err != nil {
+		if err := control.PollNextDescriptor(correlationId, int(fragmentsWanted)); err != nil {
 			control.IsPollComplete = true
 			return err
 		}
@@ -391,7 +395,7 @@ func (control *Control) PollForDescriptors(correlationId int64, count int32) err
 
 		// Check we're on the right session
 		if control.ControlResponse.ControlSessionId != control.SessionId {
-			// FIXME: Other than log?
+			// FIXME: Other than log?1
 			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.ControlResponse.ControlSessionId, control.SessionId))
 			control.IsPollComplete = true
 			return nil
