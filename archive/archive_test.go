@@ -17,6 +17,8 @@ package archive
 import (
 	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
+	"log"
+	"os"
 	"testing"
 )
 
@@ -26,7 +28,7 @@ import (
 // FIXME: this plan fails as aeron-go calls log.Fatalf() !!!
 var context *ArchiveContext
 var archive *Archive
-var connectionError error
+var haveArchive bool = false
 
 type TestCases struct {
 	sampleStream  int32
@@ -39,24 +41,33 @@ var testCases = []TestCases{
 	{int32(*TestConfig.SampleStream), *TestConfig.SampleChannel, int32(*TestConfig.ReplayStream), *TestConfig.ReplayChannel},
 }
 
-func init() {
+func TestMain(m *testing.M) {
+	var err error
 	context = NewArchiveContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
-	archive, connectionError = ArchiveConnect(context)
+	archive, err = ArchiveConnect(context)
+	if err != nil || archive == nil {
+		log.Printf("archive-media-driver connection failed, skipping all archive_tests")
+		return
+	} else {
+		haveArchive = true
+	}
+
+	result := m.Run()
+	archive.Close()
+	os.Exit(result)
 }
 
 // This should always pass
 func TestConnection(t *testing.T) {
-	if connectionError != nil || archive == nil {
-		t.Log("Skipping as not connected to archive-media-driver")
+	if !haveArchive {
 		return
 	}
 }
 
 // Test adding a recording
 func TestStartRecording(t *testing.T) {
-	if connectionError != nil || archive == nil {
-		t.Log("Skipping as not connected to archive-media-driver")
+	if !haveArchive {
 		return
 	}
 
@@ -70,14 +81,14 @@ func TestStartRecording(t *testing.T) {
 
 // Test adding a recording
 func TestListRecordingsForUri(t *testing.T) {
-	if connectionError != nil || archive == nil {
-		t.Log("Skipping as not connected to archive-media-driver")
+	if !haveArchive {
 		return
 	}
 
 	if testing.Verbose() {
 		logging.SetLevel(logging.DEBUG, "archive")
 	}
+
 	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
 	if err != nil {
 		t.Log(err)
@@ -88,14 +99,10 @@ func TestListRecordingsForUri(t *testing.T) {
 
 // Test starting a replay
 func TestStartReplay(t *testing.T) {
-	if connectionError != nil || archive == nil {
-		t.Log("Skipping as not connected to archive-media-driver")
+	if !haveArchive {
 		return
 	}
 
-	if testing.Verbose() {
-		logging.SetLevel(logging.DEBUG, "archive")
-	}
 	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
 	if err != nil {
 		t.Log(err)

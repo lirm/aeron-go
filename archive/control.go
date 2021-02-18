@@ -127,7 +127,6 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 			return
 		}
 
-		// Set our state to let the caller of Poll() which triggered this know they have something
 		control.Results.ControlResponse = controlResponse
 		control.Results.IsPollComplete = true
 
@@ -140,7 +139,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via a channel
-// FIXME: This is what the connection establishment currently uses, switch it over
+// FIXME: This is what the connection establishment currently uses, switch it over ro non connection specific one
 func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 

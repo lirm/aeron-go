@@ -66,7 +66,6 @@ func ArchiveUnavailableImageHandler(*aeron.Image) {
 	logger.Infof("Archive NewUnavalableImageHandler\n")
 }
 
-// FIXME: move
 // ArchiveConnect factory method to create a Archive instance from the ArchiveContext settings
 func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	var err error
@@ -109,7 +108,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	defer connectionsMapClean(correlationId) // Clear the lookup
 
 	// Send the request and poll for the reply, giving up if we hit our timeout
-	if err := archive.Proxy.ConnectRequest(control.ResponseChannel, control.ResponseStream, correlationId); err != nil {
+	if err := archive.Proxy.Connect(control.ResponseChannel, control.ResponseStream, correlationId); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}
@@ -136,6 +135,8 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 		logger.Error("Connect failed\n")
 	}
 
+	// Store the SessionId in the proxy as well
+	archive.Proxy.SessionId = control.SessionId
 	logger.Infof("Archive connection established for sessionId:%d\n", control.SessionId)
 	sessionsMap[archive.Control.SessionId] = archive.Control // Add it to our map so we can look it up
 
@@ -145,6 +146,7 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 
 // Close will terminate client conductor and remove all publications and subscriptions from the media driver
 func (archive *Archive) Close() error {
+	archive.Proxy.CloseSession()
 	return archive.aeron.Close()
 }
 
@@ -176,7 +178,7 @@ func (archive *Archive) ClientId() int64 {
 
 // Clear the connections map of a correlationId. Done by a function so it can defer'ed
 func connectionsMapClean(correlationId int64) {
-	connectionsMap[correlationId] = nil
+	delete(connectionsMap, correlationId)
 }
 
 // Start recording a channel/stream
@@ -191,7 +193,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	connectionsMap[correlationId] = archive.Control // Set the lookup
 	defer connectionsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StartRecording(archive.Control.SessionId, correlationId, stream, sourceLocation, autoStop, channel); err != nil {
+	if err := archive.Proxy.StartRecording(correlationId, stream, sourceLocation, autoStop, channel); err != nil {
 		return 0, err
 	}
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
@@ -222,7 +224,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	defer connectionsMapClean(correlationId)        // Clear the lookup
 	fmt.Printf("Start recording correlationId:%d\n", correlationId)
 	// FIXME: semantics of autoStop here?
-	if err := archive.Proxy.StartRecording(archive.Control.SessionId, correlationId, stream, codecs.SourceLocation.LOCAL, false, channel); err != nil {
+	if err := archive.Proxy.StartRecording(correlationId, stream, codecs.SourceLocation.LOCAL, false, channel); err != nil {
 		// FIXME: cleanup
 		return nil, err
 	}
@@ -245,7 +247,7 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 	connectionsMap[correlationId] = archive.Control // Set the lookup
 	defer connectionsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.ListRecordingsForUri(archive.Control.SessionId, correlationId, fromRecordingId, recordCount, stream, channelFragment); err != nil {
+	if err := archive.Proxy.ListRecordingsForUri(correlationId, fromRecordingId, recordCount, stream, channelFragment); err != nil {
 		return 0, err
 	}
 
@@ -294,7 +296,7 @@ func (archive *Archive) StartReplay(recordingId int64, position int64, length in
 	connectionsMap[correlationId] = archive.Control // Set the lookup
 	defer connectionsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.ReplayRequest(archive.Control.SessionId, correlationId, recordingId, position, length, replayChannel, replayStream); err != nil {
+	if err := archive.Proxy.Replay(correlationId, recordingId, position, length, replayChannel, replayStream); err != nil {
 		return 0, err
 	}
 

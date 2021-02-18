@@ -12,8 +12,13 @@ Finally golang idioms are used where reasonable.
 
 The library should be fully reentrant.
 
-Each Archive instance has it's won aeron instance running a proxy
+Each Archive instance has it's own aeron instance running a proxy
 (outgoing/producer) and control (incoming/subscriber) pair.
+
+It was tempting to make the sourceLocation a boolean ```isLocal``` but
+keeping the underlying codec value allows for future
+additionals. However, where the protocol specifies a BooelanType a
+bool is used until encoding.
 
 Questions/Issues
 ===
@@ -23,14 +28,19 @@ Sync APIs built on top of Async via channel design choice? For now just sync as 
 Testing:
  * Look for local archive and exec? Test and not run for Travis? Mock? Add jars to repo and fetch?
 
+Are there any Packets bigger than MTU requiring fragment assembly?
+ * Errors *could* conceivably be artbitrarily long strings but this is a) unlikely, b) not currently the case.
 
 Backlog
 ===
-Ephemeral port usage
 
 Simplest straight line basic recorded publisher and basic subscriber
 
-Now up to 58 FIXMEs
+Ephemeral port usage
+
+The archive state is bogus
+
+58 FIXMEs
 
 AuthConnect, Challenge/Response
 
@@ -38,7 +48,7 @@ Close/Disconnect
 
 Improve the Error handling
 
-OnAvailableCounter: Not supported yet? 
+OnAvailableCounter: Not supported yet? This is going to matter I think
 
 Defaults settings and setting
 

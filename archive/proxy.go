@@ -84,8 +84,11 @@ func (proxy *Proxy) Offer(buf bytes.Buffer) int64 {
 
 }
 
-// Make a Connect Request
-func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32, correlationId int64) error {
+// From here we have all the functions that create a data packet and send it on the
+// publication
+
+// ConnectRequest
+func (proxy *Proxy) Connect(responseChannel string, responseStream int32, correlationId int64) error {
 
 	// Create a packet and send it
 	bytes, err := ConnectRequestPacket(responseChannel, responseStream, correlationId)
@@ -100,10 +103,10 @@ func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32,
 	return nil
 }
 
-// Start a Recorded Publication
-func (proxy *Proxy) StartRecording(sessionId int64, correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
-
-	bytes, err := StartRecordingRequest2Packet(sessionId, correlationId, stream, sourceLocation, autoStop, channel)
+//  ClosesSession
+func (proxy *Proxy) CloseSession() error {
+	// Create a packet and send it
+	bytes, err := CloseSessionRequestPacket(proxy.SessionId)
 	if err != nil {
 		return err
 	}
@@ -115,11 +118,11 @@ func (proxy *Proxy) StartRecording(sessionId int64, correlationId int64, stream 
 	return nil
 }
 
-// List up to recordCount recordings that match the channel and stream
-func (proxy *Proxy) ListRecordingsForUri(sessionId int64, correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) error {
+// StartRecording
+// Uses the more recent protocol addition StartdRecordingRequest2 which added autoStop
+func (proxy *Proxy) StartRecording(correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
 
-	bytes, err := ListRecordingsForUriRequestPacket(sessionId, correlationId, fromRecordingId, recordCount, stream, channel)
-
+	bytes, err := StartRecordingRequest2Packet(proxy.SessionId, correlationId, stream, sourceLocation, autoStop, channel)
 	if err != nil {
 		return err
 	}
@@ -131,11 +134,134 @@ func (proxy *Proxy) ListRecordingsForUri(sessionId int64, correlationId int64, f
 	return nil
 }
 
-// Start a replay
-func (proxy *Proxy) ReplayRequest(sessionId int64, correlationId int64, recordingId int64, position int64, length int64, replayChannel string, replayStream int32) error {
+// StopRecording
+func (proxy *Proxy) StopRecording(correlationId int64, stream int32, channel string) error {
+	// Create a packet and send it
+	bytes, err := StopRecordingRequestPacket(proxy.SessionId, correlationId, stream, channel)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// Replay
+func (proxy *Proxy) Replay(correlationId int64, recordingId int64, position int64, length int64, replayChannel string, replayStream int32) error {
 
 	// Create a packet and send it
-	bytes, err := ReplayRequestPacket(sessionId, correlationId, recordingId, position, length, replayStream, replayChannel)
+	bytes, err := ReplayRequestPacket(proxy.SessionId, correlationId, recordingId, position, length, replayStream, replayChannel)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// StopReplay
+func (proxy *Proxy) StopReplay(correlationId int64, replaySessionId int64) error {
+	// Create a packet and send it
+	bytes, err := StopReplayRequestPacket(proxy.SessionId, correlationId, replaySessionId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// ListRecordings
+func (proxy *Proxy) ListRecordings(correlationId int64, fromRecordingId int64, recordCount int32) error {
+	// Create a packet and send it
+	bytes, err := ListRecordingsRequestPacket(proxy.SessionId, correlationId, fromRecordingId, recordCount)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// ListRecordingsForUri
+// Lists up to recordCount recordings that match the channel and stream
+func (proxy *Proxy) ListRecordingsForUri(correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) error {
+
+	bytes, err := ListRecordingsForUriRequestPacket(proxy.SessionId, correlationId, fromRecordingId, recordCount, stream, channel)
+
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// ListRecording
+func (proxy *Proxy) ListRecording(correlationId int64, fromRecordingId int64) error {
+	// Create a packet and send it
+	bytes, err := ListRecordingRequestPacket(proxy.SessionId, correlationId, fromRecordingId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// ExtendRecording
+// Uses the more recent protocol addition ExtendRecordingRequest2 which added autoStop
+func (proxy *Proxy) ExtendRecording(correlationId int64, recordingId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
+	// Create a packet and send it
+	bytes, err := ExtendRecordingRequest2Packet(proxy.SessionId, correlationId, recordingId, stream, sourceLocation, autoStop, channel)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// RecordingPosition
+func (proxy *Proxy) RecordingPosition(correlationId int64, recordingId int64) error {
+	// Create a packet and send it
+	bytes, err := RecordingPositionRequestPacket(proxy.SessionId, correlationId, recordingId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// TruncateRecording
+func (proxy *Proxy) TruncateRecording(correlationId int64, recordingId int64, position int64) error {
+	// Create a packet and send it
+	bytes, err := TruncateRecordingPacket(proxy.SessionId, correlationId, recordingId, position)
 	if err != nil {
 		return err
 	}
