@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/archive"
 	"github.com/lirm/aeron-go/archive/codecs"
 	"github.com/lirm/aeron-go/archive/examples"
@@ -53,24 +54,32 @@ func main() {
 	context.AeronDir(*examples.Config.AeronPrefix)
 	context.MediaDriverTimeout(timeout)
 
-	archive, err := archive.ArchiveConnect(context)
+	arch, err := archive.ArchiveConnect(context)
 	if err != nil {
 		logger.Fatalf("Failed to connect to media driver: %s\n", err.Error())
 	}
-	defer archive.Close()
+	defer arch.Close()
 
 	channel := *examples.Config.SampleChannel
 	stream := int32(*examples.Config.SampleStream)
 
-	id, err := archive.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true)
+	id, err := arch.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true)
 	if err != nil {
 		logger.Infof("StartRecording failed: %s\n", err.Error())
 	}
 	logger.Infof("StartRecording succeeded: id:%d\n", id)
 
-	publication := <-archive.AddPublication(channel, stream)
+	publication := <-arch.AddPublication(channel, stream)
 	logger.Infof("Publication found %v", publication)
 	defer publication.Close()
+
+	// FIXME: counters unimplemented
+	// The Java RecordedBasicPublisher polls the counters to wait until
+	// the the recording has actually started.
+	// For now we'll just dealy a bit to let that get established
+	// There may be a way to use the NewImageHandler here as well
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+	idler.Idle(0)
 
 	for counter := 0; counter < *examples.Config.Messages; counter++ {
 		message := fmt.Sprintf("this is a message %d", counter)
@@ -78,7 +87,8 @@ func main() {
 		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
 		switch ret {
 		case aeron.NotConnected:
-			logger.Infof("%d: not connected yet", counter)
+			logger.Infof("%d, Not connected (yet)", counter)
+
 		case aeron.BackPressured:
 			logger.Infof("%d: back pressured", counter)
 		default:
