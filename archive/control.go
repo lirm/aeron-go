@@ -121,7 +121,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		logger.Debugf("ControlResponse: %#v\n", controlResponse)
 
 		// Look it up
-		control, ok := connectionsMap[controlResponse.CorrelationId]
+		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
 			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
 			return
@@ -167,7 +167,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		logger.Debugf("ControlResponse: %#v\n", controlResponse)
 
 		// Look it up
-		control, ok := connectionsMap[controlResponse.CorrelationId]
+		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
 			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
 			return
@@ -304,7 +304,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		logger.Debugf("RecordingDescriptor: %#v\n", recordingDescriptor)
 
 		// Look it up
-		control, ok := connectionsMap[recordingDescriptor.CorrelationId]
+		control, ok := correlationsMap[recordingDescriptor.CorrelationId]
 		if !ok {
 			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId) // Not much to be done here as we can't correlate
 			return
@@ -321,7 +321,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		}
 
 		// Look it up
-		control, ok := connectionsMap[controlResponse.CorrelationId]
+		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
 			// Not much to be done here as we can't correlate
 			logger.Info("Uncorrelated control response correlationId=", controlResponse.CorrelationId)
