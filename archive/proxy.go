@@ -272,3 +272,33 @@ func (proxy *Proxy) TruncateRecording(correlationId int64, recordingId int64, po
 
 	return nil
 }
+
+// StopRecordingSubscription
+func (proxy *Proxy) StopRecordingBySubscriptionId(correlationId int64, subscriptionId int64) error {
+	// Create a packet and send it
+	bytes, err := StopRecordingSubscriptionPacket(proxy.SessionId, correlationId, subscriptionId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+// StopRecordingIdentity
+func (proxy *Proxy) StopRecordingByIdentity(correlationId int64, recordingId int64) error {
+	// Create a packet and send it
+	bytes, err := StopRecordingByIdentityPacket(proxy.SessionId, correlationId, recordingId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}

@@ -288,10 +288,47 @@ func TruncateRecordingPacket(sessionId int64, correlationId int64, recordingId i
 	return buffer.Bytes(), nil
 }
 
+func StopRecordingSubscriptionPacket(sessionId int64, correlationId int64, subscriptionId int64) ([]byte, error) {
+	var request codecs.StopRecordingSubscriptionRequest
+	request.ControlSessionId = sessionId
+	request.CorrelationId = correlationId
+	request.SubscriptionId = subscriptionId
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func StopRecordingByIdentityPacket(sessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request codecs.StopRecordingByIdentityRequest
+	request.ControlSessionId = sessionId
+	request.CorrelationId = correlationId
+	request.RecordingId = recordingId
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
 // FIXME: Todo (although some are incoming)
 
 /*
-StopRecordingSubscriptionRequest
 StopPositionRequest
 FindLastMatchingRecordingRequest
 ListRecordingSubscriptionsRequest
@@ -316,7 +353,7 @@ ChallengeResponse
 KeepAliveRequest
 TaggedReplicateRequest
 StartRecordingRequest2
-StopRecordingByIdentityRequest
+// StopRecordingByIdentityRequest
 RecordingStarted
 RecordingProgress
 RecordingStopped

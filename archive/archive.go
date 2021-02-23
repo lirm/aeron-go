@@ -66,6 +66,16 @@ func ArchiveUnavailableImageHandler(*aeron.Image) {
 	logger.Infof("Archive NewUnavalableImageHandler\n")
 }
 
+// Utility function to convert a recordingId into a sessionId (the least significant 32 bits)
+func RecordingIdToSessionId(recordingId int64) int32 {
+	return int32(recordingId)
+}
+
+// Utility function to add a session to a channel URI
+func AddSessionIdToChannel(channel string, sessionId int32) string {
+	return channel + "|session-id=" + fmt.Sprint(sessionId)
+}
+
 // ArchiveConnect factory method to create a Archive instance from the ArchiveContext settings
 func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	var err error
@@ -182,7 +192,7 @@ func connectionsMapClean(correlationId int64) {
 }
 
 // Start recording a channel/stream
-// Returns relevantId on success, explanatory error otherwise
+// Returns recordingId on success, explanatory error otherwise. Also See RecordingIdToSessionId()
 func (archive *Archive) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool) (int64, error) {
 
 	logger.Debugf("StartRecording(%s:%d)\n", channel, stream)
@@ -201,6 +211,74 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	}
 
 	return archive.Control.Results.ControlResponse.RelevantId, nil
+}
+
+// StopRecording can be performed by RecordingId, by SubscriptionId, by Publication, or by a channel/stream pairing
+
+// StopRecording by Channel and Stream
+// Channels that include sessionId parameters are considered different than channels without sessionIds. Stopping
+// recording on a channel without a sessionId parameter will not stop the recording of any sessionId specific
+// recordings that use the same channel and streamId.
+func (archive *Archive) StopRecording(channel string, stream int32) (int64, error) {
+	logger.Debugf("StopRecording(%s:%d)\n", channel, stream)
+
+	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.StopRecording(correlationId, stream, channel); err != nil {
+		return 0, err
+	}
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.Results.ControlResponse.RelevantId, nil
+}
+
+// StopRecording by RecordingId as returned by StartRecording
+func (archive *Archive) StopRecordingByRecordingId(recordingId int64) (int64, error) {
+	logger.Debugf("StopRecordingByRecordingId(%d)\n", recordingId)
+
+	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.StopRecordingByIdentity(correlationId, recordingId); err != nil {
+		return 0, err
+	}
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.Results.ControlResponse.RelevantId, nil
+}
+
+// StopRecording by SubscriptionId
+// Channels that include sessionId parameters are considered different than channels without sessionIds. Stopping
+// recording on a channel without a sessionId parameter will not stop the recording of any sessionId specific
+// recordings that use the same channel and streamId.
+func (archive *Archive) StopRecordingBySubscriptionId(subscriptionId int64) (int64, error) {
+	logger.Debugf("StopRecordingByRecordingId(%d)\n", subscriptionId)
+
+	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.StopRecordingBySubscriptionId(correlationId, subscriptionId); err != nil {
+		return 0, err
+	}
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.Results.ControlResponse.RelevantId, nil
+}
+
+// StopRecording by Publication
+// Stop recording a sessionId specific recording that pertains to the given Publication
+func (archive *Archive) StopRecordingByPublication(publication aeron.Publication) (int64, error) {
+	return archive.StopRecording(AddSessionIdToChannel(publication.Channel(), publication.SessionID()), publication.StreamID())
 }
 
 // Add a Recorded Publication and set it up to be recorded.
@@ -306,4 +384,21 @@ func (archive *Archive) StartReplay(recordingId int64, position int64, length in
 
 	return archive.Control.Results.ControlResponse.RelevantId, nil
 
+}
+
+// StopReplay
+func (archive *Archive) StopReplay(replaySessionId int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	connectionsMap[correlationId] = archive.Control // Set the lookup
+	defer connectionsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.StopReplay(correlationId, replaySessionId); err != nil {
+		return 0, err
+	}
+
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.Results.ControlResponse.RelevantId, nil
 }

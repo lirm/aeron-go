@@ -66,17 +66,23 @@ func TestConnection(t *testing.T) {
 }
 
 // Test adding a recording
-func TestStartRecording(t *testing.T) {
+func TestStartStopRecording(t *testing.T) {
 	if !haveArchive {
 		return
 	}
 
-	pub, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
 	if err != nil {
 		t.Log(err)
 		t.Fail()
 	}
-	t.Logf("pub:%#v", pub)
+	t.Logf("id:%#v", recordingId)
+
+	res, err := archive.StopRecordingByRecordingId(recordingId)
+	if err != nil {
+		t.Log(err, res)
+		t.Fail()
+	}
 }
 
 // Test adding a recording
@@ -89,19 +95,42 @@ func TestListRecordingsForUri(t *testing.T) {
 		logging.SetLevel(logging.DEBUG, "archive")
 	}
 
+	// Add a recording to make sure there is one
+	recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	t.Logf("id:%#v", recordingId)
+
 	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
 	if err != nil {
 		t.Log(err)
 		t.Fail()
 	}
 	t.Logf("count:%d", count)
+
+	// Clean up
+	res, err := archive.StopRecordingByRecordingId(recordingId)
+	if err != nil {
+		t.Log(err, res)
+		t.Fail()
+	}
 }
 
 // Test starting a replay
-func TestStartReplay(t *testing.T) {
+func TestStartStopReplay(t *testing.T) {
 	if !haveArchive {
 		return
 	}
+
+	// Add a recording to make sure there is one
+	recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	t.Logf("recordingId:%#v", recordingId)
 
 	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
 	if err != nil {
@@ -115,14 +144,24 @@ func TestStartReplay(t *testing.T) {
 		t.Fail()
 	}
 
-	recordingId := archive.Control.Results.RecordingDescriptors[count-1].RecordingId
+	recordingId = archive.Control.Results.RecordingDescriptors[count-1].RecordingId
+	t.Logf("id:%#v", recordingId)
 	replayId, err := archive.StartReplay(recordingId, 0, -1, testCases[0].replayChannel, testCases[0].replayStream)
 	if err != nil {
-		t.Log("StartReplay failed:", err.Error())
+		t.Logf("StartReplay failed: %d, %s", replayId, err.Error())
 		t.Fail()
 	}
 
-	sessionId := int32(replayId)
-	t.Logf("FIXME:TODO implement(recordingId:%d, replayId:%d sessionId:%d", recordingId, replayId, sessionId)
-	t.Fail()
+	// Clean up
+	res, err := archive.StopReplay(replayId)
+	if err != nil {
+		t.Logf("StopReplay(%d) failed:%d %s", replayId, res, err.Error())
+		t.Fail()
+	}
+
+	res, err = archive.StopRecordingByRecordingId(recordingId)
+	if err != nil {
+		t.Logf("StopRecordingByRecordingId(%d) failed:%d %s", replayId, res, err.Error())
+		t.Fail()
+	}
 }
