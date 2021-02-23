@@ -66,9 +66,10 @@ func ArchiveUnavailableImageHandler(*aeron.Image) {
 	logger.Infof("Archive NewUnavalableImageHandler\n")
 }
 
-// Utility function to convert a recordingId into a sessionId (the least significant 32 bits)
-func RecordingIdToSessionId(recordingId int64) int32 {
-	return int32(recordingId)
+// Utility function to convert a replay's sessionId into a streamId
+// It's actually just the least significant 32 bits
+func SessionIdToStreamId(sessionId int64) int32 {
+	return int32(sessionId)
 }
 
 // Utility function to add a session to a channel URI
