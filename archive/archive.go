@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
 	"time"
@@ -58,11 +59,11 @@ func init() {
 	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "rb")
 }
 
-func ArchiveAvailableImageHandler(*aeron.Image) {
+func ArchiveAvailableImageHandler(image *aeron.Image) {
 	logger.Infof("Archive NewAvailableImageHandler\n")
 }
 
-func ArchiveUnavailableImageHandler(*aeron.Image) {
+func ArchiveUnavailableImageHandler(image *aeron.Image) {
 	logger.Infof("Archive NewUnavalableImageHandler\n")
 }
 
@@ -119,6 +120,10 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	defer correlationsMapClean(correlationId) // Clear the lookup
 
 	// Send the request and poll for the reply, giving up if we hit our timeout
+	// FIXME: This can return but the image is not yet properly established so delay a little
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+	idler.Idle(0)
+
 	if err := archive.Proxy.Connect(control.ResponseChannel, control.ResponseStream, correlationId); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
@@ -158,6 +163,8 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 // Close will terminate client conductor and remove all publications and subscriptions from the media driver
 func (archive *Archive) Close() error {
 	archive.Proxy.CloseSession()
+	archive.Control.Publication.Close()
+	archive.Control.Subscription.Close()
 	return archive.aeron.Close()
 }
 
