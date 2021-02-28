@@ -224,9 +224,16 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 	for {
 		fragmentsWanted -= control.Poll(ControlFragmentHandler, fragmentsWanted)
 
+		// Check result
 		if control.Results.IsPollComplete {
 			logger.Debugf("PollNextResponse(%d) complete", correlationId)
-			return nil
+			if control.Results.ControlResponse.Code != codecs.ControlResponseCode.OK {
+				err := fmt.Errorf("Control Response failure: %s", control.Results.ControlResponse.ErrorMessage)
+				logger.Debug(err)
+				return err
+			} else {
+				return nil
+			}
 		}
 
 		if control.Subscription.IsClosed() {
@@ -394,7 +401,7 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 		}
 
 		if control.Results.IsPollComplete {
-			logger.Debugf("PollNextResponse(%d) complete", correlationId)
+			logger.Debugf("PollForDescriptors(%d) complete", correlationId)
 			return nil
 		}
 
