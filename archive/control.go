@@ -277,6 +277,7 @@ func (control *Control) PollForResponse(correlationId int64) error {
 		}
 
 		control.Results.IsPollComplete = true
+		logger.Debugf("PollForResponse(%d) complete", correlationId)
 		return nil
 	}
 }
