@@ -416,12 +416,49 @@ func BoundedReplayPacket(controlSessionId int64, correlationId int64, recordingI
 	return buffer.Bytes(), nil
 }
 
+func StopAllReplaysPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request codecs.StopAllReplaysRequest
+	request.ControlSessionId = controlSessionId
+	request.CorrelationId = correlationId
+	request.RecordingId = recordingId
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func CatalogHeaderPacket(version int32, length int32, nextRecordingId int64, alignment int32) ([]byte, error) {
+	var request codecs.CatalogHeader
+	request.Version = version
+	request.Length = length
+	request.NextRecordingId = nextRecordingId
+	request.Alignment = alignment
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
 // FIXME: Todo (although some are incoming)
 
 /*
 
-StopAllReplaysRequest
-CatalogHeader
 RecordingDescriptorHeader
 RecordingDescriptor
 RecordingSubscriptionDescriptor

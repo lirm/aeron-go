@@ -351,3 +351,33 @@ func (proxy *Proxy) BoundedReplayRequest(controlSessionId int64, correlationId i
 
 	return nil
 }
+
+func (proxy *Proxy) StopAllReplaysRequest(controlSessionId int64, correlationId int64, recordingId int64) error {
+
+	// Create a packet and send it
+	bytes, err := StopAllReplaysPacket(proxy.SessionId, correlationId, recordingId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+func (proxy *Proxy) CatalogHeaderRequest(version int32, length int32, nextRecordingId int64, alignment int32) error {
+
+	// Create a packet and send it
+	bytes, err := CatalogHeaderPacket(version, length, nextRecordingId, alignment)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Publication.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Publication.Offer failed: %d", ret)
+	}
+
+	return nil
+}
