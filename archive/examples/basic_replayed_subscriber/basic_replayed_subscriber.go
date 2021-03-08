@@ -34,7 +34,7 @@ func main() {
 	flag.Parse()
 
 	if !*examples.Config.Verbose {
-		logging.SetLevel(logging.DEBUG, "archive")
+		logging.SetLevel(logging.INFO, "archive")
 		logging.SetLevel(logging.INFO, "aeron")
 		logging.SetLevel(logging.INFO, "memmap")
 		logging.SetLevel(logging.INFO, "driver")
@@ -91,17 +91,14 @@ func main() {
 	counter := 0
 	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
-		logger.Debugf("%8.d: Received fragment offset:%d length:%d payload:%s\n", counter, offset, length, bytes)
+		// logger.Debugf("%8.d: Received fragment offset:%d length:%d payload:%s\n", counter, offset, length, bytes)
+		logger.Infof("%s\n", bytes)
 		counter++
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 1000}
 	for {
 		fragmentsRead := subscription.Poll(printHandler, 10)
-		if fragmentsRead > 0 {
-			logger.Debugf("Poll received %d fragments\n", fragmentsRead)
-		}
-
 		idleStrategy.Idle(fragmentsRead)
 	}
 }
