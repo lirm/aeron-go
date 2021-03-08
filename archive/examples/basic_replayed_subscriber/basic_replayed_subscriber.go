@@ -69,9 +69,9 @@ func main() {
 		logger.Fatalf(err.Error())
 	}
 	var position int64 = 0
-	var length int64 = math.MaxInt32
+	var length int64 = math.MaxInt64
 
-	logger.Infof("Start replay of channel:%s, stream:%d", sampleChannel, replayStream)
+	logger.Infof("Start replay of channel:%s, stream:%d, position:%d, length:%d", sampleChannel, replayStream, position, length)
 	replaySessionId, err := arch.StartReplay(recordingId, position, length, sampleChannel, replayStream)
 	if err != nil {
 		logger.Fatalf(err.Error())
