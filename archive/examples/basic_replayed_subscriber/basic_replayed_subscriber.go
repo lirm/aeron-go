@@ -35,12 +35,12 @@ func main() {
 
 	if !*examples.Config.Verbose {
 		logging.SetLevel(logging.DEBUG, "archive")
-		logging.SetLevel(logging.DEBUG, "aeron")
-		logging.SetLevel(logging.DEBUG, "memmap")
-		logging.SetLevel(logging.DEBUG, "driver")
-		logging.SetLevel(logging.DEBUG, "counters")
-		logging.SetLevel(logging.DEBUG, "logbuffers")
-		logging.SetLevel(logging.DEBUG, "buffer")
+		logging.SetLevel(logging.INFO, "aeron")
+		logging.SetLevel(logging.INFO, "memmap")
+		logging.SetLevel(logging.INFO, "driver")
+		logging.SetLevel(logging.INFO, "counters")
+		logging.SetLevel(logging.INFO, "logbuffers")
+		logging.SetLevel(logging.INFO, "buffer")
 	}
 
 	// As per Java example
@@ -72,13 +72,17 @@ func main() {
 	var length int64 = math.MaxInt32
 
 	logger.Infof("Start replay of channel:%s, stream:%d", sampleChannel, replayStream)
-	sessionId, err := arch.StartReplay(recordingId, position, length, sampleChannel, replayStream)
+	replaySessionId, err := arch.StartReplay(recordingId, position, length, sampleChannel, replayStream)
 	if err != nil {
 		logger.Fatalf(err.Error())
 	}
 
 	// Make the channel based upon that recording and subscribe to it
-	subChannel := archive.AddSessionIdToChannel(sampleChannel, archive.SessionIdToStreamId(sessionId))
+	subChannel, err := archive.AddReplaySessionIdToChannel(sampleChannel, archive.ReplaySessionIdToStreamId(replaySessionId))
+	if err != nil {
+		logger.Fatalf("AddReplaySessionIdToChannel() failed: %s", err.Error())
+	}
+
 	logger.Infof("Subscribing to channel:%s, stream:%d", subChannel, replayStream)
 	subscription := <-arch.AddSubscription(subChannel, replayStream)
 	defer subscription.Close()
@@ -87,14 +91,16 @@ func main() {
 	counter := 0
 	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
-		fmt.Printf("%8.d: Received fragment offset:%d length:%d payload:%s\n", counter, offset, length, bytes)
+		logger.Debugf("%8.d: Received fragment offset:%d length:%d payload:%s\n", counter, offset, length, bytes)
 		counter++
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 1000}
 	for {
 		fragmentsRead := subscription.Poll(printHandler, 10)
-		fmt.Printf("Poll received %d fragments\n", fragmentsRead)
+		if fragmentsRead > 0 {
+			logger.Debugf("Poll received %d fragments\n", fragmentsRead)
+		}
 
 		idleStrategy.Idle(fragmentsRead)
 	}

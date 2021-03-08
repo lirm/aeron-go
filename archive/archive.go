@@ -67,15 +67,21 @@ func ArchiveUnavailableImageHandler(image *aeron.Image) {
 	logger.Infof("Archive NewUnavalableImageHandler\n")
 }
 
-// Utility function to convert a replay's sessionId into a streamId
+// Utility function to convert a ReplaySessionId into a streamId
 // It's actually just the least significant 32 bits
-func SessionIdToStreamId(sessionId int64) int32 {
-	return int32(sessionId)
+func ReplaySessionIdToStreamId(replaySessionId int64) int32 {
+	return int32(replaySessionId)
 }
 
 // Utility function to add a session to a channel URI
-func AddSessionIdToChannel(channel string, sessionId int32) string {
-	return channel + "|session-id=" + fmt.Sprint(sessionId)
+// On failure it will return the original
+func AddReplaySessionIdToChannel(channel string, replaySessionId int32) (string, error) {
+	uri, err := aeron.ParseChannelUri(channel)
+	if err != nil {
+		return channel, err
+	}
+	uri.Set("session-id", fmt.Sprint(replaySessionId))
+	return uri.String(), nil
 }
 
 // ArchiveConnect factory method to create a Archive instance from the ArchiveContext settings
@@ -286,7 +292,11 @@ func (archive *Archive) StopRecordingBySubscriptionId(subscriptionId int64) (int
 // StopRecording by Publication
 // Stop recording a sessionId specific recording that pertains to the given Publication
 func (archive *Archive) StopRecordingByPublication(publication aeron.Publication) (int64, error) {
-	return archive.StopRecording(AddSessionIdToChannel(publication.Channel(), publication.SessionID()), publication.StreamID())
+	channel, err := AddReplaySessionIdToChannel(publication.Channel(), publication.SessionID())
+	if err != nil {
+		return 0, err
+	}
+	return archive.StopRecording(channel, publication.StreamID())
 }
 
 // Add a Recorded Publication and set it up to be recorded.
@@ -374,8 +384,8 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 // 64-bits are required to uniquely identify the replay when calling StopReplay(). The lower 32-bits
 // can be obtained by casting the int64 value to an int32. (FIXME: provide a mechanism)
 //
-// Returns the id of the replay session which will be the same as the Image sessionId of the received
-// replay for correlation with the matching channel and stream id in the lower 32 bits
+// Returns a ReplaySessionId - the id of the replay session which will be the same as the Image sessionId
+// of the received replay for correlation with the matching channel and stream id in the lower 32 bits
 func (archive *Archive) StartReplay(recordingId int64, position int64, length int64, replayChannel string, replayStream int32) (int64, error) {
 
 	correlationId := NextCorrelationId()
