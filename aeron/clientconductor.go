@@ -731,3 +731,8 @@ func (cc *ClientConductor) onCheckManagedResources(now int64) {
 func (cc *ClientConductor) isPublicationConnected(timeOfLastStatusMessage int64) bool {
 	return time.Now().UnixNano() <= (timeOfLastStatusMessage*int64(time.Millisecond) + cc.publicationConnectionTimeoutNs)
 }
+
+// Return the counter reader
+func (cc *ClientConductor) CounterReader() *ctr.Reader {
+	return cc.counterReader
+}
