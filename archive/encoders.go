@@ -123,6 +123,7 @@ func ReplayRequestPacket(controlSessionId int64, correlationId int64, recordingI
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 	request.Position = position
+	request.Length = length
 	request.ReplayStreamId = replayStream
 	request.ReplayChannel = []uint8(replayChannel)
 
