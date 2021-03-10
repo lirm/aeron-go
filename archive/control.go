@@ -89,7 +89,7 @@ func NewControl() *Control {
 
 // useful to see in debug mode
 func ArchiveNewSubscriptionHandler(string, int32, int64) {
-	logger.Debugf("Archive NewSubscriptionandler\n")
+	logger.Debugf("Archive NewSubscriptionHandler\n")
 }
 
 // The current subscription handler doesn't provide a mechanism for passing a rock
@@ -106,7 +106,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		// FIXME: Wef could use an ErrorHandler/Listener
+		// FIXME: We could use an ErrorHandler/Listener
 		logger.Error("Failed to decode control message header", err)
 
 	}
