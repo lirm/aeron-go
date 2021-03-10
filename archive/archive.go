@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
 	"time"
@@ -124,11 +123,6 @@ func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
 	correlationId := NextCorrelationId()
 	correlationsMap[correlationId] = control  // Add it to our map so we can find it
 	defer correlationsMapClean(correlationId) // Clear the lookup
-
-	// Send the request and poll for the reply, giving up if we hit our timeout
-	// FIXME: This can return but the image is not yet properly established so delay a little
-	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
-	idler.Idle(0)
 
 	if err := archive.Proxy.Connect(control.ResponseChannel, control.ResponseStream, correlationId); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
