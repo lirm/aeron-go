@@ -66,23 +66,6 @@ func TestConnection(t *testing.T) {
 	}
 }
 
-// Test adding a recording
-func TestStartStopRecording(t *testing.T) {
-	if !haveArchive {
-		return
-	}
-
-	if testing.Verbose() && DEBUG {
-		logging.SetLevel(logging.DEBUG, "archive")
-	}
-	if err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true); err != nil {
-		t.Log(err)
-		t.Fail()
-	}
-	//FIXME: StopRecording(t.Logf, recordingId)
-
-}
-
 // Test adding a recording and then removing it, checking the listing counts between times
 func TestListRecordingsForUri(t *testing.T) {
 	if !haveArchive {
@@ -98,7 +81,8 @@ func TestListRecordingsForUri(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	t.Logf("Initial count is %d", len(recordings))
+	initial := len(recordings)
+	t.Logf("Initial count is %d", initial)
 
 	// Add a recording
 	if err = archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true); err != nil {
@@ -132,7 +116,13 @@ func TestListRecordingsForUri(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	t.Logf("Final count is %d", len(recordings))
+	final := len(recordings)
+	t.Logf("Final count is %d", final)
+
+	if initial != final {
+		t.Logf("Number of recordings changed from %d to %d", initial, final)
+		t.Fail()
+	}
 }
 
 // Test starting a replay
