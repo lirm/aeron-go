@@ -105,17 +105,16 @@ func main() {
 
 // Lookup the last recording
 func FindLatestRecording(arch *archive.Archive, channel string, stream int32) (int64, error) {
-	foundCount, err := arch.ListRecordingsForUri(0, 100, channel, stream)
+	descriptors, err := arch.ListRecordingsForUri(0, 100, channel, stream)
 
 	if err != nil {
 		return 0, err
 	}
 
-	if foundCount == 0 {
+	if len(descriptors) == 0 {
 		return 0, fmt.Errorf("No recordings found\n")
 	}
 
 	// Return the last recordingId
-	descriptors := arch.Control.Results.RecordingDescriptors
 	return descriptors[len(descriptors)-1].RecordingId, nil
 }

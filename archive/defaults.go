@@ -39,7 +39,7 @@ type Defaults struct {
 
 var ArchiveDefaults Defaults = Defaults{
 	ArchiveLoglevel:       logging.INFO,
-	AeronLoglevel:         logging.INFO,
+	AeronLoglevel:         logging.NOTICE,
 	ControlTimeout:        time.Second * 5,
 	ControlIdleStrategy:   idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
 	RecordingIdleStrategy: idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune

@@ -456,6 +456,25 @@ func CatalogHeaderPacket(version int32, length int32, nextRecordingId int64, ali
 	return buffer.Bytes(), nil
 }
 
+func PurgeRecordingRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request codecs.PurgeRecordingRequest
+	request.ControlSessionId = controlSessionId
+	request.CorrelationId = correlationId
+	request.RecordingId = recordingId
+
+	// Marshal it
+	header := codecs.MessageHeader{request.SbeBlockLength(), request.SbeTemplateId(), request.SbeSchemaId(), request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, ArchiveDefaults.RangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
 // FIXME: Todo (although some are incoming)
 
 /*
@@ -482,5 +501,5 @@ StartRecordingRequest2
 RecordingStarted
 RecordingProgress
 RecordingStopped
-PurgeRecordingRequest
+* PurgeRecordingRequest
 */

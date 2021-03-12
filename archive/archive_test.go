@@ -15,13 +15,11 @@
 package archive
 
 import (
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
 	"log"
 	"os"
 	"testing"
-	"time"
 )
 
 // Rather than mock or spawn an archive-media-driver we're just seeing
@@ -31,7 +29,7 @@ import (
 var context *ArchiveContext
 var archive *Archive
 var haveArchive bool = false
-var DEBUG = true
+var DEBUG = false
 
 type TestCases struct {
 	sampleStream  int32
@@ -58,8 +56,6 @@ func TestMain(m *testing.M) {
 
 	result := m.Run()
 	archive.Close()
-	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 500}
-	idler.Idle(0)
 	os.Exit(result)
 }
 
@@ -79,17 +75,15 @@ func TestStartStopRecording(t *testing.T) {
 	if testing.Verbose() && DEBUG {
 		logging.SetLevel(logging.DEBUG, "archive")
 	}
-	recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
-	if err != nil {
+	if err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true); err != nil {
 		t.Log(err)
 		t.Fail()
 	}
-	t.Logf("id:%#v", recordingId)
-	StopRecording(recordingId)
+	//FIXME: StopRecording(t.Logf, recordingId)
 
 }
 
-// Test adding a recording
+// Test adding a recording and then removing it, checking the listing counts between times
 func TestListRecordingsForUri(t *testing.T) {
 	if !haveArchive {
 		return
@@ -99,32 +93,46 @@ func TestListRecordingsForUri(t *testing.T) {
 		logging.SetLevel(logging.DEBUG, "archive")
 	}
 
-	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
+	recordings, err := archive.ListRecordingsForUri(0, 100, testCases[0].sampleChannel, testCases[0].sampleStream)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
+	t.Logf("Initial count is %d", len(recordings))
 
-	if count == 0 {
-		// Add a recording to make sure there is one
-		recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
-		if err != nil {
-			t.Log(err)
-			t.FailNow()
-		}
-		t.Logf("Added new recording: id:%d", recordingId)
-		defer StopRecording(recordingId)
-		// FIXME: Again a delay is a bogus thing to do here.
-		idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 500}
-		idler.Idle(0)
+	// Add a recording
+	if err = archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true); err != nil {
+		t.Log(err)
+		t.FailNow()
 	}
 
-	count, err = archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
+	// Add a publication on that [FIXME]
+	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	t.Logf("Publication found %v", publication)
+
+	recordings, err = archive.ListRecordingsForUri(0, 100, testCases[0].sampleChannel, testCases[0].sampleStream)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	t.Logf("count:%d", count)
+	recordingId := recordings[len(recordings)-1].RecordingId
+	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
+
+	// Cleanup
+	if res, err := archive.StopRecordingByRecordingId(recordingId); err != nil {
+		t.Logf("StopRecordingByRecordingId(%d) failed:%d %s", recordingId, res, err.Error())
+	}
+	if err := archive.PurgeRecording(recordingId); err != nil {
+		t.Logf("PurgeRecording(%d) failed: %s", recordingId, err.Error())
+	}
+	publication.Close()
+
+	recordings, err = archive.ListRecordingsForUri(0, 100, testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	t.Logf("Final count is %d", len(recordings))
 }
 
 // Test starting a replay
@@ -134,57 +142,34 @@ func TestStartStopReplay(t *testing.T) {
 	}
 
 	// Add a recording to make sure there is one
-	recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	if err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true); err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	// defer StopRecording(t.Logf, recordingId)
+
+	recordings, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	t.Logf("recordingId:%#v", recordingId)
-	defer StopRecording(recordingId)
-
-	// FIXME: Delay a little to get that established
-	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 500}
-	idler.Idle(0)
-
-	count, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
-	if err != nil {
-		t.Log(err)
-		t.FailNow()
-	}
-
-	if count == 0 {
-		t.Log("FIXME:No recordings to start")
+	if len(recordings) == 0 {
+		t.Log("No recordings!")
 		t.FailNow()
 
 	}
 
-	recordingId = archive.Control.Results.RecordingDescriptors[count-1].RecordingId
-	t.Logf("id:%#v", recordingId)
+	recordingId := archive.Control.Results.RecordingDescriptors[len(recordings)-1].RecordingId
+	t.Logf("recordingid:%d", recordingId)
 	replayId, err := archive.StartReplay(recordingId, 0, -1, testCases[0].replayChannel, testCases[0].replayStream)
 	if err != nil {
 		t.Logf("StartReplay failed: %d, %s", replayId, err.Error())
 		t.FailNow()
 	}
-	defer StopReplay(replayId)
+	if res, err := archive.StopReplay(replayId); err != nil {
+		t.Logf("StopReplay(%d) failed:%d %s", replayId, res, err.Error())
+	}
 
 	return
 
-}
-
-// Defer functions to keep the tests tidy
-
-func StopRecording(recordingId int64) {
-	log.Printf("StopRecordingBySubscriptionId(%d)", recordingId)
-	res, err := archive.StopRecordingBySubscriptionId(recordingId)
-	if err != nil {
-		log.Printf("StopRecordingBySubscriptionId(%d) failed:%d %s", recordingId, res, err.Error())
-	}
-}
-
-func StopReplay(replayId int64) {
-	log.Printf("StopReplay(%d)", replayId)
-	res, err := archive.StopReplay(replayId)
-	if err != nil {
-		log.Printf("StopReplay(%d) failed:%d %s", replayId, res, err.Error())
-	}
 }

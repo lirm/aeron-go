@@ -59,11 +59,11 @@ func init() {
 }
 
 func ArchiveAvailableImageHandler(image *aeron.Image) {
-	logger.Infof("Archive NewAvailableImageHandler\n")
+	logger.Debugf("Archive NewAvailableImageHandler\n")
 }
 
 func ArchiveUnavailableImageHandler(image *aeron.Image) {
-	logger.Infof("Archive NewUnavalableImageHandler\n")
+	logger.Debugf("Archive NewUnavalableImageHandler\n")
 }
 
 // Utility function to convert a ReplaySessionId into a streamId
@@ -200,8 +200,8 @@ func correlationsMapClean(correlationId int64) {
 }
 
 // Start recording a channel/stream
-// Returns recordingId on success, explanatory error otherwise. Also See RecordingIdToSessionId()
-func (archive *Archive) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool) (int64, error) {
+// Returns nil or explanatory error otherwise. Also See RecordingIdToSessionId()
+func (archive *Archive) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool) error {
 
 	logger.Debugf("StartRecording(%s:%d)\n", channel, stream)
 	// FIXME: locking
@@ -212,16 +212,16 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
 	if err := archive.Proxy.StartRecording(correlationId, stream, sourceLocation, autoStop, channel); err != nil {
-		return 0, err
+		return err
 	}
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
-		return 0, err
+		return err
 	}
 
-	return archive.Control.Results.ControlResponse.RelevantId, nil
+	return nil
 }
 
-// StopRecording can be performed by RecordingId, by SubscriptionId, by Publication, or by a channel/stream pairing
+// StopRecording can be performed by RecordingId, by SubscriptionId, by Publication, or by a channel/stream pairing (default)
 
 // StopRecording by Channel and Stream
 // Channels that include sessionId parameters are considered different than channels without sessionIds. Stopping
@@ -244,7 +244,7 @@ func (archive *Archive) StopRecording(channel string, stream int32) (int64, erro
 	return archive.Control.Results.ControlResponse.RelevantId, nil
 }
 
-// StopRecording by RecordingId as returned by StartRecording
+// StopRecording by RecordingId as looked up in ListRecording*()
 func (archive *Archive) StopRecordingByRecordingId(recordingId int64) (int64, error) {
 	logger.Debugf("StopRecordingByRecordingId(%d)\n", recordingId)
 
@@ -276,6 +276,7 @@ func (archive *Archive) StopRecordingBySubscriptionId(subscriptionId int64) (int
 	if err := archive.Proxy.StopRecordingBySubscriptionId(correlationId, subscriptionId); err != nil {
 		return 0, err
 	}
+	// FIXME: StopRecordingBySubscriptionId is special (see Java pollForStopRecordingresponse)
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
 		return 0, err
 	}
@@ -331,18 +332,18 @@ func NextCorrelationId() int64 {
 // with a limit of recordCount for a given channel and stream
 // returning the number of descriptors consumed.  If fromRecordingId
 // is greater than we return 0.
-func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount int32, channelFragment string, stream int32) (int, error) {
+func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount int32, channelFragment string, stream int32) ([]*codecs.RecordingDescriptor, error) {
 
 	correlationId := NextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
 	if err := archive.Proxy.ListRecordingsForUri(correlationId, fromRecordingId, recordCount, stream, channelFragment); err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if err := archive.Control.PollForDescriptors(correlationId, recordCount); err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	// If there's a ControlResponse let's see what transpired
@@ -350,17 +351,16 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 	if response != nil {
 		switch response.Code {
 		case codecs.ControlResponseCode.ERROR:
-			return 0, fmt.Errorf("Response for correlationId %d (relevantId %d) failed %s", response.CorrelationId, response.CorrelationId, response.ErrorMessage)
+			return nil, fmt.Errorf("Response for correlationId %d (relevantId %d) failed %s", response.CorrelationId, response.CorrelationId, response.ErrorMessage)
 
 		case codecs.ControlResponseCode.RECORDING_UNKNOWN:
-			return len(archive.Control.Results.RecordingDescriptors), nil
+			return archive.Control.Results.RecordingDescriptors, nil
 
 		}
 	}
 
 	// Otherwise we can return our results
-	return len(archive.Control.Results.RecordingDescriptors), nil
-
+	return archive.Control.Results.RecordingDescriptors, nil
 }
 
 // Start a replay for a length in bytes of a recording from a position.
@@ -413,4 +413,21 @@ func (archive *Archive) StopReplay(replaySessionId int64) (int64, error) {
 	}
 
 	return archive.Control.Results.ControlResponse.RelevantId, nil
+}
+
+// PurgeRecording
+func (archive *Archive) PurgeRecording(recordingId int64) error {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.PurgeRecordingRequest(correlationId, recordingId); err != nil {
+		return err
+	}
+
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return err
+	}
+
+	return nil
 }

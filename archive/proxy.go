@@ -372,3 +372,17 @@ func (proxy *Proxy) CatalogHeaderRequest(version int32, length int32, nextRecord
 
 	return nil
 }
+
+func (proxy *Proxy) PurgeRecordingRequest(correlationId int64, replaySessionId int64) error {
+	// Create a packet and send it
+	bytes, err := PurgeRecordingRequestPacket(proxy.SessionId, correlationId, replaySessionId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Offer failed: %d", ret)
+	}
+
+	return nil
+}

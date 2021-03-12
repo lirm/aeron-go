@@ -63,11 +63,11 @@ func main() {
 	channel := *examples.Config.SampleChannel
 	stream := int32(*examples.Config.SampleStream)
 
-	id, err := arch.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true)
-	if err != nil {
+	if err = arch.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true); err != nil {
 		logger.Infof("StartRecording failed: %s\n", err.Error())
+		os.Exit(1)
 	}
-	logger.Infof("StartRecording succeeded: id:%d\n", id)
+	logger.Infof("StartRecording succeeded\n")
 
 	publication := <-arch.AddPublication(channel, stream)
 	logger.Infof("Publication found %v", publication)
