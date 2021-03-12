@@ -12,26 +12,25 @@ Finally golang idioms are used where reasonable.
 
 The archive library does not lock and concurrent calls to archive
 library calls that invoke the aeron-archive protocol calls should be
-externally locked to ensure only one concuurrent access.
+externally locked to ensure only one concurrent access.
 
 Each Archive instance has it's own aeron instance running a proxy
 (outgoing/producer) and control (incoming/subscriber) pair to make up
 both halves of what is essentially an RPC based protocol.
 
 Archive operations are hence modelled as synchronous calls. Should an
-async API be desired then this can be easily achieved by wrapping the
-sync call with a channel, see for example aeron.AddSubscription().
+async API be desired, this can be easily achieved by wrapping the sync
+call with a channel, see for example aeron.AddSubscription().
 
 The codecs used are generated using Aeron, and generally the archive library uses those types:
 
- * It was tempting to make the sourceLocation a boolean ```isLocal```
-   butkeeping the underlying codec value allows for future
-   additions.
-
- * Where the protocol specifies a BooelanType a golang bool is used
-   until encoding.
+ * Where the protocol specifies a BooleanType a golang bool is used
+   until the point of encoding.
 
  * Recording descriptors are returned using the codecs.RecordingDescriptor type.
+
+ * It was tempting to make the sourceLocation a boolean ```isLocal```
+   but keeping the underlying codec value allows for future additions.
 
 Questions/Issues
 ===
@@ -42,8 +41,8 @@ Testing:
 Are there any Packets bigger than MTU requiring fragment assembly?
  * Errors *could* conceivably be artbitrarily long strings but this is a) unlikely, b) not currently the case.
 
-Logging INFO - I would like henormal operation to be NORMAL so I can
-have an intermediate on DEBUG which is voluminous.
+Logging INFO - I would like normal operation to be NORMAL so I can
+have an intermediate to DEBUG which is currently too voluminous.
 
 FindLatestRecording() currently in basic_replayed_subscriber useful in API?
 
@@ -59,13 +58,14 @@ Backlog
  * Expand testing
  * Review locking decision. Adding lock/unlock in archive is simple.
  * Ephemeral port usage
- * The archive state is bogus
- * 58 FIXMEs
+ * The current archive state is bogus
+ * 60 FIXMEs
  * AuthConnect, Challenge/Response
  * Improve the Error handling
  * OnAvailableCounter: Not supported yet? This is going to matter I think
   * See also RecordingIdFromCounter
  * Defaults settings and setting
+  * I think we should be able to load a 'Settings' into the library after initialization.
  * RecordingEvent Handler and Recording Admin (detach segment etc)
  * Clean up and initial upstream push
 
