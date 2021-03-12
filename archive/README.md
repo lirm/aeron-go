@@ -10,20 +10,31 @@ the archive library is a layering on top of that.
 
 Finally golang idioms are used where reasonable.
 
-The library should be fully reentrant.
+The archive library does not lock and concurrent calls to archive
+library calls that invoke the aeron-archive protocol calls should be
+externally locked to ensure only one concuurrent access.
 
 Each Archive instance has it's own aeron instance running a proxy
-(outgoing/producer) and control (incoming/subscriber) pair.
+(outgoing/producer) and control (incoming/subscriber) pair to make up
+both halves of what is essentially an RPC based protocol.
 
-It was tempting to make the sourceLocation a boolean ```isLocal``` but
-keeping the underlying codec value allows for future
-additionals. However, where the protocol specifies a BooelanType a
-bool is used until encoding.
+Archive operations are hence modelled as synchronous calls. Should an
+async API be desired then this can be easily achieved by wrapping the
+sync call with a channel, see for example aeron.AddSubscription().
+
+The codecs used are generated using Aeron, and generally the archive library uses those types:
+
+ * It was tempting to make the sourceLocation a boolean ```isLocal```
+   butkeeping the underlying codec value allows for future
+   additions.
+
+ * Where the protocol specifies a BooelanType a golang bool is used
+   until encoding.
+
+ * Recording descriptors are returned using the codecs.RecordingDescriptor type.
 
 Questions/Issues
 ===
-
-Sync APIs built on top of Async via channel design choice? For now just sync as we get things working.
 
 Testing:
  * Look for local archive and exec? Test and not run for Travis? Mock? Add jars to repo and fetch?
@@ -31,24 +42,36 @@ Testing:
 Are there any Packets bigger than MTU requiring fragment assembly?
  * Errors *could* conceivably be artbitrarily long strings but this is a) unlikely, b) not currently the case.
 
+Logging INFO - I would like henormal operation to be NORMAL so I can
+have an intermediate on DEBUG which is voluminous.
+
+FindLatestRecording() currently in basic_replayed_subscriber useful in API?
+
+startRecording return .. arguably this is an aeron-archive issue and relevantID should be recordingId.
+
+stopRecordingBySubscription - seriously?
+
+
 Backlog
 ===
+ * Have I really understood java's startRecording(), and the relevantId returned from StartRecording exchange.
+ * Test failures / reliability
+ * Expand testing
+ * Review locking decision. Adding lock/unlock in archive is simple.
+ * Ephemeral port usage
+ * The archive state is bogus
+ * 58 FIXMEs
+ * AuthConnect, Challenge/Response
+ * Improve the Error handling
+ * OnAvailableCounter: Not supported yet? This is going to matter I think
+  * See also RecordingIdFromCounter
+ * Defaults settings and setting
+ * RecordingEvent Handler and Recording Admin (detach segment etc)
+ * Clean up and initial upstream push
 
-Simplest straight line basic recorded publisher and basic subscriber
+Done
+===
 
-Ephemeral port usage
-
-The archive state is bogus
-
-58 FIXMEs
-
-AuthConnect, Challenge/Response
-
-Close/Disconnect
-
-Improve the Error handling
-
-OnAvailableCounter: Not supported yet? This is going to matter I think
-
-Defaults settings and setting
+ * Close/Disconnect
+ * Simplest straight line basic recorded publisher and basic subscriber
 
