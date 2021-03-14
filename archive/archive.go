@@ -165,6 +165,7 @@ func (archive *Archive) Close() error {
 	archive.Proxy.CloseSession()
 	archive.Control.Publication.Close()
 	archive.Control.Subscription.Close()
+	delete(sessionsMap, archive.Control.SessionId)
 	return archive.aeron.Close()
 }
 
