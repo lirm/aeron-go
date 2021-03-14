@@ -154,7 +154,7 @@ func TestStartStopReplay(t *testing.T) {
 
 	recordingId := archive.Control.Results.RecordingDescriptors[len(recordings)-1].RecordingId
 	t.Logf("recordingid:%d", recordingId)
-	replayId, err := archive.StartReplay(recordingId, 0, -1, testCases[0].replayChannel, testCases[0].replayStream)
+	replayId, err := archive.StartReplay(recordingId, 0, RecordingLengthNull, testCases[0].replayChannel, testCases[0].replayStream)
 	if err != nil {
 		t.Logf("StartReplay failed: %d, %s", replayId, err.Error())
 		t.FailNow()

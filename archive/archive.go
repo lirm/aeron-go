@@ -315,9 +315,10 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 	fmt.Printf("Start recording correlationId:%d\n", correlationId)
+
 	// FIXME: semantics of autoStop here?
 	if err := archive.Proxy.StartRecording(correlationId, stream, codecs.SourceLocation.LOCAL, false, channel); err != nil {
-		// FIXME: cleanup
+		publication.Close()
 		return nil, err
 	}
 
@@ -364,20 +365,25 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 	return archive.Control.Results.RecordingDescriptors, nil
 }
 
+// Useful constants for StartReplay
+const RecordingPositionNull = int64(-1)     // Replay the stream from the start.
+const RecordingLengthNull = int64(-1)       // Replay will follow a live recording
+const RecordingLengthMax = int64(2<<31 - 1) // Replay the whole stream
+
 // Start a replay for a length in bytes of a recording from a position.
 //
-// If the position is FIXME: Java NULL_POSITION (-1) then the stream will
+// If the position is RecordingPositionNull (-1) then the stream will
 // be replayed from the start.
 //
-// If the length is FIXME: Java MAX_VALUE (2^31-1) the replay will follow a
-// live recording.
+// If the length is RecordingLengthMax (2^31-1) the replay will follow
+// a live recording.
 //
-// If the length is FIXME: Java NULL_LENGTH (-1) the replay will
+// If the length is RecordingLengthNull (-1) the replay will
 // replay the whole stream of unknown length.
 //
 // The lower 32-bits of the returned value contains the ImageSessionId() of the received replay. All
 // 64-bits are required to uniquely identify the replay when calling StopReplay(). The lower 32-bits
-// can be obtained by casting the int64 value to an int32. (FIXME: provide a mechanism)
+// can be obtained by casting the int64 value to an int32. See ReplaySessionIdToStreamId() helper.
 //
 // Returns a ReplaySessionId - the id of the replay session which will be the same as the Image sessionId
 // of the received replay for correlation with the matching channel and stream id in the lower 32 bits
