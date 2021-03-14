@@ -90,7 +90,7 @@ func TestListRecordingsForUri(t *testing.T) {
 		t.FailNow()
 	}
 
-	// Add a publication on that [FIXME]
+	// Add a publication on that
 	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
 	t.Logf("Publication found %v", publication)
 
@@ -136,7 +136,10 @@ func TestStartStopReplay(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	// defer StopRecording(t.Logf, recordingId)
+
+	// Add a publication on that
+	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	t.Logf("Publication found %v", publication)
 
 	recordings, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)
 	if err != nil {
@@ -158,6 +161,19 @@ func TestStartStopReplay(t *testing.T) {
 	}
 	if res, err := archive.StopReplay(replayId); err != nil {
 		t.Logf("StopReplay(%d) failed:%d %s", replayId, res, err.Error())
+	}
+
+	recordings, err = archive.ListRecordingsForUri(0, 100, testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	recordingId = recordings[len(recordings)-1].RecordingId
+	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
+
+	// Cleanup
+	if res, err := archive.StopRecordingByRecordingId(recordingId); err != nil {
+		t.Logf("StopRecordingByRecordingId(%d) failed:%d %s", recordingId, res, err.Error())
 	}
 
 	return
