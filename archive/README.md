@@ -10,68 +10,53 @@ the archive library is a layering on top of that.
 
 Finally golang idioms are used where reasonable.
 
-The archive library does not lock and concurrent calls to archive
-library calls that invoke the aeron-archive protocol calls should be
-externally locked to ensure only one concurrent access.
+The archive library does not lock and concurrent calls to archive library calls that invoke the aeron-archive protocol calls should be externally locked to ensure only one  concuurrent access.
 
 Each Archive instance has it's own aeron instance running a proxy
-(outgoing/producer) and control (incoming/subscriber) pair to make up
-both halves of what is essentially an RPC based protocol.
+(outgoing/producer) and control (incoming/subscriber) pair.
 
-Archive operations are hence modelled as synchronous calls. Should an
-async API be desired, this can be easily achieved by wrapping the sync
-call with a channel, see for example aeron.AddSubscription().
-
-The codecs used are generated using Aeron, and generally the archive library uses those types:
-
- * Where the protocol specifies a BooleanType a golang bool is used
-   until the point of encoding.
-
- * Recording descriptors are returned using the codecs.RecordingDescriptor type.
-
- * It was tempting to make the sourceLocation a boolean ```isLocal```
-   but keeping the underlying codec value allows for future additions.
+It was tempting to make the sourceLocation a boolean ```isLocal``` but
+keeping the underlying codec value allows for future
+additionals. However, where the protocol specifies a BooelanType a
+bool is used until encoding.
 
 Questions/Issues
 ===
-
 Testing:
  * Look for local archive and exec? Test and not run for Travis? Mock? Add jars to repo and fetch?
 
 Are there any Packets bigger than MTU requiring fragment assembly?
  * Errors *could* conceivably be artbitrarily long strings but this is a) unlikely, b) not currently the case.
 
-Logging INFO - I would like normal operation to be NORMAL so I can
-have an intermediate to DEBUG which is currently too voluminous.
+Logging INFO - I'd rathernormal operations to be NORMAL so I can
+have an intermediate on DEBUG which is voluminous.
 
 FindLatestRecording() currently in basic_replayed_subscriber useful in API?
 
-startRecording return .. arguably this is an aeron-archive issue and relevantID should be recordingId.
-
-stopRecordingBySubscription - seriously?
-
+startRecording return .. arguably this is an aeron-archive issue and relevantID should be recordingId? upstream?
 
 Backlog
 ===
- * Have I really understood java's startRecording(), and the relevantId returned from StartRecording exchange.
- * Test failures / reliability
- * Expand testing
- * Review locking decision. Adding lock/unlock in archive is simple.
- * Ephemeral port usage
- * The current archive state is bogus
- * 60 FIXMEs
- * AuthConnect, Challenge/Response
- * Improve the Error handling
- * OnAvailableCounter: Not supported yet? This is going to matter I think
+ * [?] Have I really understood java's startRecording(), and the relevantId returned from StartRecording exchange.
+ * [L] Expand testing
+  * [S] Test failures
+  * [S] Test reliability
+  * [?] archive-media-driver mocking/execution
+ * [S] Review locking decision. Adding lock/unlock in archive is simple.
+ * [?] Ephemeral port usage
+ * [S} The archive state is bogus
+   * IsOpen()?
+ * 58 FIXMEs
+ * [?] AuthConnect, Challenge/Response
+ * [?] Improve the Error handling
+ * [?] OnAvailableCounter: Not supported yet? This may matter I think
   * See also RecordingIdFromCounter
- * Defaults settings and setting
-  * I think we should be able to load a 'Settings' into the library after initialization.
- * RecordingEvent Handler and Recording Admin (detach segment etc)
- * Clean up and initial upstream push
+ * [S] Defaults settings and setting
+ * [M] RecordingEvent Handler and Recording Admin (detach segment etc)
+ * [?] Clean up and initial upstream push
 
 Done
 ===
-
  * Close/Disconnect
  * Simplest straight line basic recorded publisher and basic subscriber
 
