@@ -23,18 +23,19 @@ import (
 // These are the Options used by default for an Archive object
 // Those attributes marked [init] must be changed before calling ArchiveConnect()
 // Those attributes marked [runtime] may be changed at any time
+// Those attributes marked [enable] may be changed when the feature is not enabled
 type Options struct {
 	ArchiveLoglevel        logging.Level      // [runtime]
 	AeronLoglevel          logging.Level      // [runtime]
-	ControlTimeout         time.Duration      // [runtime] How long to try sending/receiving control messages [see Proxy.Timeorecut]
-	ControlIdleStrategy    idlestrategy.Idler // [runtime] Idlestrategy as for aeron itself
+	ControlTimeout         time.Duration      // [runtime] How long to try sending/receiving control messages
+	ControlIdleStrategy    idlestrategy.Idler // [runtime] Idlestrategy for sending/receiving control messages
 	RangeChecking          bool               // [init] Turn on range checking for control protocol marshalling
 	RequestChannel         string             // [init] Control request publication channel
 	RequestStream          int32              // [init] and stream
 	ResponseChannel        string             // [init] Control response subscription channel
 	ResponseStream         int32              // [init] and stream
-	RecordingEventsChannel string             // [init] Recording progress events
-	RecordingEventsStream  int32              // [init] and stream
+	RecordingEventsChannel string             // [enable] Recording progress events
+	RecordingEventsStream  int32              // [enable] and stream
 	RecordingIdleStrategy  idlestrategy.Idler // [runtime] Idlestrategy for the recording poller
 }
 
