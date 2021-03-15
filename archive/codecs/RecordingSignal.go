@@ -16,10 +16,11 @@ type RecordingSignalValues struct {
 	REPLICATE RecordingSignalEnum
 	MERGE     RecordingSignalEnum
 	SYNC      RecordingSignalEnum
+	DELETE    RecordingSignalEnum
 	NullValue RecordingSignalEnum
 }
 
-var RecordingSignal = RecordingSignalValues{0, 1, 2, 3, 4, 5, -2147483648}
+var RecordingSignal = RecordingSignalValues{0, 1, 2, 3, 4, 5, 6, -2147483648}
 
 func (r RecordingSignalEnum) Encode(_m *SbeGoMarshaller, _w io.Writer) error {
 	if err := _m.WriteInt32(_w, int32(r)); err != nil {
@@ -121,5 +122,17 @@ func (r *RecordingSignalEnum) SYNCInActingVersion(actingVersion uint16) bool {
 }
 
 func (*RecordingSignalEnum) SYNCDeprecated() uint16 {
+	return 0
+}
+
+func (*RecordingSignalEnum) DELETESinceVersion() uint16 {
+	return 0
+}
+
+func (r *RecordingSignalEnum) DELETEInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= r.DELETESinceVersion()
+}
+
+func (*RecordingSignalEnum) DELETEDeprecated() uint16 {
 	return 0
 }
