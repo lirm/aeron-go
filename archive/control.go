@@ -132,7 +132,12 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		control.Results.IsPollComplete = true
 
 	case recordingSignalEvent.SbeTemplateId():
-		logger.Warningf("Insert decoder for recordingSignalEvent[type:%d]\n", hdr.TemplateId)
+		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, ArchiveDefaults.RangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			logger.Error("Failed to decode recording signal", err)
+		}
+		logger.Infof("RecordingSignal: %#v\n", recordingSignalEvent)
+		logger.Warningf("Insert callback for recordingSignalEvent[type:%d]\n", hdr.TemplateId)
 
 	default:
 		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
@@ -141,9 +146,8 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	return
 }
 
-// The current subscription handler doesn't provide a mechanism for passing a rock
-// so we return data via a channel
-// FIXME: This is what the connection establishment currently uses, switch it over ro non connection specific one
+// The connection handling specific fragment handler.
+// This mechanism only alows us to pass results back via global state which we do in control.State
 func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
@@ -388,7 +392,6 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 			continue
 		}
 
-		// FIXME: maybe a separate timeout, this could legitimately be a while
 		if time.Since(start) > ArchiveDefaults.ControlTimeout {
 			return fmt.Errorf("timeout waiting for correlationId %d", correlationId)
 		}
@@ -410,7 +413,6 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 		// Check for error
 		if err := control.PollNextDescriptor(correlationId, int(fragmentsWanted)); err != nil {
 			control.Results.IsPollComplete = true
-			logger.Debugf("FIXME:strip PollForDescriptors(%s) returning error", err.Error())
 			return err
 		}
 
