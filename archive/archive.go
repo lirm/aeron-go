@@ -307,7 +307,6 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	// FIXME: check failure
 	publication := <-archive.AddPublication(channel, stream)
 	if !publication.IsOriginal() {
-		// FIXME: cleanup
 		return nil, fmt.Errorf("publication already added for channel=%s stream=%d", channel, stream)
 	}
 
