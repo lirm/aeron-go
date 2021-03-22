@@ -16,42 +16,28 @@ package archive
 
 import (
 	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"time"
 )
 
-// FIXME: ArchiveContext configuration options are located here:
-// https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-archive-client-options
+// The ArchiveContext contains data (Listeners, Options, aeronContext, etc) which is
+// necessary across the archive, in use in the Proxy, Control, and RecordingEvent.
+//
+// It also wraps some the Aeron context methods so you can deal with just the archive
 type ArchiveContext struct {
-	aeron                   *aeron.Aeron
-	aeronContext            *aeron.Context
-	RecordingEventsChannel  string
-	RecordingEventsStreamID int32
-	MessageTimeouts         time.Duration
-	IdleStrategy            idlestrategy.Idler
+	Options      *Options
+	SessionId    int64
+	aeron        *aeron.Aeron
+	aeronContext *aeron.Context
 }
 
-// NewContext creates and initializes new Context for AeronArchive
-// FIXME: For now this is just a simple wrapper, round this out
+// NewContext creates and initializes a new Context for AeronArchive
+// FIXME: For now this is just a simple wrapperarc, round this out
 // FIXME: ArchiveContext configuration options are located here:
 // https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-archive-client-opt
 func NewArchiveContext() *ArchiveContext {
 
 	context := new(ArchiveContext)
 	context.aeronContext = aeron.NewContext()
-
-	// FIXME: Only in debug
-	context.aeronContext.AvailableImageHandler(ArchiveAvailableImageHandler)
-	context.aeronContext.UnavailableImageHandler(ArchiveUnavailableImageHandler)
-	context.aeronContext.NewSubscriptionHandler(ArchiveNewSubscriptionHandler)
-	context.aeronContext.NewPublicationHandler(ArchiveProxyNewPublicationHandler)
-
-	// Archive specific additional context
-	// FIXME: Add methods to set all of these and make a suitable place for the defaults
-	// FIXME: Java/C++ try and work out a response channel
-
-	context.MessageTimeouts = 5 * 1000 * 1000 * 1000                             // 5 seconds in Nanos
-	context.IdleStrategy = idlestrategy.Sleeping{SleepFor: time.Millisecond * 5} // FIXME: load from defaults
 
 	return context
 }
@@ -89,18 +75,6 @@ func (context *ArchiveContext) InterServiceTimeout(timeout time.Duration) *Archi
 // PublicationConnectionTimeout sets the timeout for publications
 func (context *ArchiveContext) PublicationConnectionTimeout(timeout time.Duration) *ArchiveContext {
 	context.aeronContext.PublicationConnectionTimeout(timeout)
-	return context
-}
-
-// AvailableImageHandler sets an optional callback for available image notifications
-func (context *ArchiveContext) AvailableImageHandler(handler func(*aeron.Image)) *ArchiveContext {
-	context.aeronContext.AvailableImageHandler(handler)
-	return context
-}
-
-// UnavailableImageHandler sets an optional callback for unavailable image notification
-func (context *ArchiveContext) UnavailableImageHandler(handler func(*aeron.Image)) *ArchiveContext {
-	context.aeronContext.UnavailableImageHandler(handler)
 	return context
 }
 

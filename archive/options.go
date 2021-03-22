@@ -20,16 +20,18 @@ import (
 	"time"
 )
 
-// These are the Options used by default for an Archive object
+// Options are set by NewArchive() with default ioptions specified below
+// Some options may be changed dynamically by setting their values in Archive.Context.Options.*
+// Those attributes marked [compile] must be changed at compile time
 // Those attributes marked [init] must be changed before calling ArchiveConnect()
 // Those attributes marked [runtime] may be changed at any time
 // Those attributes marked [enable] may be changed when the feature is not enabled
 type Options struct {
+	RangeChecking          bool               // [runtime] archive protocol marshalling checks
 	ArchiveLoglevel        logging.Level      // [runtime]
 	AeronLoglevel          logging.Level      // [runtime]
-	ControlTimeout         time.Duration      // [runtime] How long to try sending/receiving control messages
-	ControlIdleStrategy    idlestrategy.Idler // [runtime] Idlestrategy for sending/receiving control messages
-	RangeChecking          bool               // [init] Turn on range checking for control protocol marshalling
+	Timeout                time.Duration      // [runtime] How long to try sending/receiving control messages
+	IdleStrategy           idlestrategy.Idler // [runtime] Idlestrategy for sending/receiving control messages
 	RequestChannel         string             // [init] Control request publication channel
 	RequestStream          int32              // [init] and stream
 	ResponseChannel        string             // [init] Control response subscription channel
@@ -39,17 +41,24 @@ type Options struct {
 	RecordingIdleStrategy  idlestrategy.Idler // [runtime] Idlestrategy for the recording poller
 }
 
-var ArchiveOptions Options = Options{
+// These are the Options used by default for an Archive object
+var defaultOptions Options = Options{
+	RangeChecking:          true, // FIXME: turn off
 	ArchiveLoglevel:        logging.INFO,
 	AeronLoglevel:          logging.NOTICE,
-	ControlTimeout:         time.Second * 5,
-	ControlIdleStrategy:    idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
-	RangeChecking:          true,                                                   // FIXME: turn off
+	Timeout:                time.Second * 5,
+	IdleStrategy:           idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
 	RequestChannel:         "aeron:udp?endpoint=localhost:8010",
 	RequestStream:          10,
 	ResponseChannel:        "aeron:udp?endpoint=localhost:8020",
 	ResponseStream:         20,
 	RecordingEventsChannel: "aeron:udp?control-mode=dynamic|control=localhost:8030",
 	RecordingEventsStream:  30,
-	RecordingIdleStrategy:  idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
+	RecordingIdleStrategy:  idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: unused
+}
+
+// Create and return a new options from the defaults.
+func DefaultOptions() *Options {
+	options := defaultOptions
+	return &options
 }

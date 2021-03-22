@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 	var err error
 	context = NewArchiveContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
-	archive, err = ArchiveConnect(context)
+	archive, err = NewArchive(context, nil)
 	if err != nil || archive == nil {
 		log.Printf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
 		return

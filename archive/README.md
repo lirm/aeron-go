@@ -49,8 +49,6 @@ startRecording return .. arguably this is an aeron-archive issue and relevantID 
 startRecording polymorphism ... leading to API choices
 
 # Backlog
- * [M] RecordingEvent Handler and Recording Admin (detach segment etc)
- * [S] Strip the archive context. It adds no value.
  * [S] Improve the Error handling
  * [?] Have I really understood java's startRecording(), and the relevantId returned from StartRecording exchange.
  * [L] Expand testing
@@ -61,14 +59,19 @@ startRecording polymorphism ... leading to API choices
  * [?] Ephemeral port usage
  * [S} The archive state is bogus
    * IsOpen()?
- * 58 FIXMEs
+ * 39 FIXMEs
  * [?] AuthConnect, Challenge/Response
  * [?] OnAvailableCounter: Not supported yet? This may matter I think
   * See also RecordingIdFromCounter
+ * Logging tidy
+ * Error callbacks
+ * Add remaining archive protocol packets to encoders, control, and API.
+ * Is it worth having multiple Idletimers in different places? probably.
+ * Encoders might take marshaller as parameter to assist reentrancy
  * [?] Clean up and initial upstream push
+ 
 
 # Done
- * [x] Close/Disconnect
- * [x] Simplest straight line basic recorded publisher and basic subscriber
- * [x] Options (was Defaults) settings and setting
+ * [x] RecordingEvent Handler and Recording Admin (detach segment etc)
+ * [x] Rework the archive context, using it in both the conrol And RecrodingEvents
 

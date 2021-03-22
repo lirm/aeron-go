@@ -51,14 +51,16 @@ func main() {
 
 	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.Config.DriverTimeout)
 	context := archive.NewArchiveContext()
-	archive.ArchiveDefaults.RequestChannel = *examples.Config.RequestChannel
-	archive.ArchiveDefaults.RequestStream = int32(*examples.Config.RequestStream)
-	archive.ArchiveDefaults.ResponseChannel = *examples.Config.ResponseChannel
-	archive.ArchiveDefaults.ResponseStream = int32(responseStream) // Unique to avoid clashes
 	context.AeronDir(*examples.Config.AeronPrefix)
 	context.MediaDriverTimeout(timeout)
 
-	arch, err := archive.ArchiveConnect(context)
+	options := archive.DefaultOptions()
+	options.RequestChannel = *examples.Config.RequestChannel
+	options.RequestStream = int32(*examples.Config.RequestStream)
+	options.ResponseChannel = *examples.Config.ResponseChannel
+	options.ResponseStream = int32(responseStream)
+
+	arch, err := archive.NewArchive(context, options)
 	if err != nil {
 		logger.Fatalf("Failed to connect to media driver: %s\n", err.Error())
 	}

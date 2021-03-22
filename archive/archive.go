@@ -27,12 +27,82 @@ import (
 // Archive is the primary interface to the media driver for managing archiving
 type Archive struct {
 	aeron   *aeron.Aeron
-	context *ArchiveContext
+	Context *ArchiveContext
 	Proxy   *Proxy
 	Control *Control
+	Events  *RecordingEventsAdapter
 }
 
-// Globals
+// By default all but one of these callbacks are active, and all need to be
+// set to user functions to be invoked. This can be done at any time
+//
+// If the loglevel is set to DEBUG, then all of the default listeners
+// will be set to logging listeners.
+//
+// The Signal Listener if set will be called in normal operation
+//
+// The Image listeners will be be called in normal operation if set
+//
+// The ReccordingEvent listeners require RecordingEventEnable() to be called
+// as well as having the RecordingEvent Poll() called by user code
+type ArchiveListeners struct {
+	RecordingEventStartedListener  func(*codecs.RecordingStarted)
+	RecordingEventProgressListener func(*codecs.RecordingProgress)
+	RecordingEventStoppedListener  func(*codecs.RecordingStopped)
+
+	RecordingSignalListener func(*codecs.RecordingSignalEvent)
+
+	AvailableImageListener   func(*aeron.Image)
+	UnavailableImageListener func(*aeron.Image)
+
+	NewSubscriptionListener func(string, int32, int64)
+	NewPublicationListener  func(string, int32, int32, int64)
+}
+
+// Some Listeners that log for convenience/debug
+func LoggingAvailableImageListener(image *aeron.Image) {
+	logger.Debugf("NewAvailableImageListener, sessionId is %d\n", image.SessionID())
+}
+
+func LoggingUnavailableImageListener(image *aeron.Image) {
+	logger.Debugf("NewUnavalableImageListener, sessionId is %d\n", image.SessionID())
+}
+
+func LoggingRecordingSignalListener(rse *codecs.RecordingSignalEvent) {
+	logger.Debugf("RecordingSignalListener, signal event is %#v\n", rse)
+}
+
+func LoggingRecordingEventStartedListener(rs *codecs.RecordingStarted) {
+	logger.Debugf("RecordingEventStartedListener, event is %#v\n", rs)
+}
+
+func LoggingRecordingEventProgressListener(rp *codecs.RecordingProgress) {
+	logger.Debugf("RecordingEventProgressListener, event is %#v\n", rp)
+}
+
+func LoggingRecordingEventStoppedListener(rs *codecs.RecordingStopped) {
+	logger.Debugf("RecordingEventStoppedListener, event is %#v\n", rs)
+}
+
+func LoggingNewSubscriptionListener(channel string, stream int32, correlationId int64) {
+	logger.Debugf("NewSubscriptionListener(channel:%s stream:%d correlationId:%d)\n", channel, stream, correlationId)
+}
+
+func LoggingNewPublicationListener(channel string, stream int32, session int32, regId int64) {
+	logger.Debugf("NewPublicationListener(channel:%s stream:%d, session:%d, regId:%d)", channel, stream, session, regId)
+}
+
+// Listeners may be set to get callbacks on various operations.
+// This global as the aeron library calls the FragmentAssemblers without any user
+// data (or other context).
+var Listeners *ArchiveListeners
+
+// Also set globally (and set via the Options) is the protocol
+// marshalling checks. If protocol marshaling goes wrong we lack
+// context so it needs to be global.
+var rangeChecking bool
+
+// Other globals used internally
 var logger = logging.MustGetLogger("archive")
 var _correlationId atomic.Long
 var sessionsMap map[int64]*Control     // Used for recording signal sessionId lookup
@@ -46,34 +116,16 @@ func init() {
 	sessionsMap = make(map[int64]*Control)
 	correlationsMap = make(map[int64]*Control)
 	recordingsMap = make(map[int64]*Control)
-
-	// FIXME: Provide options
-	logging.SetLevel(ArchiveDefaults.ArchiveLoglevel, "archive")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "aeron")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "memmap")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "driver")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "counters")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "logbuffers")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "buffer")
-	logging.SetLevel(ArchiveDefaults.AeronLoglevel, "rb")
-}
-
-func ArchiveAvailableImageHandler(image *aeron.Image) {
-	logger.Debugf("Archive NewAvailableImageHandler\n")
-}
-
-func ArchiveUnavailableImageHandler(image *aeron.Image) {
-	logger.Debugf("Archive NewUnavalableImageHandler\n")
 }
 
 // Utility function to convert a ReplaySessionId into a streamId
-// It's actually just the least significant 32 bits
 func ReplaySessionIdToStreamId(replaySessionId int64) int32 {
+	// It's actually just the least significant 32 bits
 	return int32(replaySessionId)
 }
 
 // Utility function to add a session to a channel URI
-// On failure it will return the original
+// On failure it will return the original and an error
 func AddReplaySessionIdToChannel(channel string, replaySessionId int32) (string, error) {
 	uri, err := aeron.ParseChannelUri(channel)
 	if err != nil {
@@ -84,89 +136,154 @@ func AddReplaySessionIdToChannel(channel string, replaySessionId int32) (string,
 }
 
 // ArchiveConnect factory method to create a Archive instance from the ArchiveContext settings
-func ArchiveConnect(context *ArchiveContext) (*Archive, error) {
+// You may provide your own archive context which may include an aeron context
+func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	var err error
 
 	archive := new(Archive)
 	archive.aeron = new(aeron.Aeron)
+
+	// Use they're context or allocate a default one for them
 	if context != nil {
-		archive.context = NewArchiveContext()
+		archive.Context = context
 	} else {
-		archive.context = context
+		archive.Context = NewArchiveContext()
 	}
 
-	// Setup the Control
-	control := NewControl()
-	archive.Control = control
+	// Use the provided options or use our defaults
+	if options != nil {
+		archive.Context.Options = options
+	} else {
+		if archive.Context.Options == nil {
+			// Create a new set
+			archive.Context.Options = DefaultOptions()
+		}
+	}
+
+	// FIXME: strip once development complete
+	archive.Context.Options.RangeChecking = true
+
+	logging.SetLevel(archive.Context.Options.ArchiveLoglevel, "archive")
+	logging.SetLevel(archive.Context.Options.AeronLoglevel, "aeron")
+	logging.SetLevel(archive.Context.Options.AeronLoglevel, "memmap")
+	logging.SetLevel(archive.Context.Options.AeronLoglevel, "driver")
+	logging.SetLevel(archive.Context.Options.AeronLoglevel, "counters")
+	logging.SetLevel(archive.Context.Options.AeronLoglevel, "logbuffers")
+	logging.SetLevel(archive.Context.Options.AeronLoglevel, "buffer")
+	logging.SetLevel(archive.Context.Options.AeronLoglevel, "rb")
+
+	// Setup the Control (subscriber/response)
+	archive.Control = NewControl(context)
+
+	// Setup the Proxy (publisher/request)
+	archive.Proxy = NewProxy(context)
+
+	// Setup Recording Events (although it's not enabled by default)
+	archive.Events = NewRecordingEventsAdapter(context)
+
+	// In Debug mode initialize our listeners with simple loggers
+	Listeners = new(ArchiveListeners)
+	if logging.GetLevel("archive") >= logging.DEBUG {
+		Listeners.RecordingEventStartedListener = LoggingRecordingEventStartedListener
+		Listeners.RecordingEventProgressListener = LoggingRecordingEventProgressListener
+		Listeners.RecordingEventStoppedListener = LoggingRecordingEventStoppedListener
+		Listeners.RecordingSignalListener = LoggingRecordingSignalListener
+		Listeners.AvailableImageListener = LoggingAvailableImageListener
+		Listeners.UnavailableImageListener = LoggingUnavailableImageListener
+		Listeners.NewSubscriptionListener = LoggingNewSubscriptionListener
+		Listeners.NewPublicationListener = LoggingNewPublicationListener
+
+		archive.Context.aeronContext.NewSubscriptionHandler(Listeners.NewSubscriptionListener)
+		archive.Context.aeronContext.NewPublicationHandler(Listeners.NewPublicationListener)
+	}
 
 	// Connect the underlying aeron
 	logger.Debugf("Archive connecting with context: %v", context.aeronContext)
-	archive.aeron, err = aeron.Connect(archive.context.aeronContext)
+	archive.aeron, err = aeron.Connect(archive.Context.aeronContext)
 	if err != nil {
 		return archive, err
 	}
 
 	// and then the subscription, it's poller and initiate a connection
-	control.Subscription = <-archive.aeron.AddSubscription(control.ResponseChannel, control.ResponseStream)
-	logger.Debugf("Control response subscription: %#v", control.Subscription)
+	archive.Control.Subscription = <-archive.aeron.AddSubscription(archive.Context.Options.ResponseChannel, archive.Context.Options.ResponseStream)
+	logger.Debugf("Control response subscription: %#v", archive.Control.Subscription)
 
-	// Create the publication half and the proxy that looks after sending requests on that
-	control.Publication = <-archive.aeron.AddExclusivePublication(control.RequestChannel, control.RequestStream)
-	logger.Debugf("Control request publication: %#v", control.Publication)
-	archive.Proxy = NewProxy(control.Publication, context.IdleStrategy, control.SessionId)
+	// Create the publication half for the proxy that looks after sending requests on that
+	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Context.Options.RequestChannel, archive.Context.Options.RequestStream)
+	logger.Debugf("Proxy request publication: %#v", archive.Proxy.Publication)
 
 	// FIXME: Java can somehow use an ephemeral port looked up here ...
 	// FIXME: Java and C++ use AUTH and Challenge/Response
 
 	// And intitiate the connection
-	control.State.state = ControlStateConnectRequestSent
+	archive.Control.State.state = ControlStateConnectRequestSent
 	correlationId := NextCorrelationId()
-	correlationsMap[correlationId] = control  // Add it to our map so we can find it
-	defer correlationsMapClean(correlationId) // Clear the lookup
+	correlationsMap[correlationId] = archive.Control // Add it to our map so we can find it
+	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.Connect(control.ResponseChannel, control.ResponseStream, correlationId); err != nil {
+	if err := archive.Proxy.Connect(archive.Context.Options.ResponseChannel, archive.Context.Options.ResponseStream, correlationId); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}
 
 	start := time.Now()
-	for control.State.state != ControlStateConnected && control.State.err == nil {
+	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
 		fragments := archive.Control.Poll(ConnectionControlFragmentHandler, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragments\n", fragments)
 		}
 
 		// Check for timeout
-		if time.Since(start) > ArchiveDefaults.ControlTimeout {
-			control.State.state = ControlStateTimedOut
+		if time.Since(start) > archive.Context.Options.Timeout {
+			archive.Control.State.state = ControlStateTimedOut
 		} else {
-			control.IdleStrategy.Idle(0)
+			archive.Context.Options.IdleStrategy.Idle(0)
 		}
 	}
 
-	if control.State.err != nil {
+	if archive.Control.State.err != nil {
 		logger.Errorf("Connect failed: %s\n", err)
 	}
-	if control.State.state != ControlStateConnected {
+	if archive.Control.State.state != ControlStateConnected {
 		logger.Error("Connect failed\n")
 	}
 
 	// Store the SessionId in the proxy as well
-	archive.Proxy.SessionId = control.SessionId
-	logger.Infof("Archive connection established for sessionId:%d\n", control.SessionId)
-	sessionsMap[archive.Control.SessionId] = archive.Control // Add it to our map so we can look it up
+	logger.Infof("Archive connection established for sessionId:%d\n", archive.Context.SessionId)
+	sessionsMap[archive.Context.SessionId] = archive.Control // Add it to our map so we can look it up
 
 	// FIXME: Return the archive with the control intact, not sure if this the right thing to do on failure
-	return archive, control.State.err
+	return archive, archive.Control.State.err
 }
 
 // Close will terminate client conductor and remove all publications and subscriptions from the media driver
 func (archive *Archive) Close() error {
 	archive.Proxy.CloseSession()
-	archive.Control.Publication.Close()
+	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
-	delete(sessionsMap, archive.Control.SessionId)
+	delete(sessionsMap, archive.Context.SessionId)
 	return archive.aeron.Close()
+}
+
+// Start recording events flowing
+// Events are returned via the three callbacks which should be
+// overridden from the default logging listeners defined in the Listeners
+func (archive *Archive) EnableRecordingEvents() {
+	archive.Events.Subscription = <-archive.aeron.AddSubscription(archive.Context.Options.RecordingEventsChannel, archive.Context.Options.RecordingEventsStream)
+	archive.Events.Enabled = true
+	logger.Debugf("RecordingEvents subscription: %#v", archive.Events.Subscription)
+}
+
+// Stop recording events flowing
+func (archive *Archive) DisableRecordingEvents() {
+	archive.Events.Subscription.Close()
+	archive.Events.Enabled = false
+	logger.Debugf("RecordingEvents subscription closed")
+}
+
+// Poll for recording events
+func (archive *Archive) RecordingEventsPoll() int {
+	return archive.Events.Poll(nil, 1)
 }
 
 // AddSubscription will add a new subscription to the driver.
