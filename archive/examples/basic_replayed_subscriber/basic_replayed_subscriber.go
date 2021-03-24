@@ -33,16 +33,6 @@ var logger = logging.MustGetLogger("basic_recording_subscriber")
 func main() {
 	flag.Parse()
 
-	if !*examples.Config.Verbose {
-		logging.SetLevel(logging.INFO, "archive")
-		logging.SetLevel(logging.INFO, "aeron")
-		logging.SetLevel(logging.INFO, "memmap")
-		logging.SetLevel(logging.INFO, "driver")
-		logging.SetLevel(logging.INFO, "counters")
-		logging.SetLevel(logging.INFO, "logbuffers")
-		logging.SetLevel(logging.INFO, "buffer")
-	}
-
 	// As per Java example
 	sampleChannel := *examples.Config.SampleChannel
 	sampleStream := int32(*examples.Config.SampleStream)
@@ -59,12 +49,20 @@ func main() {
 	options.RequestStream = int32(*examples.Config.RequestStream)
 	options.ResponseChannel = *examples.Config.ResponseChannel
 	options.ResponseStream = int32(responseStream)
+	if *examples.Config.Verbose {
+		fmt.Printf("Setting loglevel: DEBUG/INFO\n")
+		options.ArchiveLoglevel = logging.DEBUG
+		options.AeronLoglevel = logging.INFO
+	}
 
 	arch, err := archive.NewArchive(context, options)
 	if err != nil {
 		logger.Fatalf("Failed to connect to media driver: %s\n", err.Error())
 	}
 	defer arch.Close()
+
+	// Enable recording events although the defaults will only log in debug mode
+	arch.EnableRecordingEvents()
 
 	recordingId, err := FindLatestRecording(arch, sampleChannel, sampleStream)
 	if err != nil {
@@ -101,6 +99,8 @@ func main() {
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 1000}
 	for {
 		fragmentsRead := subscription.Poll(printHandler, 10)
+		arch.RecordingEventsPoll()
+
 		idleStrategy.Idle(fragmentsRead)
 	}
 }
