@@ -46,5 +46,5 @@ var Config = struct {
 	flag.Int64("timeout", 10000, "driver liveliness timeout in ms"),
 	flag.Int("messages", 100, "number of messages to send/receive"),
 	flag.Int("payload", 256, "messages size"),
-	flag.Bool("verbose", true, "enable logging"),
+	flag.Bool("verbose", false, "enable debug logging"),
 }
