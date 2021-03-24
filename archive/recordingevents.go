@@ -75,43 +75,38 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 	case recordingStarted.SbeTemplateId():
 		logger.Debugf("Received RecordingStarted: length %d", buf.Len())
 		if err := recordingStarted.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			// Not much to be done here as we can't correlate
+			// FIXME: Listeners.ErrorListener()
 			logger.Error("Failed to decode RecordingStarted", err)
-		} else {
-			logger.Debugf("RecordingStarted: %#v\n", recordingStarted)
-		}
 
-		// Call the Listener
-		if Listeners.RecordingEventStartedListener != nil {
-			Listeners.RecordingEventStartedListener(recordingStarted)
+		} else {
+			// Call the Listener
+			if Listeners.RecordingEventStartedListener != nil {
+				Listeners.RecordingEventStartedListener(recordingStarted)
+			}
 		}
 
 	case recordingProgress.SbeTemplateId():
 		logger.Debugf("Received RecordingProgress: length %d", buf.Len())
 		if err := recordingProgress.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			// Not much to be done here as we can't correlate
 			logger.Error("Failed to decode RecordingProgress", err)
 		} else {
 			logger.Debugf("RecordingProgress: %#v\n", recordingProgress)
-		}
-
-		// Call the Listener
-		if Listeners.RecordingEventProgressListener != nil {
-			Listeners.RecordingEventProgressListener(recordingProgress)
+			// Call the Listener
+			if Listeners.RecordingEventProgressListener != nil {
+				Listeners.RecordingEventProgressListener(recordingProgress)
+			}
 		}
 
 	case recordingStopped.SbeTemplateId():
 		logger.Debugf("Received RecordingStopped: length %d", buf.Len())
 		if err := recordingStopped.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			// Not much to be done here as we can't correlate
 			logger.Error("Failed to decode RecordingStopped", err)
 		} else {
 			logger.Debugf("RecordingStopped: %#v\n", recordingStopped)
-		}
-
-		// Call the Listener
-		if Listeners.RecordingEventStoppedListener != nil {
-			Listeners.RecordingEventStoppedListener(recordingStopped)
+			// Call the Listener
+			if Listeners.RecordingEventStoppedListener != nil {
+				Listeners.RecordingEventStoppedListener(recordingStopped)
+			}
 		}
 
 	default:
