@@ -61,35 +61,35 @@ type ArchiveListeners struct {
 
 // Some Listeners that log for convenience/debug
 func LoggingAvailableImageListener(image *aeron.Image) {
-	logger.Debugf("NewAvailableImageListener, sessionId is %d\n", image.SessionID())
+	logger.Infof("NewAvailableImageListener, sessionId is %d\n", image.SessionID())
 }
 
 func LoggingUnavailableImageListener(image *aeron.Image) {
-	logger.Debugf("NewUnavalableImageListener, sessionId is %d\n", image.SessionID())
+	logger.Infof("NewUnavalableImageListener, sessionId is %d\n", image.SessionID())
 }
 
 func LoggingRecordingSignalListener(rse *codecs.RecordingSignalEvent) {
-	logger.Debugf("RecordingSignalListener, signal event is %#v\n", rse)
+	logger.Infof("RecordingSignalListener, signal event is %#v\n", rse)
 }
 
 func LoggingRecordingEventStartedListener(rs *codecs.RecordingStarted) {
-	logger.Debugf("RecordingEventStartedListener, event is %#v\n", rs)
+	logger.Infof("RecordingEventStartedListener: %#v\n", rs)
 }
 
 func LoggingRecordingEventProgressListener(rp *codecs.RecordingProgress) {
-	logger.Debugf("RecordingEventProgressListener, event is %#v\n", rp)
+	logger.Infof("RecordingEventProgressListener, event is %#v\n", rp)
 }
 
 func LoggingRecordingEventStoppedListener(rs *codecs.RecordingStopped) {
-	logger.Debugf("RecordingEventStoppedListener, event is %#v\n", rs)
+	logger.Infof("RecordingEventStoppedListener, event is %#v\n", rs)
 }
 
 func LoggingNewSubscriptionListener(channel string, stream int32, correlationId int64) {
-	logger.Debugf("NewSubscriptionListener(channel:%s stream:%d correlationId:%d)\n", channel, stream, correlationId)
+	logger.Infof("NewSubscriptionListener(channel:%s stream:%d correlationId:%d)\n", channel, stream, correlationId)
 }
 
 func LoggingNewPublicationListener(channel string, stream int32, session int32, regId int64) {
-	logger.Debugf("NewPublicationListener(channel:%s stream:%d, session:%d, regId:%d)", channel, stream, session, regId)
+	logger.Infof("NewPublicationListener(channel:%s stream:%d, session:%d, regId:%d)", channel, stream, session, regId)
 }
 
 // Listeners may be set to get callbacks on various operations.
@@ -181,15 +181,21 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	// Setup Recording Events (although it's not enabled by default)
 	archive.Events = NewRecordingEventsAdapter(context)
 
-	// In Debug mode initialize our listeners with simple loggers
 	Listeners = new(ArchiveListeners)
+	// In Debug mode initialize our listeners with simple loggers
+	// Note that these actually log at INFO so you can do this manually for INFO if you like
 	if logging.GetLevel("archive") >= logging.DEBUG {
+		logger.Debugf("Setting logging listeners")
+
 		Listeners.RecordingEventStartedListener = LoggingRecordingEventStartedListener
 		Listeners.RecordingEventProgressListener = LoggingRecordingEventProgressListener
 		Listeners.RecordingEventStoppedListener = LoggingRecordingEventStoppedListener
+
 		Listeners.RecordingSignalListener = LoggingRecordingSignalListener
+
 		Listeners.AvailableImageListener = LoggingAvailableImageListener
 		Listeners.UnavailableImageListener = LoggingUnavailableImageListener
+
 		Listeners.NewSubscriptionListener = LoggingNewSubscriptionListener
 		Listeners.NewPublicationListener = LoggingNewPublicationListener
 
