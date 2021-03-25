@@ -49,7 +49,7 @@ startRecording return .. arguably this is an aeron-archive issue and relevantID 
 startRecording polymorphism ... leading to API choices
 
 # Backlog
- * [S] Improve the Error handling
+ * [S] Improve the Error handling / Error listeners
  * [?] Have I really understood java's startRecording(), and the relevantId returned from StartRecording exchange.
  * [L] Expand testing
   * [S] Test failures
@@ -64,7 +64,6 @@ startRecording polymorphism ... leading to API choices
  * [?] OnAvailableCounter: Not supported yet? This may matter I think
   * See also RecordingIdFromCounter
  * Logging tidy
- * Error callbacks
  * Add remaining archive protocol packets to encoders, control, and API.
  * Is it worth having multiple Idletimers in different places? probably.
  * Encoders might take marshaller as parameter to assist reentrancy
