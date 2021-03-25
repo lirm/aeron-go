@@ -67,7 +67,7 @@ func TestConnection(t *testing.T) {
 }
 
 // Test adding a recording and then removing it, checking the listing counts between times
-func TestListRecordingsForUri(t *testing.T) {
+func TestListRecordings(t *testing.T) {
 	if !haveArchive {
 		return
 	}
@@ -159,10 +159,11 @@ func TestStartStopReplay(t *testing.T) {
 		t.Logf("StartReplay failed: %d, %s", replayId, err.Error())
 		t.FailNow()
 	}
-	if res, err := archive.StopReplay(replayId); err != nil {
-		t.Logf("StopReplay(%d) failed:%d %s", replayId, res, err.Error())
+	if err := archive.StopReplay(replayId); err != nil {
+		t.Logf("StopReplay(%d) failed: %s", replayId, err.Error())
 	}
 
+	// So ListRecordingsForUri should find something
 	recordings, err = archive.ListRecordingsForUri(0, 100, testCases[0].sampleChannel, testCases[0].sampleStream)
 	if err != nil {
 		t.Log(err)
@@ -170,6 +171,40 @@ func TestStartStopReplay(t *testing.T) {
 	}
 	recordingId = recordings[len(recordings)-1].RecordingId
 	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
+
+	// And ListRecordings should also find something
+	recordings, err = archive.ListRecordings(0, 10)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	recordingId = recordings[len(recordings)-1].RecordingId
+	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
+
+	// ListRecording should find one by the above Id
+	recording, err := archive.ListRecording(recordingId)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	if recordingId != recording.RecordingId {
+		t.Log("ListRecording did not return the correct record descriptor")
+		t.FailNow()
+	}
+	t.Logf("ListRecording(%d) returned %#v", recordingId, *recording)
+
+	// ListRecording should now find one with a bad Id
+	badId := -127
+	recording, err = archive.ListRecording(-127)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	if recording != nil {
+		t.Log("ListRecording returned a record descriptor and should not have")
+		t.FailNow()
+	}
+	t.Logf("ListRecording(%d) correctly returned nil", badId)
 
 	// Cleanup
 	if res, err := archive.StopRecordingByRecordingId(recordingId); err != nil {
