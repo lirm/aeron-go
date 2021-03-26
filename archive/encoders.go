@@ -270,7 +270,7 @@ func RecordingPositionRequestPacket(controlSessionId int64, correlationId int64,
 	return buffer.Bytes(), nil
 }
 
-func TruncateRecordingPacket(controlSessionId int64, correlationId int64, recordingId int64, position int64) ([]byte, error) {
+func TruncateRecordingRequestPacket(controlSessionId int64, correlationId int64, recordingId int64, position int64) ([]byte, error) {
 	var request codecs.TruncateRecordingRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId

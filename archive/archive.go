@@ -232,7 +232,7 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	correlationsMap[correlationId] = archive.Control // Add it to our map so we can find it
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.Connect(archive.Context.Options.ResponseChannel, archive.Context.Options.ResponseStream, correlationId); err != nil {
+	if err := archive.Proxy.ConnectRequest(archive.Context.Options.ResponseChannel, archive.Context.Options.ResponseStream, correlationId); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 
 // Close will terminate client conductor and remove all publications and subscriptions from the media driver
 func (archive *Archive) Close() error {
-	archive.Proxy.CloseSession()
+	archive.Proxy.CloseSessionRequest()
 	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
 	delete(sessionsMap, archive.Context.SessionId)
@@ -340,7 +340,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StartRecording(correlationId, stream, sourceLocation, autoStop, channel); err != nil {
+	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, sourceLocation, autoStop, channel); err != nil {
 		return err
 	}
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
@@ -363,7 +363,7 @@ func (archive *Archive) StopRecording(channel string, stream int32) (int64, erro
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StopRecording(correlationId, stream, channel); err != nil {
+	if err := archive.Proxy.StopRecordingRequest(correlationId, stream, channel); err != nil {
 		return 0, err
 	}
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
@@ -374,14 +374,14 @@ func (archive *Archive) StopRecording(channel string, stream int32) (int64, erro
 }
 
 // StopRecording by RecordingId as looked up in ListRecording*()
-func (archive *Archive) StopRecordingByRecordingId(recordingId int64) (int64, error) {
-	logger.Debugf("StopRecordingByRecordingId(%d)\n", recordingId)
+func (archive *Archive) StopRecordingByIdentity(recordingId int64) (int64, error) {
+	logger.Debugf("StopRecordingByIdentity(%d)\n", recordingId)
 
 	correlationId := NextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StopRecordingByIdentity(correlationId, recordingId); err != nil {
+	if err := archive.Proxy.StopRecordingByIdentityRequest(correlationId, recordingId); err != nil {
 		return 0, err
 	}
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
@@ -395,17 +395,17 @@ func (archive *Archive) StopRecordingByRecordingId(recordingId int64) (int64, er
 // Channels that include sessionId parameters are considered different than channels without sessionIds. Stopping
 // recording on a channel without a sessionId parameter will not stop the recording of any sessionId specific
 // recordings that use the same channel and streamId.
-func (archive *Archive) StopRecordingBySubscriptionId(subscriptionId int64) (int64, error) {
-	logger.Debugf("StopRecordingByRecordingId(%d)\n", subscriptionId)
+func (archive *Archive) StopRecordingSubscriptionRequest(subscriptionId int64) (int64, error) {
+	logger.Debugf("StopRecordingSubscriptionRequest(%d)\n", subscriptionId)
 
 	correlationId := NextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StopRecordingBySubscriptionId(correlationId, subscriptionId); err != nil {
+	if err := archive.Proxy.StopRecordingSubscriptionRequest(correlationId, subscriptionId); err != nil {
 		return 0, err
 	}
-	// FIXME: StopRecordingBySubscriptionId is special (see Java pollForStopRecordingresponse)
+	// FIXME: StopRecordingSubscriptionId is special (see Java pollForStopRecordingresponse)
 	if err := archive.Control.PollForResponse(correlationId); err != nil {
 		return 0, err
 	}
@@ -444,7 +444,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	fmt.Printf("Start recording correlationId:%d\n", correlationId)
 
 	// FIXME: semantics of autoStop here?
-	if err := archive.Proxy.StartRecording(correlationId, stream, codecs.SourceLocation.LOCAL, false, channel); err != nil {
+	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, codecs.SourceLocation.LOCAL, false, channel); err != nil {
 		publication.Close()
 		return nil, err
 	}
@@ -573,7 +573,7 @@ func (archive *Archive) StartReplay(recordingId int64, position int64, length in
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.Replay(correlationId, recordingId, position, length, replayChannel, replayStream); err != nil {
+	if err := archive.Proxy.ReplayRequest(correlationId, recordingId, position, length, replayChannel, replayStream); err != nil {
 		return 0, err
 	}
 
@@ -591,7 +591,7 @@ func (archive *Archive) StopReplay(replaySessionId int64) error {
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StopReplay(correlationId, replaySessionId); err != nil {
+	if err := archive.Proxy.StopReplayRequest(correlationId, replaySessionId); err != nil {
 		return err
 	}
 

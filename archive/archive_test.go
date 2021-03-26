@@ -103,8 +103,8 @@ func TestListRecordings(t *testing.T) {
 	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
 
 	// Cleanup
-	if res, err := archive.StopRecordingByRecordingId(recordingId); err != nil {
-		t.Logf("StopRecordingByRecordingId(%d) failed:%d %s", recordingId, res, err.Error())
+	if res, err := archive.StopRecordingByIdentity(recordingId); err != nil {
+		t.Logf("StopRecordingByIdetity(%d) failed:%d %s", recordingId, res, err.Error())
 	}
 	if err := archive.PurgeRecording(recordingId); err != nil {
 		t.Logf("PurgeRecording(%d) failed: %s", recordingId, err.Error())
@@ -207,8 +207,8 @@ func TestStartStopReplay(t *testing.T) {
 	t.Logf("ListRecording(%d) correctly returned nil", badId)
 
 	// Cleanup
-	if res, err := archive.StopRecordingByRecordingId(recordingId); err != nil {
-		t.Logf("StopRecordingByRecordingId(%d) failed:%d %s", recordingId, res, err.Error())
+	if res, err := archive.StopRecordingByIdentity(recordingId); err != nil {
+		t.Logf("StopRecordingByIdentity(%d) failed:%d %s", recordingId, res, err.Error())
 	}
 
 	return
