@@ -520,7 +520,7 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 	return archive.Control.Results.RecordingDescriptors, nil
 }
 
-// Grab the recording descriptor for a rcordingId
+// Grab the recording descriptor for a recordingId
 // Returns a single recording descriptor or nil if there was no match
 func (archive *Archive) ListRecording(recordingId int64) (*codecs.RecordingDescriptor, error) {
 	correlationId := NextCorrelationId()
@@ -617,6 +617,49 @@ func (archive *Archive) StopAllReplays(recordingId int64) error {
 	}
 
 	return nil
+}
+
+// Extend an existing nont-active recording of a channel and stream
+// pairing. The channel must be configured for the initial position
+// from which it will be extended. This can be done with FIXME:
+// ChannelUriStringBuilder#initialPosition(long, int, int). The
+// details required to initialise can be found by calling FIXME:
+// listRecording(long, RecordingDescriptorConsumer).
+//
+// Returns the subscriptionId of the recording that can be passed to
+// StopRecording()
+func (archive *Archive) ExtendRecording(recordingId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.ExtendRecordingRequest(correlationId, recordingId, stream, sourceLocation, autoStop, channel); err != nil {
+		return 0, err
+	}
+
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.Results.ControlResponse.RelevantId, nil
+}
+
+// Get the position recorded for an active recording. If no active
+// recording then return RecordingPositionNull.
+func (archive *Archive) GetRecordingPosition(recordingId int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.RecordingPositionRequest(correlationId, recordingId); err != nil {
+		return 0, err
+	}
+
+	if err := archive.Control.PollForResponse(correlationId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.Results.ControlResponse.RelevantId, nil
 }
 
 // PurgeRecording
