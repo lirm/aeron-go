@@ -102,7 +102,7 @@ func (*StopPositionRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*StopPositionRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*StopPositionRequest) SbeSemanticType() (semanticType []byte) {

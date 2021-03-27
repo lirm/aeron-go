@@ -121,7 +121,7 @@ func (*RecordingDescriptorHeader) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*RecordingDescriptorHeader) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*RecordingDescriptorHeader) SbeSemanticType() (semanticType []byte) {

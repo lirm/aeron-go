@@ -155,7 +155,7 @@ func (*ListRecordingsForUriRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ListRecordingsForUriRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*ListRecordingsForUriRequest) SbeSemanticType() (semanticType []byte) {

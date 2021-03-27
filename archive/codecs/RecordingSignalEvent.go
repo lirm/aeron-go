@@ -146,7 +146,7 @@ func (*RecordingSignalEvent) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*RecordingSignalEvent) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*RecordingSignalEvent) SbeSemanticType() (semanticType []byte) {

@@ -141,7 +141,7 @@ func (*CatalogHeader) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*CatalogHeader) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*CatalogHeader) SbeSemanticType() (semanticType []byte) {

@@ -102,7 +102,7 @@ func (*PurgeRecordingRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*PurgeRecordingRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*PurgeRecordingRequest) SbeSemanticType() (semanticType []byte) {

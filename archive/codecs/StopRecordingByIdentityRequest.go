@@ -102,7 +102,7 @@ func (*StopRecordingByIdentityRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*StopRecordingByIdentityRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*StopRecordingByIdentityRequest) SbeSemanticType() (semanticType []byte) {

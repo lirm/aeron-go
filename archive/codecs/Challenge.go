@@ -124,7 +124,7 @@ func (*Challenge) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*Challenge) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*Challenge) SbeSemanticType() (semanticType []byte) {

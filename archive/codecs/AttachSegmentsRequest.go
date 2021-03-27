@@ -102,7 +102,7 @@ func (*AttachSegmentsRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*AttachSegmentsRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*AttachSegmentsRequest) SbeSemanticType() (semanticType []byte) {

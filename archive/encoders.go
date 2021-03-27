@@ -616,6 +616,32 @@ func MigrateSegmentsRequestPacket(controlSessionId int64, correlationId int64, s
 	return buffer.Bytes(), nil
 }
 
+func ReplicateRequest2Packet(controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, stopPosition int64, channelTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string, replicationChannel string) ([]byte, error) {
+	var request codecs.ReplicateRequest2
+	request.ControlSessionId = controlSessionId
+	request.CorrelationId = correlationId
+	request.SrcRecordingId = srcRecordingId
+	request.DstRecordingId = dstRecordingId
+	request.StopPosition = stopPosition
+	request.ChannelTagId = channelTagId
+	request.SrcControlStreamId = srcControlStreamId
+	request.SrcControlChannel = []uint8(srcControlChannel)
+	request.LiveDestination = []uint8(liveDestination)
+	request.ReplicationChannel = []uint8(replicationChannel)
+
+	// Marshal it
+	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
 func PurgeRecordingRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
 	var request codecs.PurgeRecordingRequest
 	request.ControlSessionId = controlSessionId

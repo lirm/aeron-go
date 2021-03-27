@@ -176,7 +176,7 @@ func (*ReplicateRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ReplicateRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*ReplicateRequest) SbeSemanticType() (semanticType []byte) {

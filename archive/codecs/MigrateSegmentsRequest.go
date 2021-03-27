@@ -118,7 +118,7 @@ func (*MigrateSegmentsRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*MigrateSegmentsRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*MigrateSegmentsRequest) SbeSemanticType() (semanticType []byte) {

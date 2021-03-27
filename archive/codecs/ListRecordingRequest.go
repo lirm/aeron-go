@@ -102,7 +102,7 @@ func (*ListRecordingRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ListRecordingRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*ListRecordingRequest) SbeSemanticType() (semanticType []byte) {

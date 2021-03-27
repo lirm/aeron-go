@@ -374,6 +374,20 @@ func (proxy *Proxy) ReplicateRequest(correlationId int64, srcRecordingId int64, 
 	return nil
 }
 
+func (proxy *Proxy) ReplicateRequest2(correlationId int64, srcRecordingId int64, dstRecordingId int64, stopPosition int64, channelTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string, replicationChannel string) error {
+	// Create a packet and send it
+	bytes, err := ReplicateRequest2Packet(proxy.Context.SessionId, correlationId, srcRecordingId, dstRecordingId, stopPosition, channelTagId, srcControlStreamId, srcControlChannel, liveDestination, replicationChannel)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
 func (proxy *Proxy) StopReplicationRequest(correlationId int64, replicationId int64) error {
 	// Create a packet and send it
 	bytes, err := StopReplicationRequestPacket(proxy.Context.SessionId, correlationId, replicationId)

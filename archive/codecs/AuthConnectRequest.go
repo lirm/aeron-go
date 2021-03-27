@@ -145,7 +145,7 @@ func (*AuthConnectRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*AuthConnectRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*AuthConnectRequest) SbeSemanticType() (semanticType []byte) {

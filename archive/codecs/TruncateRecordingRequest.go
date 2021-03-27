@@ -118,7 +118,7 @@ func (*TruncateRecordingRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*TruncateRecordingRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*TruncateRecordingRequest) SbeSemanticType() (semanticType []byte) {

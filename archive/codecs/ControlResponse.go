@@ -152,7 +152,7 @@ func (*ControlResponse) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ControlResponse) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*ControlResponse) SbeSemanticType() (semanticType []byte) {

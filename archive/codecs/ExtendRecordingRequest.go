@@ -151,7 +151,7 @@ func (*ExtendRecordingRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ExtendRecordingRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 5
+	return 6
 }
 
 func (*ExtendRecordingRequest) SbeSemanticType() (semanticType []byte) {
