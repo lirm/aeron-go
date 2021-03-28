@@ -241,35 +241,35 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 }
 
 // Poll for a specific correlationId
-// Returns nil on success, error otherwise, with detail passed back via Control.ControlResponse
-func (control *Control) PollForResponse(correlationId int64) error {
+// Returns nil, relevantId on success, error, 0 failure
+// More complex responses are contained in Control.ControlResponse after the call
+func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 	logger.Debugf("PollForResponse(%d)", correlationId)
 
 	for {
 		// Check for error
 		if err := control.PollNextResponse(correlationId); err != nil {
-			return err
+			return 0, err
 		}
 
 		// Check we're on the right session
 		if control.Results.ControlResponse.ControlSessionId != control.Context.SessionId {
-			// FIXME: Other than log?
-			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.Context.SessionId))
+			err := fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.Context.SessionId)
+			control.ErrorHandler(err)
 			control.Results.IsPollComplete = true
-			return nil
+			return 0, err
 		}
 
 		// Check we've got the right correlationId
+		// This is usually a sign of a logic error in handling the protocol so we'll log it and move on
 		if control.Results.ControlResponse.CorrelationId != correlationId {
-			// FIXME: Other than log?
-			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId))
-			control.Results.IsPollComplete = true
-			return nil
+			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId)
+			control.ErrorHandler(err)
 		}
 
 		control.Results.IsPollComplete = true
 		logger.Debugf("PollForResponse(%d) complete", correlationId)
-		return nil
+		return control.Results.ControlResponse.RelevantId, nil
 	}
 }
 

@@ -65,7 +65,7 @@ func main() {
 	channel := *examples.Config.SampleChannel
 	stream := int32(*examples.Config.SampleStream)
 
-	if err = arch.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true); err != nil {
+	if _, err := arch.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true); err != nil {
 		logger.Infof("StartRecording failed: %s\n", err.Error())
 		os.Exit(1)
 	}
