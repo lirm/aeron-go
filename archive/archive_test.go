@@ -187,7 +187,7 @@ func TestStartStopReplay(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	recordingId = recordings[len(recordings)-1].RecordingId
+	// FIXME: don't update recordingId = recordings[len(recordings)-1].RecordingId
 	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
 
 	// And ListRecordings should also find something
@@ -211,9 +211,9 @@ func TestStartStopReplay(t *testing.T) {
 	}
 	t.Logf("ListRecording(%d) returned %#v", recordingId, *recording)
 
-	// ListRecording should now find one with a bad Id
-	badId := -127
-	recording, err = archive.ListRecording(-127)
+	// ListRecording should not find one with a bad Id
+	badId := int64(-127)
+	recording, err = archive.ListRecording(badId)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -224,9 +224,26 @@ func TestStartStopReplay(t *testing.T) {
 	}
 	t.Logf("ListRecording(%d) correctly returned nil", badId)
 
+	// While we're here, check ListRecordingSubscription is working
+	descriptors, err := archive.ListRecordingSubscriptions(0, 10, false, 0, "aeron")
+	if err != nil {
+		t.Logf("ListRecordingSubscriptions() returned error:%s", err.Error())
+		t.FailNow()
+	}
+	if descriptors == nil {
+		t.Logf("ListRecordingSubscriptions() returned no descriptors")
+		t.FailNow()
+	}
+	t.Logf("ListRecordingSubscriptions() returned %d descriptor(s)", len(descriptors))
+
 	// Cleanup
-	if res, err := archive.StopRecordingByIdentity(recordingId); err != nil || !res {
+	res, err := archive.StopRecordingByIdentity(recordingId)
+	if err != nil {
 		t.Logf("StopRecordingByIdentity(%d) failed: %s", recordingId, err.Error())
+		t.FailNow()
+	}
+	if !res {
+		t.Logf("StopRecordingByIdentity(%d) failed", recordingId)
 	}
 
 	return

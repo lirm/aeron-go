@@ -665,22 +665,15 @@ func PurgeRecordingRequestPacket(controlSessionId int64, correlationId int64, re
 
 /*
 
-RecordingDescriptorHeader
-RecordingDescriptor
 RecordingSubscriptionDescriptor
-
-[rcv] RecordingSignalEvent
 
 AuthConnectRequest
 Challenge
 ChallengeResponse
 KeepAliveRequest
+
 TaggedReplicateRequest
-* StartRecordingRequest2
-// StopRecordingByIdentityRequest
-[rcv] RecordingStarted
-[rcv] RecordingProgress
-[rcv] RecordingStopped
-* PurgeRecordingRequest
+
+CatalogHeader
 
 */

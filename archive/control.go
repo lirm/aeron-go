@@ -45,10 +45,11 @@ type Control struct {
 // The polling mechanism is not parameterizsed so we need to set state for the results as we go
 // These pieces are filled out by various ResponsePollers which will set IsPollComplete to true
 type ControlResults struct {
-	CorrelationId        int64                         // FIXME: we may want overlapping operations
-	ControlResponse      *codecs.ControlResponse       // FIXME: We may want a queue here
-	RecordingDescriptors []*codecs.RecordingDescriptor // FIXME: ditto
-	IsPollComplete       bool
+	CorrelationId                    int64
+	ControlResponse                  *codecs.ControlResponse
+	RecordingDescriptors             []*codecs.RecordingDescriptor
+	RecordingSubscriptionDescriptors []*codecs.RecordingSubscriptionDescriptor
+	IsPollComplete                   bool
 }
 
 // An archive "connection" involves some to and fro
@@ -73,7 +74,7 @@ func NewControl(context *ArchiveContext) *Control {
 }
 
 // The current subscription handler doesn't provide a mechanism for passing a rock
-// so we return data via the control
+// so we return data via the control's Results
 func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	logger.Debugf("ControlFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
@@ -121,7 +122,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		}
 
 	default:
-		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
+		fmt.Printf("ControlFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
 	}
 
 	return
@@ -182,7 +183,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		control.Context.SessionId = controlResponse.ControlSessionId
 
 	default:
-		fmt.Printf("Insert decoder for type: %d\n", hdr.TemplateId)
+		fmt.Printf("ConnectionControlFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
 	}
 
 	return
@@ -273,14 +274,17 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 	}
 }
 
+// Poll for descriptors (both recording and subscription)
 // The current subscription handler doesn't provide a mechanism for passing a rock
-// so we return data via the control
+// so we return data via the control's Results
 func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	// logger.Debugf("DescriptorFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 	var recordingDescriptor = new(codecs.RecordingDescriptor)
+	var recordingSubscriptionDescriptor = new(codecs.RecordingSubscriptionDescriptor)
 	var controlResponse = new(codecs.ControlResponse)
+	var recordingSignalEvent = new(codecs.RecordingSignalEvent)
 
 	buf := new(bytes.Buffer)
 	buffer.WriteBytes(buf, offset, length)
@@ -312,6 +316,24 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// Set our state to let the caller of Poll() which triggered this know they have something
 		control.Results.RecordingDescriptors = append(control.Results.RecordingDescriptors, recordingDescriptor)
 
+	case recordingSubscriptionDescriptor.SbeTemplateId():
+		// logger.Debugf("Received RecordingSubscriptionDescriptorResponse: length %d", buf.Len())
+		if err := recordingSubscriptionDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			logger.Error("Failed to decode RecordingSubscriptioDescriptor", err)
+		}
+		// logger.Debugf("RecordingSubscriptionDescriptor: %#v\n", recordingSubscriptionDescriptor)
+
+		// Look it up
+		control, ok := correlationsMap[recordingSubscriptionDescriptor.CorrelationId]
+		if !ok {
+			logger.Infof("Uncorrelated control response correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse) // Not much to be done here as we can't correlate
+			return
+		}
+
+		// Set our state to let the caller of Poll() which triggered this know they have something
+		control.Results.RecordingSubscriptionDescriptors = append(control.Results.RecordingSubscriptionDescriptors, recordingSubscriptionDescriptor)
+
 	case controlResponse.SbeTemplateId():
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
@@ -342,8 +364,18 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			return
 		}
 
+	case recordingSignalEvent.SbeTemplateId():
+		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			logger.Error("Failed to decode recording signal", err)
+		}
+		if Listeners.RecordingSignalListener != nil {
+			Listeners.RecordingSignalListener(recordingSignalEvent)
+		}
+
 	default:
-		logger.Debugf("Insert decoder for type: %d\n", hdr.TemplateId)
+		logger.Debugf("DescriptorFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
+		fmt.Printf("DescriptorFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
 	}
 
 	return
@@ -391,9 +423,10 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = control.Context.Options.RangeChecking
 
-	control.Results.ControlResponse = nil      // Clear old results
-	control.Results.IsPollComplete = false     // Clear completion flag
-	control.Results.RecordingDescriptors = nil // Clear previous search
+	control.Results.ControlResponse = nil                  // Clear old results
+	control.Results.IsPollComplete = false                 // Clear completion flag
+	control.Results.RecordingDescriptors = nil             // Clear previous search
+	control.Results.RecordingSubscriptionDescriptors = nil // Clear previous search
 
 	for {
 		// Check for error
@@ -418,7 +451,9 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 		// Check we've got the right correlationId
 		if control.Results.ControlResponse.CorrelationId != correlationId {
 			// FIXME: Other than log?
-			control.ErrorHandler(fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId))
+			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId)
+			control.ErrorHandler(err)
+			// fmt.Printf("%s\n", err.Error())
 			control.Results.IsPollComplete = true
 			return nil
 		}

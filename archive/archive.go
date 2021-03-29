@@ -123,6 +123,11 @@ func init() {
 	recordingsMap = make(map[int64]*Control)
 }
 
+// Get a new correlation Id
+func NextCorrelationId() int64 {
+	return _correlationId.Inc()
+}
+
 // Utility function to convert a ReplaySessionId into a streamId
 func ReplaySessionIdToStreamId(replaySessionId int64) int32 {
 	// It's actually just the least significant 32 bits
@@ -350,12 +355,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, sourceLocation, autoStop, channel); err != nil {
 		return 0, err
 	}
-	subId, err := archive.Control.PollForResponse(correlationId)
-	if err != nil {
-		return 0, err
-	}
-
-	return subId, nil
+	return archive.Control.PollForResponse(correlationId)
 }
 
 // StopRecording can be performed by RecordingId, by SubscriptionId, by Publication, or by a channel/stream pairing (default)
@@ -375,11 +375,7 @@ func (archive *Archive) StopRecording(channel string, stream int32) error {
 		return err
 	}
 	_, err := archive.Control.PollForResponse(correlationId)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // StopRecording by RecordingId as looked up in ListRecording*()
@@ -456,11 +452,6 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	}
 
 	return publication, nil
-}
-
-// Get a new correlation Id
-func NextCorrelationId() int64 {
-	return _correlationId.Inc()
 }
 
 // List up to recordCount recording descriptors
@@ -586,6 +577,30 @@ func (archive *Archive) StartReplay(recordingId int64, position int64, length in
 	return archive.Control.PollForResponse(correlationId)
 }
 
+// Start a replay for a length in bytes of a recording from a position
+// bounded by a position counter. If the position is
+// RecordingPositionNull then the stream will be replayed from the
+// start.  The lower 32-bits of the returned value contains the
+// sessionId of the received replay. All 64-bits are required to
+// uniquely identify the replay when calling StopReplay The lower
+// 32-bits can be obtained by casting casting the int64 value to an
+// int32. See ReplaySessionIdToStreamId() helper.
+// Returns a ReplaySessionId - the id of the replay session which will
+// be the same as the Image sessionId of the received replay for
+// correlation with the matching channel and stream id in the lower 32
+// bits.
+func (archive *Archive) BoundedReplay(recordingId int64, position int64, length int64, limitCounterId int32, replayStream int32, replayChannel string) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.BoundedReplayRequest(correlationId, recordingId, position, length, limitCounterId, replayStream, replayChannel); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
 // Stop a Replay session
 // Returns error on failure, nil on success
 func (archive *Archive) StopReplay(replaySessionId int64) error {
@@ -644,6 +659,189 @@ func (archive *Archive) GetRecordingPosition(recordingId int64) (int64, error) {
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
 	if err := archive.Proxy.RecordingPositionRequest(correlationId, recordingId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Truncate a stopped recording to a given position that is less than
+// the stopped position. The provided position must be on a fragment
+// boundary. Truncating a recording to the start position effectively
+// deletes the recording.  If the truncate operation will result in
+// deleting segments then this will occur asynchronously. Before
+// extending a truncated recording which has segments being
+// asynchronously being deleted then you should await completion
+// via the RecordingSignal Delete
+func (archive *Archive) TruncateRecording(recordingId int64, position int64) error {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.TruncateRecordingRequest(correlationId, recordingId, position); err != nil {
+		return err
+	}
+
+	_, err := archive.Control.PollForResponse(correlationId)
+	return err
+}
+
+// Get the start position for a recording.
+// Return the start position of the recording
+func (archive *Archive) GetStartPosition(recordingId int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.StartPositionRequest(correlationId, recordingId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Get the stop position for a recording.
+// Return the stop position, or RecordingPositionNull if still active.
+func (archive *Archive) GetStopPosition(recordingId int64, position int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.StopPositionRequest(correlationId, recordingId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Find the last recording that matches the given criteria.
+func (archive *Archive) FindLastMatchingRecording(minRecordingId int64, sessionId int32, stream int32, channel string) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.FindLastMatchingRecordingRequest(correlationId, minRecordingId, sessionId, stream, channel); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// List active recording subscriptions in the archive create via StartRecording or ExtendRecording.
+// Returns a (possibly empty) list of RecordingSubscriptionDescriptors
+func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscriptionCount int32, applyStreamId bool, stream int32, channelFragment string) ([]*codecs.RecordingSubscriptionDescriptor, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.ListRecordingSubscriptionsRequest(correlationId, pseudoIndex, subscriptionCount, applyStreamId, stream, channelFragment); err != nil {
+		return nil, err
+	}
+
+	if err := archive.Control.PollForDescriptors(correlationId, subscriptionCount); err != nil {
+		return nil, err
+	}
+
+	// If there's a ControlResponse let's see what transpired
+	response := archive.Control.Results.ControlResponse
+	if response != nil {
+		switch response.Code {
+		case codecs.ControlResponseCode.ERROR:
+			return nil, fmt.Errorf("Response for correlationId %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
+
+		case codecs.ControlResponseCode.SUBSCRIPTION_UNKNOWN:
+			return archive.Control.Results.RecordingSubscriptionDescriptors, nil
+		}
+	}
+
+	// Otherwise we can return our results
+	return archive.Control.Results.RecordingSubscriptionDescriptors, nil
+
+}
+
+// Detach segments from the beginning of a recording up to the
+// provided new start position. The new start position must be first
+// byte position of a segment after the existing start position.  It
+// is not possible to detach segments which are active for recording
+// or being replayed.
+func (archive *Archive) DetachSegments(recordingId int64, newStartPosition int64) error {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.DetachSegmentsRequest(correlationId, recordingId, newStartPosition); err != nil {
+		return err
+	}
+
+	_, err := archive.Control.PollForResponse(correlationId)
+	return err
+}
+
+// Delete segments which have been previously detached from a recording.
+// Returns the count of deleted segment files.
+func (archive *Archive) DeleteDetachedSegments(recordingId int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.DeleteDetachedSegmentsRequest(correlationId, recordingId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Purge (detach and delete) segments from the beginning of a
+// recording up to the provided new start position. The new start
+// position must be first byte position of a segment after the
+// existing start position. It is not possible to detach segments
+// which are active for recording or being replayed.
+// Returns the count of deleted segment files.
+func (archive *Archive) PurgeSegments(recordingId int64, newStartPosition int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.PurgeSegmentsRequest(correlationId, recordingId, newStartPosition); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Attach segments to the beginning of a recording to restore history
+// that was previously detached.
+// Segment files must match the existing recording and join exactly to
+// the start position of the recording they are being attached to.
+// Returns the count of attached segment files.
+func (archive *Archive) AttachSegments(recordingId int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.AttachSegmentsRequest(correlationId, recordingId); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Migrate segments from a source recording and attach them to the
+// beginning of a destination recording.
+// The source recording must match the destination recording for
+// segment length, term length, mtu length, stream id, plus the stop
+// position and term id of the source must join with the start
+// position of the destination and be on a segment boundary.
+// The source recording will be effectively truncated back to its
+// start position after the migration.  Returns the count of attached
+// segment files.
+// Returns the count of attached segment files.
+func (archive *Archive) MigrateSegments(recordingId int64, position int64) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.MigrateSegmentsRequest(correlationId, recordingId, position); err != nil {
 		return 0, err
 	}
 
