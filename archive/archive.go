@@ -136,12 +136,12 @@ func ReplaySessionIdToStreamId(replaySessionId int64) int32 {
 
 // Utility function to add a session to a channel URI
 // On failure it will return the original and an error
-func AddReplaySessionIdToChannel(channel string, replaySessionId int32) (string, error) {
+func AddSessionIdToChannel(channel string, sessionId int32) (string, error) {
 	uri, err := aeron.ParseChannelUri(channel)
 	if err != nil {
 		return channel, err
 	}
-	uri.Set("session-id", fmt.Sprint(replaySessionId))
+	uri.Set("session-id", fmt.Sprint(sessionId))
 	return uri.String(), nil
 }
 
@@ -418,7 +418,7 @@ func (archive *Archive) StopRecordingBySubscriptionId(subscriptionId int64) erro
 // Stop recording a sessionId specific recording that pertains to the given Publication
 // Returns error on failure, nil on success
 func (archive *Archive) StopRecordingByPublication(publication aeron.Publication) error {
-	channel, err := AddReplaySessionIdToChannel(publication.Channel(), publication.SessionID())
+	channel, err := AddSessionIdToChannel(publication.Channel(), publication.SessionID())
 	if err != nil {
 		return err
 	}
@@ -426,12 +426,11 @@ func (archive *Archive) StopRecordingByPublication(publication aeron.Publication
 }
 
 // Add a Recorded Publication and set it up to be recorded.
-
+// This creates a per-session recording
+//
 // This can fail if:
 //   Publication.IsOriginal() is false // FIXME: check semantics
 //   Sending the request fails - see error for detail
-//
-// FIXME: Formalize the error handling
 func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*aeron.Publication, error) {
 
 	// FIXME: check failure
@@ -445,8 +444,12 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 	fmt.Printf("Start recording correlationId:%d\n", correlationId)
 
-	// FIXME: semantics of autoStop here?
-	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, codecs.SourceLocation.LOCAL, false, channel); err != nil {
+	sessionChannel, err := AddSessionIdToChannel(publication.Channel(), publication.SessionID())
+	if err != nil {
+		publication.Close()
+		return nil, err
+	}
+	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, codecs.SourceLocation.LOCAL, false, sessionChannel); err != nil {
 		publication.Close()
 		return nil, err
 	}

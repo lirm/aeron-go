@@ -78,7 +78,7 @@ func main() {
 	// FIXME: counters unimplemented
 	// The Java RecordedBasicPublisher polls the counters to wait until
 	// the recording has actually started.
-	// For now we'll just dealy a bit to let that get established
+	// For now we'll just delay a bit to let that get established
 	// There may be a way to use the NewImageHandler here as well
 	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
 	idler.Idle(0)

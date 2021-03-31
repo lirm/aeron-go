@@ -15,11 +15,13 @@
 package archive
 
 import (
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
 	"log"
 	"os"
 	"testing"
+	"time"
 )
 
 // Rather than mock or spawn an archive-media-driver we're just seeing
@@ -66,6 +68,83 @@ func TestConnection(t *testing.T) {
 	}
 }
 
+// Test adding a recording and then removing it - by Publication (session specific)
+func TestStartStopRecordingByPublication(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	publication, err := archive.AddRecordedPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	// Delay a little to get the publication is established
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+	idler.Idle(0)
+
+	if err := archive.StopRecordingByPublication(*publication); err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	publication.Close()
+}
+
+// Test adding a recording and then removing it - by Subscription
+func TestStartStopRecordingBySubscription(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	// Start snd stop by subscription
+	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	err = archive.StopRecordingBySubscriptionId(subscriptionId)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+}
+
+// Test adding a recording and then removing it - by Channel and Stream
+func TestStartStopRecordingByChannelAndStream(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	// Start snd stop by channel&stream
+	_, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	err = archive.StopRecording(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	// Start snd stop by identity is done in other tests
+}
+
 // Test adding a recording and then removing it, checking the listing counts between times
 func TestListRecordings(t *testing.T) {
 	if !haveArchive {
@@ -86,11 +165,12 @@ func TestListRecordings(t *testing.T) {
 	t.Logf("Initial count is %d", initial)
 
 	// Add a recording
-	recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
+	t.Logf("SubscriptionId is %d", subscriptionId)
 
 	// Add a publication on that
 	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
@@ -103,13 +183,8 @@ func TestListRecordings(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	// That should give us the same recordingId
-	if recordingId != recordings[len(recordings)-1].RecordingId {
-		t.Logf("recordingId:%d is not the same as the last recording from ListRecordingsForUri:%d", recordingId, recordings[len(recordings)-1].RecordingId)
-		// FIXME: This fails but the question is why
-		// t.FailNow()
-		recordingId = recordings[len(recordings)-1].RecordingId
-	}
+	//  Grab the recordingId
+	recordingId := recordings[len(recordings)-1].RecordingId
 	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
 
 	// Cleanup
@@ -142,11 +217,12 @@ func TestStartStopReplay(t *testing.T) {
 	}
 
 	// Add a recording to make sure there is one
-	recordingId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
+	t.Logf("SubscriptionId is %d", subscriptionId)
 
 	// Add a publication on that
 	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
@@ -163,14 +239,8 @@ func TestStartStopReplay(t *testing.T) {
 
 	}
 
-	// That should give us the same recordingId
-	if recordingId != recordings[len(recordings)-1].RecordingId {
-		t.Logf("recordingId:%d is not the same as the last recording from ListRecordingsForUri:%d", recordingId, recordings[len(recordings)-1].RecordingId)
-		// FIXME: This fails but the question is why
-		// t.FailNow()
-		recordingId = recordings[len(recordings)-1].RecordingId
-	}
-	t.Logf("recordingid:%d", recordingId)
+	// That should give us a recordingId
+	recordingId := recordings[len(recordings)-1].RecordingId
 
 	replayId, err := archive.StartReplay(recordingId, 0, RecordingLengthNull, testCases[0].replayChannel, testCases[0].replayStream)
 	if err != nil {
