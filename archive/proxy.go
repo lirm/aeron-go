@@ -485,6 +485,20 @@ func (proxy *Proxy) MigrateSegmentsRequest(correlationId int64, srcRecordingId i
 	return nil
 }
 
+func (proxy *Proxy) TaggedReplicateRequest(correlationId int64, srcRecordingId int64, dstRecordingId int64, channelTagId int64, subscriptionTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) error {
+	// Create a packet and send it
+	bytes, err := TaggedReplicateRequestPacket(proxy.Context.SessionId, correlationId, srcRecordingId, dstRecordingId, channelTagId, subscriptionTagId, srcControlStreamId, srcControlChannel, liveDestination)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
 func (proxy *Proxy) PurgeRecordingRequest(correlationId int64, replaySessionId int64) error {
 	// Create a packet and send it
 	bytes, err := PurgeRecordingRequestPacket(proxy.Context.SessionId, correlationId, replaySessionId)
