@@ -452,7 +452,13 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 		publication.Close()
 		return nil, err
 	}
+
 	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, codecs.SourceLocation.LOCAL, false, sessionChannel); err != nil {
+		publication.Close()
+		return nil, err
+	}
+
+	if _, err := archive.Control.PollForResponse(correlationId); err != nil {
 		publication.Close()
 		return nil, err
 	}
@@ -852,6 +858,15 @@ func (archive *Archive) MigrateSegments(recordingId int64, position int64) (int6
 	}
 
 	return archive.Control.PollForResponse(correlationId)
+}
+
+// KeepAlive
+func (archive *Archive) KeepAlive() error {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	return archive.Proxy.KeepAliveRequest(correlationId)
 }
 
 // Replicate a recording from a source archive to a destination which

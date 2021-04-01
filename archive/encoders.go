@@ -616,6 +616,24 @@ func MigrateSegmentsRequestPacket(controlSessionId int64, correlationId int64, s
 	return buffer.Bytes(), nil
 }
 
+func KeepAliveRequestPacket(controlSessionId int64, correlationId int64) ([]byte, error) {
+	var request codecs.KeepAliveRequest
+	request.ControlSessionId = controlSessionId
+	request.CorrelationId = correlationId
+
+	// Marshal it
+	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
 func TaggedReplicateRequestPacket(controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, channelTagId int64, subscriptionTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) ([]byte, error) {
 	var request codecs.TaggedReplicateRequest
 	request.ControlSessionId = controlSessionId
