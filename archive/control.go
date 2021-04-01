@@ -274,6 +274,24 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 	}
 }
 
+// Poll the response stream once for an error. If another message is
+// present then it will be skipped over so only call when not
+// expecting another response.
+//
+// FIXME: Need to adjust fragment counts in case something else async happens
+func (control *Control) PollForErrorResponse() error {
+
+	fragments := control.Poll(ControlFragmentHandler, 1)
+	if fragments == 0 {
+		return nil
+	}
+	if control.Results.ControlResponse.Code == codecs.ControlResponseCode.ERROR {
+		return fmt.Errorf(string(control.Results.ControlResponse.ErrorMessage))
+	}
+
+	return nil
+}
+
 // Poll for descriptors (both recording and subscription)
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via the control's Results

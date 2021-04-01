@@ -60,28 +60,14 @@ delivered a polling mechanism is provided. Again this can be easily
 wrapped in a goroutine if it's desired.
 
 # Questions/Issues
-Testing:
- * Look for local archive and exec? Test and not run for Travis? Mock? Add jars to repo and fetch?
-
-Are there any Packets bigger than MTU requiring fragment assembly?
- * Errors *could* conceivably be artbitrarily long strings but this is a) unlikely, b) not currently the case.
 
 Logging INFO - I'd rather normal operations to be NORMAL so I can have
 an intermediate on DEBUG which is voluminous.
 
-FindLatestRecording() currently in basic_replayed_subscriber useful in
-API? Turns out th eprotocol has FindLastMatchingRecordingRequest() so
-use that.
-
-startRecording return .. arguably this is an aeron-archive issue and relevantID should be recordingId? upstream?
-
-callbacks vs returning a data structure, cf subscription descriptors vs recording descriptors. 
-
 # Backlog
  * [S] Improve the Error handling / Error listeners
- * [?] Have I really understood java's startRecording(), and the relevantId returned from StartRecording exchange.
  * [L] Expand testing
-  * [S] Test failures
+  * [M] So many tests to write
   * [S] Test reliability
   * [?] archive-media-driver mocking/execution
  * [S] Review locking decision. Adding lock/unlock in archive is simple.
@@ -91,7 +77,7 @@ callbacks vs returning a data structure, cf subscription descriptors vs recordin
  * 41 FIXMEs
  * [?] AuthConnect, Challenge/Response
  * [?] OnAvailableCounter noise
- * [?] RecordingSignalEvents currently throw off the count of
+ * [?] [Bug] RecordingSignalEvents currently throw off the count of
    fragments/records we want. Need a mechanism to adjust for them.
  * [?] Logging tidy and general improvements
  * [?] Add remaining archive protocol packets to encoders, proxy, control, archive API, and tests.

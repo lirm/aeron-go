@@ -38,6 +38,9 @@ const RecordingPositionNull = int64(-1)     // Replay the stream from the start.
 const RecordingLengthNull = int64(-1)       // Replay will follow a live recording
 const RecordingLengthMax = int64(2<<31 - 1) // Replay the whole stream
 
+// constants used elsewhere
+const RecordingIdNullValue = int32(-1) // Java's io.aeron.Aeron#NULL_VALUE
+
 // By default all but one of these callbacks are active, and all need to be
 // set to user functions to be invoked. This can be done at any time
 //
@@ -849,6 +852,133 @@ func (archive *Archive) MigrateSegments(recordingId int64, position int64) (int6
 	}
 
 	return archive.Control.PollForResponse(correlationId)
+}
+
+// Replicate a recording from a source archive to a destination which
+// can be considered a backup for a primary archive. The source
+// recording will be replayed via the provided replay channel and use
+// the original stream id.  If the destination recording id is
+// RecordingIdNullValue (-1) then a new destination recording is
+// created, otherwise the provided destination recording id will be
+// extended. The details of the source recording descriptor will be
+// replicated.
+//
+// For a source recording that is still active the replay can merge
+// with the live stream and then follow it directly and no longer
+// require the replay from the source. This would require a multicast
+// live destination.
+//
+// Errors will be reported asynchronously and can be checked for with
+// PollForErrorResponse() Follow progress with the RecordingSignalAdapter
+//
+// srcRecordingId     recording id which must exist in the source archive.
+// dstRecordingId     recording to extend in the destination, otherwise {@link io.aeron.Aeron#NULL_VALUE}.
+// srcControlStreamId remote control stream id for the source archive to instruct the replay on.
+// srcControlChannel  remote control channel for the source archive to instruct the replay on.
+// liveDestination    destination for the live stream if merge is required. nil for no merge.
+//
+// Returns the replication session id which can be passed StopReplication()
+func (archive *Archive) Replicate(srcRecordingId int64, dstRecordingId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.ReplicateRequest(correlationId, srcRecordingId, dstRecordingId, srcControlStreamId, srcControlChannel, liveDestination); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Replicate a recording from a source archive to a destination which
+// can be considered a backup for a primary archive. The source
+// recording will be replayed via the provided replay channel and use
+// the original stream id.  If the destination recording id is
+// RecordingIdNullValue (-1) then a new destination recording is
+// created, otherwise the provided destination recording id will be
+// extended. The details of the source recording descriptor will be
+// replicated.
+//
+// For a source recording that is still active the replay can merge
+// with the live stream and then follow it directly and no longer
+// require the replay from the source. This would require a multicast
+// live destination.
+//
+// Errors will be reported asynchronously and can be checked for with
+// PollForErrorResponse() Follow progress with the RecordingSignalAdapter
+//
+// srcRecordingId     recording id which must exist in the source archive.
+// dstRecordingId     recording to extend in the destination, otherwise {@link io.aeron.Aeron#NULL_VALUE}.
+// stopPosition       position to stop the replication. RecordingPositionNull to stop at end of current recording.
+// srcControlStreamId remote control stream id for the source archive to instruct the replay on.
+// srcControlChannel  remote control channel for the source archive to instruct the replay on.
+// liveDestination    destination for the live stream if merge is required. nil for no merge.
+// replicationChannel channel over which the replication will occur. Empty or null for default channel.
+//
+// Returns the replication session id which can be passed StopReplication()
+func (archive *Archive) Replicate2(srcRecordingId int64, dstRecordingId int64, stopPosition int64, channelTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string, replicationChannel string) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.ReplicateRequest2(correlationId, srcRecordingId, dstRecordingId, stopPosition, channelTagId, srcControlStreamId, srcControlChannel, liveDestination, replicationChannel); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Replicate a recording from a source archive to a destination which
+// can be considered a backup for a primary archive. The source
+// recording will be replayed via the provided replay channel and use
+// the original stream id.  If the destination recording id is
+// RecordingIdNullValue (-1) then a new destination recording is
+// created, otherwise the provided destination recording id will be
+// extended. The details of the source recording descriptor will be
+// replicated.
+//
+// The subscription used in the archive will be tagged
+// with the provided tags. For a source recording that is still active
+// the replay can merge with the live stream and then follow it
+// directly and no longer require the replay from the source. This
+// would require a multicast live destination.
+//
+// Errors will be reported asynchronously and can be checked for with
+// PollForErrorResponse() Follow progress with the RecordingSignalAdapter
+//
+// srcRecordingId     recording id which must exist in the source archive.
+// dstRecordingId     recording to extend in the destination, otherwise {@link io.aeron.Aeron#NULL_VALUE}.
+// channelTagId       used to tag the replication subscription.
+// subscriptionTagId  used to tag the replication subscription.
+// srcControlStreamId remote control stream id for the source archive to instruct the replay on.
+// srcControlChannel  remote control channel for the source archive to instruct the replay on.
+// liveDestination    destination for the live stream if merge is required. nil for no merge.
+//
+// Returns the replication session id which can be passed StopReplication()
+func (archive *Archive) TaggedReplicate(srcRecordingId int64, dstRecordingId int64, channelTagId int64, subscriptionTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) (int64, error) {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.TaggedReplicateRequest(correlationId, srcRecordingId, dstRecordingId, channelTagId, subscriptionTagId, srcControlStreamId, srcControlChannel, liveDestination); err != nil {
+		return 0, err
+	}
+
+	return archive.Control.PollForResponse(correlationId)
+}
+
+// Stop a replication request
+func (archive *Archive) StopReplication(replicationId int64) error {
+	correlationId := NextCorrelationId()
+	correlationsMap[correlationId] = archive.Control // Set the lookup
+	defer correlationsMapClean(correlationId)        // Clear the lookup
+
+	if err := archive.Proxy.StopReplicationRequest(correlationId, replicationId); err != nil {
+		return err
+	}
+
+	_, err := archive.Control.PollForResponse(correlationId)
+	return err
 }
 
 // Purge a stopped recording, i.e. mark recording as Invalid and
