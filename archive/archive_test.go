@@ -68,6 +68,22 @@ func TestConnection(t *testing.T) {
 	}
 }
 
+// Test KeepAlive
+func TestKeepAlive(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	if err := archive.KeepAlive(); err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+}
+
 // Test adding a recording and then removing it - by Publication (session specific)
 func TestStartStopRecordingByPublication(t *testing.T) {
 	if !haveArchive {
