@@ -1,3 +1,14 @@
+# aeron-go/archive
+
+Implementation of [Aeron Archive](https://github.com/real-logic/Aeron/tree/master/aeron-archive) client in Go.
+
+The [Aeron Archive
+protocol](http://github.com/real-logic/aeron/blob/master/aeron-archive/src/main/resources/archive/aeron-archive-codecs.xml)
+is specified in xml using the [Simple Binary Encoding (SBE)](https://github.com/real-logic/simple-binary-encoding)
+
+## Current State
+The implementation is an alpha release. The API is not yet considered 100% stable.
+
 # Design
 
 ## Guidelines
@@ -18,29 +29,28 @@ externally locked to ensure only one concuurrent access.
 ### Naming and other choices
 
 Function names used in archive.go which contains the main API are
-based on the Java names so that developers can more easilt switch
+based on the Java names so that developers can more easily switch
 between langugages and so that any API documentation is more useful
 across implementations. Some differences exist due to capitalization
 requirements, lack of polymorphism, etc.
 
 Function names used in encoders.go and proxy.go are based on the
-protocol specification.
-
-It was tempting to make the sourceLocation a boolean ```isLocal``` but
-keeping the underlying codec value allows for future additions. Where
-the protocol specifies a BooelanType a bool is used until encoding.
+protocol specification. Where the protocol specifies a type that cab
+ne naturally repreented in golang, the golang type is used used where
+possible until encoding. Examples include the use of `bool` rather than
+`BooleanType` and `string` over `[]uint8`
 
 ## Structure
 
 The archive protocol is largely an RPC mechanism built on top of
 Aeron. Each Archive instance has it's own aeron instance running a
-proxy (publication/request) and control (subscription/response)
-pair. This mirrors the Java implementation.
+[proxy](proxy.go) (publication/request) and [control](control.go) (subscription/response)
+pair. This mirrors the Java implementation. The proxy invokes the
+encoders to marshal packets using SBE.
 
 Additionally there are some asynchronous events that can arrive on a
-RecordingEvents subscription and these are handled by the
-recordingevents. These are not enabled by default to avoid using
-resources when not required.
+[recordingevents](recordingevents.go) subscription. These
+are not enabled by default to avoid using resources when not required.
 
 ## Synchronous unlocked API optionally using polling
 
@@ -57,14 +67,15 @@ asynchronous calls are needed then this is where you can add locking.
 
 Some asynchronous events do exist (e.g, recording events) and to be
 delivered a polling mechanism is provided. Again this can be easily
-wrapped in a goroutine if it's desired.
+wrapped in a goroutine if it's desired but ensure there are no other
+operations in progress when polling.
 
-# Questions/Issues
+## Examples
 
-Logging INFO - I'd rather normal operations to be NORMAL so I can have
-an intermediate on DEBUG which is voluminous.
+Examples are provided for a [basic_recording_publisher](examples/basic_recording_publisher/basic_recording_publisher.go) and [basic_replayed_subscriber](examples/basic_replayed_subscriber/basic_replayed_subscriber.go) that interoperate with the Java examples
 
 # Backlog
+ * [S] Logging at level normal should be silent if nothing goes wrong
  * [S] Improve the Error handling / Error listeners
  * [L] Expand testing
   * [M] So many tests to write
