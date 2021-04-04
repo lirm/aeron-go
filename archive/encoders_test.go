@@ -23,7 +23,7 @@ var stream = int32(*TestConfig.RequestStream)
 
 // Execute all the encoders as a sanity check
 func TestEncoders(t *testing.T) {
-	packet, err := ConnectRequestPacket(channel, stream, 99)
+	packet, err := ConnectRequestPacket(99, stream, channel)
 	if err != nil {
 		t.Log("ConnectRequestPacket() failed")
 		t.Fail()

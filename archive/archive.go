@@ -1,4 +1,5 @@
 // Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2014-2021 Real Logic Limited.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -240,7 +241,7 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	correlationsMap[correlationId] = archive.Control // Add it to our map so we can find it
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.ConnectRequest(archive.Context.Options.ResponseChannel, archive.Context.Options.ResponseStream, correlationId); err != nil {
+	if err := archive.Proxy.ConnectRequest(correlationId, archive.Context.Options.ResponseStream, archive.Context.Options.ResponseChannel); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}

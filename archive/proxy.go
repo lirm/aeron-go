@@ -63,10 +63,10 @@ func (proxy *Proxy) Offer(buffer *atomic.Buffer, offset int32, length int32, res
 // From here we have all the functions that create a data packet and send it on the
 // publication. Responses will be processed on the control
 
-func (proxy *Proxy) ConnectRequest(responseChannel string, responseStream int32, correlationId int64) error {
+func (proxy *Proxy) ConnectRequest(correlationId int64, responseStream int32, responseChannel string) error {
 
 	// Create a packet and send it
-	bytes, err := ConnectRequestPacket(responseChannel, responseStream, correlationId)
+	bytes, err := ConnectRequestPacket(correlationId, responseStream, responseChannel)
 	if err != nil {
 		return err
 	}
@@ -474,6 +474,21 @@ func (proxy *Proxy) AttachSegmentsRequest(correlationId int64, recordingId int64
 func (proxy *Proxy) MigrateSegmentsRequest(correlationId int64, srcRecordingId int64, destRecordingId int64) error {
 	// Create a packet and send it
 	bytes, err := MigrateSegmentsRequestPacket(proxy.Context.SessionId, correlationId, srcRecordingId, destRecordingId)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
+func (proxy *Proxy) AuthConnectRequest(correlationId int64, responseStream int32, responseChannel string, encodedCredentials []uint8) error {
+
+	// Create a packet and send it
+	bytes, err := AuthConnectRequestPacket(correlationId, responseStream, responseChannel, encodedCredentials)
 	if err != nil {
 		return err
 	}

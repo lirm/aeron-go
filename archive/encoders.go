@@ -28,7 +28,7 @@ import (
 
 var marshaller *codecs.SbeGoMarshaller = codecs.NewSbeGoMarshaller()
 
-func ConnectRequestPacket(responseChannel string, responseStream int32, correlationID int64) ([]byte, error) {
+func ConnectRequestPacket(correlationID int64, responseStream int32, responseChannel string) ([]byte, error) {
 	var request codecs.ConnectRequest
 
 	request.CorrelationId = correlationID
@@ -600,6 +600,28 @@ func AttachSegmentsRequestPacket(controlSessionId int64, correlationId int64, re
 	return buffer.Bytes(), nil
 }
 
+func AuthConnectRequestPacket(correlationID int64, responseStream int32, responseChannel string, encodedCredentials []uint8) ([]byte, error) {
+	var request codecs.AuthConnectRequest
+
+	request.CorrelationId = correlationID
+	request.Version = SemanticVersion()
+	request.ResponseStreamId = responseStream
+	request.ResponseChannel = []uint8(responseChannel)
+	request.EncodedCredentials = encodedCredentials
+
+	// Marshal it
+	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
 func MigrateSegmentsRequestPacket(controlSessionId int64, correlationId int64, srcRecordingId int64, destRecordingId int64) ([]byte, error) {
 	var request codecs.MigrateSegmentsRequest
 	request.ControlSessionId = controlSessionId
@@ -707,14 +729,3 @@ func PurgeRecordingRequestPacket(controlSessionId int64, correlationId int64, re
 
 	return buffer.Bytes(), nil
 }
-
-// FIXME: Todo (although some are incoming)
-
-/*
-
-AuthConnectRequest
-Challenge
-ChallengeResponse
-
-
-*/
