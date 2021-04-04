@@ -16,7 +16,6 @@ package archive
 
 import (
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
 	"log"
 	"os"
@@ -123,7 +122,7 @@ func TestStartStopRecordingBySubscription(t *testing.T) {
 	}
 
 	// Start snd stop by subscription
-	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -147,7 +146,7 @@ func TestStartStopRecordingByChannelAndStream(t *testing.T) {
 	}
 
 	// Start snd stop by channel&stream
-	_, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	_, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -181,7 +180,7 @@ func TestListRecordings(t *testing.T) {
 	t.Logf("Initial count is %d", initial)
 
 	// Add a recording
-	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -233,7 +232,7 @@ func TestStartStopReplay(t *testing.T) {
 	}
 
 	// Add a recording to make sure there is one
-	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, codecs.SourceLocation.LOCAL, true)
+	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()

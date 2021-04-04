@@ -22,7 +22,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/archive"
-	"github.com/lirm/aeron-go/archive/codecs"
 	"github.com/lirm/aeron-go/archive/examples"
 	"github.com/op/go-logging"
 	"os"
@@ -65,7 +64,7 @@ func main() {
 	channel := *examples.Config.SampleChannel
 	stream := int32(*examples.Config.SampleStream)
 
-	if _, err := arch.StartRecording(channel, stream, codecs.SourceLocation.LOCAL, true); err != nil {
+	if _, err := arch.StartRecording(channel, stream, true, true); err != nil {
 		logger.Infof("StartRecording failed: %s\n", err.Error())
 		os.Exit(1)
 	}

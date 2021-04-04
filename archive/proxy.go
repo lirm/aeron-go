@@ -94,9 +94,9 @@ func (proxy *Proxy) CloseSessionRequest() error {
 
 // StartRecordingRequest
 // Uses the more recent protocol addition StartdRecordingRequest2 which added autoStop
-func (proxy *Proxy) StartRecordingRequest(correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
+func (proxy *Proxy) StartRecordingRequest(correlationId int64, stream int32, isLocal bool, autoStop bool, channel string) error {
 
-	bytes, err := StartRecordingRequest2Packet(proxy.Context.SessionId, correlationId, stream, sourceLocation, autoStop, channel)
+	bytes, err := StartRecordingRequest2Packet(proxy.Context.SessionId, correlationId, stream, isLocal, autoStop, channel)
 	if err != nil {
 		return err
 	}

@@ -344,8 +344,7 @@ func correlationsMapClean(correlationId int64) {
 // recording, it will be recorded twice.
 // Returns (subscriptionId, nil) or (0, error) on failure.
 // The SubscriptionId can be used in StopRecordingBySubscription()
-// FIXME: test StopRecordingBySubscription()
-func (archive *Archive) StartRecording(channel string, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool) (int64, error) {
+func (archive *Archive) StartRecording(channel string, stream int32, isLocal bool, autoStop bool) (int64, error) {
 
 	logger.Debugf("StartRecording(%s:%d)\n", channel, stream)
 	// FIXME: locking
@@ -355,7 +354,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, sourceLocat
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, sourceLocation, autoStop, channel); err != nil {
+	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, isLocal, autoStop, channel); err != nil {
 		return 0, err
 	}
 	return archive.Control.PollForResponse(correlationId)
@@ -453,7 +452,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 		return nil, err
 	}
 
-	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, codecs.SourceLocation.LOCAL, false, sessionChannel); err != nil {
+	if err := archive.Proxy.StartRecordingRequest(correlationId, stream, true, false, sessionChannel); err != nil {
 		publication.Close()
 		return nil, err
 	}

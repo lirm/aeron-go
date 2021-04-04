@@ -68,16 +68,20 @@ func CloseSessionRequestPacket(controlSessionId int64) ([]byte, error) {
 }
 
 // deprecated
-func StartRecordingRequestPacket(controlSessionId int64, correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, channel string) ([]byte, error) {
-	return StartRecordingRequest2Packet(controlSessionId, correlationId, stream, sourceLocation, false, channel)
+func StartRecordingRequestPacket(controlSessionId int64, correlationId int64, stream int32, isLocal bool, channel string) ([]byte, error) {
+	return StartRecordingRequest2Packet(controlSessionId, correlationId, stream, isLocal, false, channel)
 }
 
-func StartRecordingRequest2Packet(controlSessionId int64, correlationId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) ([]byte, error) {
+func StartRecordingRequest2Packet(controlSessionId int64, correlationId int64, stream int32, isLocal bool, autoStop bool, channel string) ([]byte, error) {
 	var request codecs.StartRecordingRequest2
 
 	request.Channel = []uint8(channel)
 	request.StreamId = stream
-	request.SourceLocation = sourceLocation
+	if isLocal {
+		request.SourceLocation = codecs.SourceLocation.LOCAL
+	} else {
+		request.SourceLocation = codecs.SourceLocation.REMOTE
+	}
 	if autoStop {
 		request.AutoStop = codecs.BooleanType.TRUE
 	} // else FALSE by default
@@ -711,7 +715,6 @@ func PurgeRecordingRequestPacket(controlSessionId int64, correlationId int64, re
 AuthConnectRequest
 Challenge
 ChallengeResponse
-KeepAliveRequest
 
 
 */

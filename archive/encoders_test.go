@@ -15,7 +15,6 @@
 package archive
 
 import (
-	"github.com/lirm/aeron-go/archive/codecs"
 	"testing"
 )
 
@@ -33,7 +32,7 @@ func TestEncoders(t *testing.T) {
 		t.Logf("ConnectRequestPacket failed length check: %d", len(packet))
 		t.Fail()
 	}
-	packet, err = StartRecordingRequest2Packet(1234, 5678, stream, codecs.SourceLocation.LOCAL, true, channel)
+	packet, err = StartRecordingRequest2Packet(1234, 5678, stream, true, true, channel)
 	if err != nil {
 		t.Log("StartRecordingRequestPacket() failed")
 		t.Fail()
