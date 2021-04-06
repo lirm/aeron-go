@@ -256,6 +256,8 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 		// Check for timeout
 		if time.Since(start) > archive.Context.Options.Timeout {
 			archive.Control.State.state = ControlStateTimedOut
+			archive.Control.State.err = fmt.Errorf("Operation timed out")
+			break
 		} else {
 			archive.Context.Options.IdleStrategy.Idle(0)
 		}
@@ -263,16 +265,15 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 
 	if archive.Control.State.err != nil {
 		logger.Errorf("Connect failed: %s\n", err)
-	}
-	if archive.Control.State.state != ControlStateConnected {
+	} else if archive.Control.State.state != ControlStateConnected {
 		logger.Error("Connect failed\n")
+	} else {
+		logger.Infof("Archive connection established for sessionId:%d\n", archive.Context.SessionId)
+
+		// Store the SessionId
+		sessionsMap[archive.Context.SessionId] = archive.Control // Add it to our map so we can look it up
 	}
 
-	// Store the SessionId in the proxy as well
-	logger.Infof("Archive connection established for sessionId:%d\n", archive.Context.SessionId)
-	sessionsMap[archive.Context.SessionId] = archive.Control // Add it to our map so we can look it up
-
-	// FIXME: Return the archive with the control intact, not sure if this the right thing to do on failure
 	return archive, archive.Control.State.err
 }
 
