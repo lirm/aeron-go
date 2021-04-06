@@ -446,7 +446,6 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	correlationId := NextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
-	fmt.Printf("Start recording correlationId:%d\n", correlationId)
 
 	sessionChannel, err := AddSessionIdToChannel(publication.Channel(), publication.SessionID())
 	if err != nil {
