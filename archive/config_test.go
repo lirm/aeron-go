@@ -42,5 +42,5 @@ var TestConfig = struct {
 
 	flag.String("prefix", aeron.DefaultAeronDir+"/aeron-"+aeron.UserName, "root directory for aeron driver file"),
 	flag.Bool("profile", false, "enable CPU profiling"),
-	flag.Bool("verbose", true, "enable logging"),
+	flag.Bool("verbose", false, "enable verbose (DEBUG) logging"),
 }
