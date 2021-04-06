@@ -44,10 +44,16 @@ var testCases = []TestCases{
 }
 
 func TestMain(m *testing.M) {
+
 	var err error
 	context = NewArchiveContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
 	options := DefaultOptions()
+	if *TestConfig.Verbose {
+		log.Printf("Setting verbose logging")
+		options.ArchiveLoglevel = logging.DEBUG
+	}
+
 	archive, err = NewArchive(context, options)
 	if err != nil || archive == nil {
 		log.Printf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
@@ -66,6 +72,7 @@ func TestConnection(t *testing.T) {
 	if !haveArchive {
 		return
 	}
+
 }
 
 // Test KeepAlive
@@ -118,7 +125,6 @@ func TestStartStopRecordingBySubscription(t *testing.T) {
 	}
 
 	if testing.Verbose() && DEBUG {
-
 		logging.SetLevel(logging.DEBUG, "archive")
 	}
 
@@ -142,7 +148,6 @@ func TestStartStopRecordingByChannelAndStream(t *testing.T) {
 	}
 
 	if testing.Verbose() && DEBUG {
-
 		logging.SetLevel(logging.DEBUG, "archive")
 	}
 
@@ -168,7 +173,6 @@ func TestListRecordings(t *testing.T) {
 	}
 
 	if testing.Verbose() && DEBUG {
-
 		logging.SetLevel(logging.DEBUG, "archive")
 	}
 
@@ -273,7 +277,6 @@ func TestStartStopReplay(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	// FIXME: don't update recordingId = recordings[len(recordings)-1].RecordingId
 	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
 
 	// And ListRecordings should also find something
