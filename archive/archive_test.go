@@ -335,3 +335,17 @@ func TestStartStopReplay(t *testing.T) {
 	return
 
 }
+
+// Test starting a replay
+// FIXME: Disabled as aeron calls log.Fatalf()
+func DisabledTestAddRecordedPublicationFailure(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	pub, err := archive.AddRecordedPublication("bogus", 99)
+	if err != nil || pub != nil {
+		t.Logf("Add recorded publication succeeded and should have failed. error:%s, pub%#v", err, pub)
+		t.FailNow()
+	}
+}

@@ -87,7 +87,6 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
    * IsOpen()?
  * 41 FIXMEs
  * [?] AuthConnect, Challenge/Response
- * [?] OnAvailableCounter noise
  * [?] [Bug] RecordingSignalEvents currently throw off the count of
    fragments/records we want. Need a mechanism to adjust for them.
  * [?] Logging tidy and general improvements
@@ -101,3 +100,6 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * [x] RecordingEvent Handler and Recording Admin (detach segment etc)
  * [x] Rework the archive context, using it in both the conrol And RecrodingEvents
 
+# Bigger picture issues
+ * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.
+ * OnAvailableCounter noise
