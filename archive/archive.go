@@ -174,9 +174,7 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 		}
 	}
 
-	// FIXME: strip once development complete
-	archive.Context.Options.RangeChecking = true
-
+	// Set the logging levels
 	logging.SetLevel(archive.Context.Options.ArchiveLoglevel, "archive")
 	logging.SetLevel(archive.Context.Options.AeronLoglevel, "aeron")
 	logging.SetLevel(archive.Context.Options.AeronLoglevel, "memmap")
@@ -232,7 +230,6 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Context.Options.RequestChannel, archive.Context.Options.RequestStream)
 	logger.Debugf("Proxy request publication: %#v", archive.Proxy.Publication)
 
-	// FIXME: Java can somehow use an ephemeral port looked up here ...
 	// FIXME: Java and C++ use AUTH and Challenge/Response
 
 	// And intitiate the connection
@@ -349,8 +346,6 @@ func correlationsMapClean(correlationId int64) {
 func (archive *Archive) StartRecording(channel string, stream int32, isLocal bool, autoStop bool) (int64, error) {
 
 	logger.Debugf("StartRecording(%s:%d)\n", channel, stream)
-	// FIXME: locking
-	// FIXME: check open
 
 	correlationId := NextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup

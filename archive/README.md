@@ -75,14 +75,10 @@ operations in progress when polling.
 Examples are provided for a [basic_recording_publisher](examples/basic_recording_publisher/basic_recording_publisher.go) and [basic_replayed_subscriber](examples/basic_replayed_subscriber/basic_replayed_subscriber.go) that interoperate with the Java examples
 
 # Backlog
- * [S] Logging at level normal should be silent if nothing goes wrong
- * [S] Improve the Error handling / Error listeners
  * [L] Expand testing
   * [M] So many tests to write
   * [S] Test reliability
   * [?] archive-media-driver mocking/execution
- * [S] Review locking decision. Adding lock/unlock in archive is simple.
- * [?] Ephemeral port usage
  * [S} The archive state is largely unused. 
    * IsOpen()?
  * 41 FIXMEs
@@ -94,12 +90,18 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * [S] Is it worth having multiple Idletimers in different places? probably.
  * [S] Encoders might take marshaller as parameter to assist reentrancy
  * [?] Clean up and initial upstream push
- 
 
-# Done
- * [x] RecordingEvent Handler and Recording Admin (detach segment etc)
- * [x] Rework the archive context, using it in both the conrol And RecrodingEvents
+# Questionable
+ * Introduce an error listener for when things like a bad error message arrive which by default logs
+   but can be overwritten/listened for by code.
+
+# Recently Done
+ * Logging at level normal should be mostly quiet if nothing goes wrong
+ * Improve the Error handling / Error listeners (mostly)a
+ * Ephemeral port usage is dependent upon accessing the counters which is out of scope here and doesn't buy much
+
 
 # Bigger picture issues
  * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.
- * OnAvailableCounter noise
+ * OnAvailableCounter noise (no can do)
+ * Decided not to do locking in sync api, could subsequently add lcoks, or just async with locks if desired
