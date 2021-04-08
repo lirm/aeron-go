@@ -46,7 +46,8 @@ const RecordingIdNullValue = int32(-1) // Java's io.aeron.Aeron#NULL_VALUE
 // set to user functions to be invoked. This can be done at any time
 //
 // If the loglevel is set to DEBUG, then all of the default listeners
-// will be set to logging listeners.
+// will be set to logging listeners. The Error listener is set to a
+// logging listener by default and will log exceptional events.
 //
 // The Signal Listener if set will be called in normal operation
 //
@@ -54,27 +55,32 @@ const RecordingIdNullValue = int32(-1) // Java's io.aeron.Aeron#NULL_VALUE
 //
 // The ReccordingEvent listeners require RecordingEventEnable() to be called
 // as well as having the RecordingEvent Poll() called by user code
+//
+// The Error Listener
 type ArchiveListeners struct {
+	// Called on errors for things like uncorrelated control messages
+	ErrorListener func(error)
+
+	// Async protocol events if enabled
 	RecordingEventStartedListener  func(*codecs.RecordingStarted)
 	RecordingEventProgressListener func(*codecs.RecordingProgress)
 	RecordingEventStoppedListener  func(*codecs.RecordingStopped)
 
+	// Async protocol event
 	RecordingSignalListener func(*codecs.RecordingSignalEvent)
 
-	AvailableImageListener   func(*aeron.Image)
-	UnavailableImageListener func(*aeron.Image)
-
+	// From the underlying Aeron instance
 	NewSubscriptionListener func(string, int32, int64)
 	NewPublicationListener  func(string, int32, int32, int64)
+
+	// From the underlying Aeron instance
+	AvailableImageListener   func(*aeron.Image)
+	UnavailableImageListener func(*aeron.Image)
 }
 
 // Some Listeners that log for convenience/debug
-func LoggingAvailableImageListener(image *aeron.Image) {
-	logger.Infof("NewAvailableImageListener, sessionId is %d\n", image.SessionID())
-}
-
-func LoggingUnavailableImageListener(image *aeron.Image) {
-	logger.Infof("NewUnavalableImageListener, sessionId is %d\n", image.SessionID())
+func LoggingErrorListener(err error) {
+	logger.Errorf("Error: %s\n", err.Error())
 }
 
 func LoggingRecordingSignalListener(rse *codecs.RecordingSignalEvent) {
@@ -101,14 +107,24 @@ func LoggingNewPublicationListener(channel string, stream int32, session int32, 
 	logger.Infof("NewPublicationListener(channel:%s stream:%d, session:%d, regId:%d)", channel, stream, session, regId)
 }
 
+func LoggingAvailableImageListener(image *aeron.Image) {
+	logger.Infof("NewAvailableImageListener, sessionId is %d\n", image.SessionID())
+}
+
+func LoggingUnavailableImageListener(image *aeron.Image) {
+	logger.Infof("NewUnavalableImageListener, sessionId is %d\n", image.SessionID())
+}
+
 // Listeners may be set to get callbacks on various operations.
 // This global as the aeron library calls the FragmentAssemblers without any user
-// data (or other context).
+// data (or other context). Listeners.ErrorListener() if set will be called
+// if for example protocol unmarshalling goes wrong.
 var Listeners *ArchiveListeners
 
 // Also set globally (and set via the Options) is the protocol
-// marshalling checks. If protocol marshaling goes wrong we lack
-// context so it needs to be global.
+// marshalling checks. When unmarshalling we lack context so we need a
+// global copy of the options values which we set before calling
+// Poll() to ensure it's current
 var rangeChecking bool
 
 // Other globals used internally
@@ -193,7 +209,10 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	// Setup Recording Events (although it's not enabled by default)
 	archive.Events = NewRecordingEventsAdapter(context)
 
+	// Create the listeners and populate
 	Listeners = new(ArchiveListeners)
+	Listeners.ErrorListener = LoggingErrorListener
+
 	// In Debug mode initialize our listeners with simple loggers
 	// Note that these actually log at INFO so you can do this manually for INFO if you like
 	if logging.GetLevel("archive") >= logging.DEBUG {

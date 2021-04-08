@@ -29,7 +29,6 @@ import (
 type Control struct {
 	Context      *ArchiveContext
 	Subscription *aeron.Subscription
-	Listeners    *ArchiveListeners
 	State        ControlState
 
 	// Polling results
@@ -88,9 +87,10 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		// FIXME: We could use an ErrorHandler/Listener
-		logger.Error("Failed to decode control message header", err)
-
+		err2 := fmt.Errorf("ControlFragmentHandler failed to decode control message header: %w", err)
+		if Listeners.ErrorListener != nil {
+			Listeners.ErrorListener(err2)
+		}
 	}
 
 	switch hdr.TemplateId {
@@ -98,21 +98,31 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			logger.Error("Failed to decode control response", err)
+			err2 := fmt.Errorf("ControlFragmentHandler failed to decode control response:%w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
 		}
-		logger.Debugf("ControlResponse: %#v\n", controlResponse)
 
 		// Check this is for our session
 		_, ok := sessionsMap[controlResponse.ControlSessionId]
 		if !ok {
-			logger.Infof("Unexpeccted sessionId in control response: %d", controlResponse.ControlSessionId) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("ControlFragmentHandler: Unexpected sessionId in control response: %d", controlResponse.ControlSessionId)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			return
 		}
 
 		// Look it up
 		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
-			logger.Infof("ControlFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("ControlFragmentHandler uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			return
 		}
 
@@ -122,7 +132,10 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	case recordingSignalEvent.SbeTemplateId():
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			logger.Error("Failed to decode recording signal", err)
+			err2 := fmt.Errorf("ControlFargamentHandler failed to decode recording signal: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
 		}
 		if Listeners.RecordingSignalListener != nil {
 			Listeners.RecordingSignalListener(recordingSignalEvent)
@@ -148,10 +161,11 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
-		// FIXME: We should use an ErrorHandler/Listener
 		// Not much to be done here as we can't correlate
-		logger.Error("Failed to decode control message header", err)
-
+		err2 := fmt.Errorf("ConnectionControlFragmentHandler failed to decode control message header: %w", err)
+		if Listeners.ErrorListener != nil {
+			Listeners.ErrorListener(err2)
+		}
 	}
 
 	switch hdr.TemplateId {
@@ -159,14 +173,21 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			logger.Error("Failed to decode control response", err)
+			err2 := fmt.Errorf("ConnectionControlFragmentHandler failed to decode control response: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
+			return
 		}
-		logger.Debugf("ControlResponse: %#v\n", controlResponse)
 
 		// Look it up
 		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
-			logger.Infof("ConnectionControlFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			return
 		}
 
@@ -174,14 +195,18 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		if controlResponse.Code != codecs.ControlResponseCode.OK {
 			control.State.state = ControlStateError
 			control.State.err = fmt.Errorf("Control Response failure: %s", controlResponse.ErrorMessage)
-			logger.Warning(control.State.err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(control.State.err)
+			}
 		}
 
 		// assert state change
 		if control.State.state != ControlStateConnectRequestSent {
 			control.State.state = ControlStateError
 			control.State.err = fmt.Errorf("Control Response not expecting response")
-			logger.Error(control.State.err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(control.State.err)
+			}
 		}
 
 		// Looking good, so update state and store the SessionId
@@ -194,12 +219,6 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	}
 
 	return
-}
-
-// The control response poller uses local state to pass back information from the underlying subscription
-func (control *Control) ErrorHandler(err error) {
-	// FIXME: for now I'm just logging
-	logger.Errorf(err.Error())
 }
 
 // The control response poller uses local state to pass back information from the underlying subscription
@@ -263,16 +282,21 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 		// Check we're on the right session
 		if control.Results.ControlResponse.ControlSessionId != control.Context.SessionId {
 			err := fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.Context.SessionId)
-			control.ErrorHandler(err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			control.Results.IsPollComplete = true
 			return 0, err
 		}
 
 		// Check we've got the right correlationId
 		// This is usually a sign of a logic error in handling the protocol so we'll log it and move on
+		// This can also happen on reconnection to same control subscription
 		if control.Results.ControlResponse.CorrelationId != correlationId {
 			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId)
-			control.ErrorHandler(err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 		}
 
 		control.Results.IsPollComplete = true
@@ -334,7 +358,11 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// Look it up
 		control, ok := correlationsMap[recordingDescriptor.CorrelationId]
 		if !ok {
-			logger.Infof("Uncorrelated recordingDesciptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			return
 		}
 
@@ -342,17 +370,23 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		control.Results.RecordingDescriptors = append(control.Results.RecordingDescriptors, recordingDescriptor)
 
 	case recordingSubscriptionDescriptor.SbeTemplateId():
-		// logger.Debugf("Received RecordingSubscriptionDescriptorResponse: length %d", buf.Len())
 		if err := recordingSubscriptionDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			logger.Error("Failed to decode RecordingSubscriptioDescriptor", err)
+			err2 := fmt.Errorf("Failed to decode RecordingSubscriptioDescriptor: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
+			return
 		}
-		// logger.Debugf("RecordingSubscriptionDescriptor: %#v\n", recordingSubscriptionDescriptor)
 
 		// Look it up
 		control, ok := correlationsMap[recordingSubscriptionDescriptor.CorrelationId]
 		if !ok {
-			logger.Infof("Uncorrelated recordingSubscriptionDescriptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("Uncorrelated recordingSubscriptionDescriptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			return
 		}
 
@@ -363,17 +397,25 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			logger.Error("Failed to decode control response", err)
+			err2 := fmt.Errorf("Failed to decode control response: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
+			return
 		}
 
 		// Look it up
 		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
-			logger.Infof("DescriptorFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("DescriptorFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			return
 		}
 
-		// We're basically finished but let's log some info if we can
+		// We're basically finished so prepare our OOB return values and log some info if we can
 		control.Results.ControlResponse = controlResponse
 		control.Results.IsPollComplete = true
 
@@ -392,7 +434,12 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 	case recordingSignalEvent.SbeTemplateId():
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			logger.Error("Failed to decode recording signal", err)
+			err2 := fmt.Errorf("Failed to decode recording signal: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
+			return
+
 		}
 		if Listeners.RecordingSignalListener != nil {
 			Listeners.RecordingSignalListener(recordingSignalEvent)
@@ -467,18 +514,22 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 
 		// Check we're on the right session
 		if control.Results.ControlResponse.ControlSessionId != control.Context.SessionId {
-			// FIXME: Other than log?1
-			control.ErrorHandler(fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.Context.SessionId))
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.Context.SessionId)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
+
 			control.Results.IsPollComplete = true
 			return nil
 		}
 
 		// Check we've got the right correlationId
 		if control.Results.ControlResponse.CorrelationId != correlationId {
-			// FIXME: Other than log?
 			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId)
-			control.ErrorHandler(err)
-			// fmt.Printf("%s\n", err.Error())
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
 			control.Results.IsPollComplete = true
 			return nil
 		}

@@ -85,23 +85,20 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * [?] AuthConnect, Challenge/Response
  * [?] [Bug] RecordingSignalEvents currently throw off the count of
    fragments/records we want. Need a mechanism to adjust for them.
- * [?] Logging tidy and general improvements
- * [?] Add remaining archive protocol packets to encoders, proxy, control, archive API, and tests.
+ * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
  * [S] Is it worth having multiple Idletimers in different places? probably.
- * [S] Encoders might take marshaller as parameter to assist reentrancy
  * [?] Clean up and initial upstream push
-
-# Questionable
- * Introduce an error listener for when things like a bad error message arrive which by default logs
-   but can be overwritten/listened for by code.
 
 # Recently Done
  * Logging at level normal should be mostly quiet if nothing goes wrong
  * Improve the Error handling / Error listeners (mostly)a
  * Ephemeral port usage is dependent upon accessing the counters which is out of scope here and doesn't buy much
+ * Error listener
+ * Logging tidying
 
 
 # Bigger picture issues
  * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.
  * OnAvailableCounter noise (no can do)
- * Decided not to do locking in sync api, could subsequently add lcoks, or just async with locks if desired
+ * Decided not to do locking in sync api, could subsequently add locks, or just async with locks if desired.
+   It may be that the marshaller should be parameterized for this.
