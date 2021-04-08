@@ -15,6 +15,7 @@
 package archive
 
 import (
+	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	logging "github.com/op/go-logging"
 	"log"
@@ -27,7 +28,6 @@ import (
 // if we can connect to one and if we can we'll run some tests. If the
 // init fails to connect then we'll skip the tests
 // FIXME: this plan fails as aeron-go calls log.Fatalf() if the media driver is not running !!!
-var context *ArchiveContext
 var archive *Archive
 var haveArchive bool = false
 var DEBUG = false
@@ -46,7 +46,7 @@ var testCases = []TestCases{
 func TestMain(m *testing.M) {
 
 	var err error
-	context = NewArchiveContext()
+	context := aeron.NewContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
 	options := DefaultOptions()
 	if *TestConfig.Verbose {
@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 		options.ArchiveLoglevel = logging.DEBUG
 	}
 
-	archive, err = NewArchive(context, options)
+	archive, err = NewArchive(options, context)
 	if err != nil || archive == nil {
 		log.Printf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
 		return

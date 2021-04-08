@@ -24,17 +24,9 @@ import (
 )
 
 type RecordingEventsAdapter struct {
-	Context      *ArchiveContext
 	Subscription *aeron.Subscription
 	Enabled      bool
-}
-
-// Create a new recording event adapter
-func NewRecordingEventsAdapter(context *ArchiveContext) *RecordingEventsAdapter {
-	rea := new(RecordingEventsAdapter)
-	rea.Context = context
-
-	return rea
+	archive      *Archive // link to parent
 }
 
 // The response poller wraps the aeron subscription handler.
@@ -43,7 +35,7 @@ func NewRecordingEventsAdapter(context *ArchiveContext) *RecordingEventsAdapter 
 func (rea *RecordingEventsAdapter) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
-	rangeChecking = rea.Context.Options.RangeChecking
+	rangeChecking = rea.archive.Options.RangeChecking
 
 	if handler == nil {
 		handler = ReFragmentHandler

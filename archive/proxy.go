@@ -25,28 +25,20 @@ import (
 
 // Proxy class for encapsulating encoding and sending of control protocol messages to an archive
 type Proxy struct {
-	Context     *ArchiveContext
 	Publication *aeron.Publication
-}
-
-// Create a proxy with default settings
-func NewProxy(context *ArchiveContext) *Proxy {
-	proxy := new(Proxy)
-	proxy.Context = context
-
-	return proxy
+	archive     *Archive // link to parent
 }
 
 // Offer to our request publication with a retry to allow time for the image establishment, some back pressure etc
 func (proxy *Proxy) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
 	start := time.Now()
 	var ret int64
-	for time.Since(start) < proxy.Context.Options.Timeout {
+	for time.Since(start) < proxy.archive.Options.Timeout {
 		ret = proxy.Publication.Offer(buffer, offset, length, reservedValueSupplier)
 		switch ret {
 		// Retry on these
 		case aeron.NotConnected, aeron.BackPressured, aeron.AdminAction:
-			proxy.Context.Options.IdleStrategy.Idle(0)
+			proxy.archive.Options.IdleStrategy.Idle(0)
 
 		// Fail or succeed on other values
 		default:
@@ -80,7 +72,7 @@ func (proxy *Proxy) ConnectRequest(correlationId int64, responseStream int32, re
 
 func (proxy *Proxy) CloseSessionRequest() error {
 	// Create a packet and send it
-	bytes, err := CloseSessionRequestPacket(proxy.Context.SessionId)
+	bytes, err := CloseSessionRequestPacket(proxy.archive.SessionId)
 	if err != nil {
 		return err
 	}
@@ -96,7 +88,7 @@ func (proxy *Proxy) CloseSessionRequest() error {
 // Uses the more recent protocol addition StartdRecordingRequest2 which added autoStop
 func (proxy *Proxy) StartRecordingRequest(correlationId int64, stream int32, isLocal bool, autoStop bool, channel string) error {
 
-	bytes, err := StartRecordingRequest2Packet(proxy.Context.SessionId, correlationId, stream, isLocal, autoStop, channel)
+	bytes, err := StartRecordingRequest2Packet(proxy.archive.SessionId, correlationId, stream, isLocal, autoStop, channel)
 	if err != nil {
 		return err
 	}
@@ -110,7 +102,7 @@ func (proxy *Proxy) StartRecordingRequest(correlationId int64, stream int32, isL
 
 func (proxy *Proxy) StopRecordingRequest(correlationId int64, stream int32, channel string) error {
 	// Create a packet and send it
-	bytes, err := StopRecordingRequestPacket(proxy.Context.SessionId, correlationId, stream, channel)
+	bytes, err := StopRecordingRequestPacket(proxy.archive.SessionId, correlationId, stream, channel)
 	if err != nil {
 		return err
 	}
@@ -125,7 +117,7 @@ func (proxy *Proxy) StopRecordingRequest(correlationId int64, stream int32, chan
 func (proxy *Proxy) ReplayRequest(correlationId int64, recordingId int64, position int64, length int64, replayChannel string, replayStream int32) error {
 
 	// Create a packet and send it
-	bytes, err := ReplayRequestPacket(proxy.Context.SessionId, correlationId, recordingId, position, length, replayStream, replayChannel)
+	bytes, err := ReplayRequestPacket(proxy.archive.SessionId, correlationId, recordingId, position, length, replayStream, replayChannel)
 	if err != nil {
 		return err
 	}
@@ -139,7 +131,7 @@ func (proxy *Proxy) ReplayRequest(correlationId int64, recordingId int64, positi
 
 func (proxy *Proxy) StopReplayRequest(correlationId int64, replaySessionId int64) error {
 	// Create a packet and send it
-	bytes, err := StopReplayRequestPacket(proxy.Context.SessionId, correlationId, replaySessionId)
+	bytes, err := StopReplayRequestPacket(proxy.archive.SessionId, correlationId, replaySessionId)
 	if err != nil {
 		return err
 	}
@@ -154,7 +146,7 @@ func (proxy *Proxy) StopReplayRequest(correlationId int64, replaySessionId int64
 // Lists up to recordCount recordings starting at fromRecordingId
 func (proxy *Proxy) ListRecordingsRequest(correlationId int64, fromRecordingId int64, recordCount int32) error {
 	// Create a packet and send it
-	bytes, err := ListRecordingsRequestPacket(proxy.Context.SessionId, correlationId, fromRecordingId, recordCount)
+	bytes, err := ListRecordingsRequestPacket(proxy.archive.SessionId, correlationId, fromRecordingId, recordCount)
 	if err != nil {
 		return err
 	}
@@ -170,7 +162,7 @@ func (proxy *Proxy) ListRecordingsRequest(correlationId int64, fromRecordingId i
 // Lists up to recordCount recordings that match the channel and stream
 func (proxy *Proxy) ListRecordingsForUriRequest(correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) error {
 
-	bytes, err := ListRecordingsForUriRequestPacket(proxy.Context.SessionId, correlationId, fromRecordingId, recordCount, stream, channel)
+	bytes, err := ListRecordingsForUriRequestPacket(proxy.archive.SessionId, correlationId, fromRecordingId, recordCount, stream, channel)
 
 	if err != nil {
 		return err
@@ -186,7 +178,7 @@ func (proxy *Proxy) ListRecordingsForUriRequest(correlationId int64, fromRecordi
 // Retrieves a recording descriptor for a specific recordingId
 func (proxy *Proxy) ListRecordingRequest(correlationId int64, fromRecordingId int64) error {
 	// Create a packet and send it
-	bytes, err := ListRecordingRequestPacket(proxy.Context.SessionId, correlationId, fromRecordingId)
+	bytes, err := ListRecordingRequestPacket(proxy.archive.SessionId, correlationId, fromRecordingId)
 	if err != nil {
 		return err
 	}
@@ -202,7 +194,7 @@ func (proxy *Proxy) ListRecordingRequest(correlationId int64, fromRecordingId in
 // Uses the more recent protocol addition ExtendRecordingRequest2 which added autoStop
 func (proxy *Proxy) ExtendRecordingRequest(correlationId int64, recordingId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
 	// Create a packet and send it
-	bytes, err := ExtendRecordingRequest2Packet(proxy.Context.SessionId, correlationId, recordingId, stream, sourceLocation, autoStop, channel)
+	bytes, err := ExtendRecordingRequest2Packet(proxy.archive.SessionId, correlationId, recordingId, stream, sourceLocation, autoStop, channel)
 	if err != nil {
 		return err
 	}
@@ -217,7 +209,7 @@ func (proxy *Proxy) ExtendRecordingRequest(correlationId int64, recordingId int6
 // RecordingPosition
 func (proxy *Proxy) RecordingPositionRequest(correlationId int64, recordingId int64) error {
 	// Create a packet and send it
-	bytes, err := RecordingPositionRequestPacket(proxy.Context.SessionId, correlationId, recordingId)
+	bytes, err := RecordingPositionRequestPacket(proxy.archive.SessionId, correlationId, recordingId)
 	if err != nil {
 		return err
 	}
@@ -231,7 +223,7 @@ func (proxy *Proxy) RecordingPositionRequest(correlationId int64, recordingId in
 
 func (proxy *Proxy) TruncateRecordingRequest(correlationId int64, recordingId int64, position int64) error {
 	// Create a packet and send it
-	bytes, err := TruncateRecordingRequestPacket(proxy.Context.SessionId, correlationId, recordingId, position)
+	bytes, err := TruncateRecordingRequestPacket(proxy.archive.SessionId, correlationId, recordingId, position)
 	if err != nil {
 		return err
 	}
@@ -245,7 +237,7 @@ func (proxy *Proxy) TruncateRecordingRequest(correlationId int64, recordingId in
 
 func (proxy *Proxy) StopRecordingSubscriptionRequest(correlationId int64, subscriptionId int64) error {
 	// Create a packet and send it
-	bytes, err := StopRecordingSubscriptionPacket(proxy.Context.SessionId, correlationId, subscriptionId)
+	bytes, err := StopRecordingSubscriptionPacket(proxy.archive.SessionId, correlationId, subscriptionId)
 	if err != nil {
 		return err
 	}
@@ -259,7 +251,7 @@ func (proxy *Proxy) StopRecordingSubscriptionRequest(correlationId int64, subscr
 
 func (proxy *Proxy) StopRecordingByIdentityRequest(correlationId int64, recordingId int64) error {
 	// Create a packet and send it
-	bytes, err := StopRecordingByIdentityPacket(proxy.Context.SessionId, correlationId, recordingId)
+	bytes, err := StopRecordingByIdentityPacket(proxy.archive.SessionId, correlationId, recordingId)
 	if err != nil {
 		return err
 	}
@@ -273,7 +265,7 @@ func (proxy *Proxy) StopRecordingByIdentityRequest(correlationId int64, recordin
 
 func (proxy *Proxy) StopPositionRequest(correlationId int64, recordingId int64) error {
 	// Create a packet and send it
-	bytes, err := StopPositionPacket(proxy.Context.SessionId, correlationId, recordingId)
+	bytes, err := StopPositionPacket(proxy.archive.SessionId, correlationId, recordingId)
 	if err != nil {
 		return err
 	}
@@ -288,7 +280,7 @@ func (proxy *Proxy) StopPositionRequest(correlationId int64, recordingId int64) 
 func (proxy *Proxy) FindLastMatchingRecordingRequest(correlationId int64, minRecordingId int64, sessionId int32, stream int32, channel string) error {
 
 	// Create a packet and send it
-	bytes, err := FindLastMatchingRecordingPacket(proxy.Context.SessionId, correlationId, minRecordingId, sessionId, stream, channel)
+	bytes, err := FindLastMatchingRecordingPacket(proxy.archive.SessionId, correlationId, minRecordingId, sessionId, stream, channel)
 	if err != nil {
 		return err
 	}
@@ -303,7 +295,7 @@ func (proxy *Proxy) FindLastMatchingRecordingRequest(correlationId int64, minRec
 func (proxy *Proxy) ListRecordingSubscriptionsRequest(correlationId int64, pseudoIndex int32, subscriptionCount int32, applyStreamId bool, stream int32, channel string) error {
 
 	// Create a packet and send it
-	bytes, err := ListRecordingSubscriptionsPacket(proxy.Context.SessionId, correlationId, pseudoIndex, subscriptionCount, applyStreamId, stream, channel)
+	bytes, err := ListRecordingSubscriptionsPacket(proxy.archive.SessionId, correlationId, pseudoIndex, subscriptionCount, applyStreamId, stream, channel)
 	if err != nil {
 		return err
 	}
@@ -318,7 +310,7 @@ func (proxy *Proxy) ListRecordingSubscriptionsRequest(correlationId int64, pseud
 func (proxy *Proxy) BoundedReplayRequest(correlationId int64, recordingId int64, position int64, length int64, limitCounterId int32, replayStream int32, replayChannel string) error {
 
 	// Create a packet and send it
-	bytes, err := BoundedReplayPacket(proxy.Context.SessionId, correlationId, recordingId, position, length, limitCounterId, replayStream, replayChannel)
+	bytes, err := BoundedReplayPacket(proxy.archive.SessionId, correlationId, recordingId, position, length, limitCounterId, replayStream, replayChannel)
 	if err != nil {
 		return err
 	}
@@ -333,7 +325,7 @@ func (proxy *Proxy) BoundedReplayRequest(correlationId int64, recordingId int64,
 func (proxy *Proxy) StopAllReplaysRequest(correlationId int64, recordingId int64) error {
 
 	// Create a packet and send it
-	bytes, err := StopAllReplaysPacket(proxy.Context.SessionId, correlationId, recordingId)
+	bytes, err := StopAllReplaysPacket(proxy.archive.SessionId, correlationId, recordingId)
 	if err != nil {
 		return err
 	}
@@ -362,7 +354,7 @@ func (proxy *Proxy) CatalogHeaderRequest(version int32, length int32, nextRecord
 
 func (proxy *Proxy) ReplicateRequest(correlationId int64, srcRecordingId int64, dstRecordingId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) error {
 	// Create a packet and send it
-	bytes, err := ReplicateRequestPacket(proxy.Context.SessionId, correlationId, srcRecordingId, dstRecordingId, srcControlStreamId, srcControlChannel, liveDestination)
+	bytes, err := ReplicateRequestPacket(proxy.archive.SessionId, correlationId, srcRecordingId, dstRecordingId, srcControlStreamId, srcControlChannel, liveDestination)
 	if err != nil {
 		return err
 	}
@@ -376,7 +368,7 @@ func (proxy *Proxy) ReplicateRequest(correlationId int64, srcRecordingId int64, 
 
 func (proxy *Proxy) ReplicateRequest2(correlationId int64, srcRecordingId int64, dstRecordingId int64, stopPosition int64, channelTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string, replicationChannel string) error {
 	// Create a packet and send it
-	bytes, err := ReplicateRequest2Packet(proxy.Context.SessionId, correlationId, srcRecordingId, dstRecordingId, stopPosition, channelTagId, srcControlStreamId, srcControlChannel, liveDestination, replicationChannel)
+	bytes, err := ReplicateRequest2Packet(proxy.archive.SessionId, correlationId, srcRecordingId, dstRecordingId, stopPosition, channelTagId, srcControlStreamId, srcControlChannel, liveDestination, replicationChannel)
 	if err != nil {
 		return err
 	}
@@ -390,7 +382,7 @@ func (proxy *Proxy) ReplicateRequest2(correlationId int64, srcRecordingId int64,
 
 func (proxy *Proxy) StopReplicationRequest(correlationId int64, replicationId int64) error {
 	// Create a packet and send it
-	bytes, err := StopReplicationRequestPacket(proxy.Context.SessionId, correlationId, replicationId)
+	bytes, err := StopReplicationRequestPacket(proxy.archive.SessionId, correlationId, replicationId)
 	if err != nil {
 		return err
 	}
@@ -404,7 +396,7 @@ func (proxy *Proxy) StopReplicationRequest(correlationId int64, replicationId in
 
 func (proxy *Proxy) StartPositionRequest(correlationId int64, recordingId int64) error {
 	// Create a packet and send it
-	bytes, err := StartPositionRequestPacket(proxy.Context.SessionId, correlationId, recordingId)
+	bytes, err := StartPositionRequestPacket(proxy.archive.SessionId, correlationId, recordingId)
 	if err != nil {
 		return err
 	}
@@ -418,7 +410,7 @@ func (proxy *Proxy) StartPositionRequest(correlationId int64, recordingId int64)
 
 func (proxy *Proxy) DetachSegmentsRequest(correlationId int64, recordingId int64, newStartPosition int64) error {
 	// Create a packet and send it
-	bytes, err := DetachSegmentsRequestPacket(proxy.Context.SessionId, correlationId, recordingId, newStartPosition)
+	bytes, err := DetachSegmentsRequestPacket(proxy.archive.SessionId, correlationId, recordingId, newStartPosition)
 	if err != nil {
 		return err
 	}
@@ -432,7 +424,7 @@ func (proxy *Proxy) DetachSegmentsRequest(correlationId int64, recordingId int64
 
 func (proxy *Proxy) DeleteDetachedSegmentsRequest(correlationId int64, recordingId int64) error {
 	// Create a packet and send it
-	bytes, err := DeleteDetachedSegmentsRequestPacket(proxy.Context.SessionId, correlationId, recordingId)
+	bytes, err := DeleteDetachedSegmentsRequestPacket(proxy.archive.SessionId, correlationId, recordingId)
 	if err != nil {
 		return err
 	}
@@ -446,7 +438,7 @@ func (proxy *Proxy) DeleteDetachedSegmentsRequest(correlationId int64, recording
 
 func (proxy *Proxy) PurgeSegmentsRequest(correlationId int64, recordingId int64, newStartPosition int64) error {
 	// Create a packet and send it
-	bytes, err := PurgeSegmentsRequestPacket(proxy.Context.SessionId, correlationId, recordingId, newStartPosition)
+	bytes, err := PurgeSegmentsRequestPacket(proxy.archive.SessionId, correlationId, recordingId, newStartPosition)
 	if err != nil {
 		return err
 	}
@@ -459,7 +451,7 @@ func (proxy *Proxy) PurgeSegmentsRequest(correlationId int64, recordingId int64,
 }
 func (proxy *Proxy) AttachSegmentsRequest(correlationId int64, recordingId int64) error {
 	// Create a packet and send it
-	bytes, err := AttachSegmentsRequestPacket(proxy.Context.SessionId, correlationId, recordingId)
+	bytes, err := AttachSegmentsRequestPacket(proxy.archive.SessionId, correlationId, recordingId)
 	if err != nil {
 		return err
 	}
@@ -473,7 +465,7 @@ func (proxy *Proxy) AttachSegmentsRequest(correlationId int64, recordingId int64
 
 func (proxy *Proxy) MigrateSegmentsRequest(correlationId int64, srcRecordingId int64, destRecordingId int64) error {
 	// Create a packet and send it
-	bytes, err := MigrateSegmentsRequestPacket(proxy.Context.SessionId, correlationId, srcRecordingId, destRecordingId)
+	bytes, err := MigrateSegmentsRequestPacket(proxy.archive.SessionId, correlationId, srcRecordingId, destRecordingId)
 	if err != nil {
 		return err
 	}
@@ -502,7 +494,7 @@ func (proxy *Proxy) AuthConnectRequest(correlationId int64, responseStream int32
 
 func (proxy *Proxy) KeepAliveRequest(correlationId int64) error {
 	// Create a packet and send it
-	bytes, err := KeepAliveRequestPacket(proxy.Context.SessionId, correlationId)
+	bytes, err := KeepAliveRequestPacket(proxy.archive.SessionId, correlationId)
 	if err != nil {
 		return err
 	}
@@ -516,7 +508,7 @@ func (proxy *Proxy) KeepAliveRequest(correlationId int64) error {
 
 func (proxy *Proxy) TaggedReplicateRequest(correlationId int64, srcRecordingId int64, dstRecordingId int64, channelTagId int64, subscriptionTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) error {
 	// Create a packet and send it
-	bytes, err := TaggedReplicateRequestPacket(proxy.Context.SessionId, correlationId, srcRecordingId, dstRecordingId, channelTagId, subscriptionTagId, srcControlStreamId, srcControlChannel, liveDestination)
+	bytes, err := TaggedReplicateRequestPacket(proxy.archive.SessionId, correlationId, srcRecordingId, dstRecordingId, channelTagId, subscriptionTagId, srcControlStreamId, srcControlChannel, liveDestination)
 	if err != nil {
 		return err
 	}
@@ -530,7 +522,7 @@ func (proxy *Proxy) TaggedReplicateRequest(correlationId int64, srcRecordingId i
 
 func (proxy *Proxy) PurgeRecordingRequest(correlationId int64, replaySessionId int64) error {
 	// Create a packet and send it
-	bytes, err := PurgeRecordingRequestPacket(proxy.Context.SessionId, correlationId, replaySessionId)
+	bytes, err := PurgeRecordingRequestPacket(proxy.archive.SessionId, correlationId, replaySessionId)
 	if err != nil {
 		return err
 	}

@@ -95,6 +95,8 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * Ephemeral port usage is dependent upon accessing the counters which is out of scope here and doesn't buy much
  * Error listener
  * Logging tidying
+ * Removed the archive context, it was offering little value. Instead,
+   the proxy, control, and recrodingevents all have a reference 
 
 
 # Bigger picture issues

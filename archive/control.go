@@ -27,7 +27,6 @@ import (
 
 // Control contains everything required for the archive subscription/response side
 type Control struct {
-	Context      *ArchiveContext
 	Subscription *aeron.Subscription
 	State        ControlState
 
@@ -39,6 +38,8 @@ type Control struct {
 	challengeSessionId int64 // FIXME: Todo
 
 	marshaller *codecs.SbeGoMarshaller // FIXME: sort out
+
+	archive *Archive // link to parent
 }
 
 // The polling mechanism is not parameterizsed so we need to set state for the results as we go
@@ -62,14 +63,6 @@ const ControlStateTimedOut = 4
 type ControlState struct {
 	state int
 	err   error
-}
-
-// Create a new initialized control. Note that a control does require inititializtion for it's channels
-func NewControl(context *ArchiveContext) *Control {
-	control := new(Control)
-	control.Context = context
-
-	return control
 }
 
 // The current subscription handler doesn't provide a mechanism for passing a rock
@@ -212,7 +205,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		// Looking good, so update state and store the SessionId
 		control.State.state = ControlStateConnected
 		control.State.err = nil
-		control.Context.SessionId = controlResponse.ControlSessionId
+		control.archive.SessionId = controlResponse.ControlSessionId
 
 	default:
 		fmt.Printf("ConnectionControlFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
@@ -225,7 +218,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
-	rangeChecking = control.Context.Options.RangeChecking
+	rangeChecking = control.archive.Options.RangeChecking
 
 	control.Results.ControlResponse = nil  // Clear old results
 	control.Results.IsPollComplete = false // Clear completion flag
@@ -260,10 +253,10 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 			return fmt.Errorf("response channel from archive is not connected")
 		}
 
-		if time.Since(start) > control.Context.Options.Timeout {
+		if time.Since(start) > control.archive.Options.Timeout {
 			return fmt.Errorf("timeout waiting for correlationId %d", correlationId)
 		}
-		control.Context.Options.IdleStrategy.Idle(0)
+		control.archive.Options.IdleStrategy.Idle(0)
 	}
 }
 
@@ -280,8 +273,8 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 		}
 
 		// Check we're on the right session
-		if control.Results.ControlResponse.ControlSessionId != control.Context.SessionId {
-			err := fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.Context.SessionId)
+		if control.Results.ControlResponse.ControlSessionId != control.archive.SessionId {
+			err := fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.archive.SessionId)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -479,10 +472,10 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 			continue
 		}
 
-		if time.Since(start) > control.Context.Options.Timeout {
+		if time.Since(start) > control.archive.Options.Timeout {
 			return fmt.Errorf("timeout waiting for correlationId %d", correlationId)
 		}
-		control.Context.Options.IdleStrategy.Idle(0)
+		control.archive.Options.IdleStrategy.Idle(0)
 	}
 
 	return nil
@@ -493,7 +486,7 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 	logger.Debugf("PollForDescriptors(%d)", correlationId)
 
 	// Update our globals in case they've changed so we use the current state in our callback
-	rangeChecking = control.Context.Options.RangeChecking
+	rangeChecking = control.archive.Options.RangeChecking
 
 	control.Results.ControlResponse = nil                  // Clear old results
 	control.Results.IsPollComplete = false                 // Clear completion flag
@@ -513,9 +506,9 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 		}
 
 		// Check we're on the right session
-		if control.Results.ControlResponse.ControlSessionId != control.Context.SessionId {
+		if control.Results.ControlResponse.ControlSessionId != control.archive.SessionId {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.Context.SessionId)
+			err := fmt.Errorf("Control Response expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.archive.SessionId)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}

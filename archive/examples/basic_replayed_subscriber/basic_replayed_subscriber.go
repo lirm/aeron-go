@@ -18,6 +18,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -40,7 +41,7 @@ func main() {
 	responseStream := sampleStream + 2
 
 	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.Config.DriverTimeout)
-	context := archive.NewArchiveContext()
+	context := aeron.NewContext()
 	context.AeronDir(*examples.Config.AeronPrefix)
 	context.MediaDriverTimeout(timeout)
 
@@ -55,7 +56,7 @@ func main() {
 		options.AeronLoglevel = logging.INFO
 	}
 
-	arch, err := archive.NewArchive(context, options)
+	arch, err := archive.NewArchive(options, context)
 	if err != nil {
 		logger.Fatalf("Failed to connect to media driver: %s\n", err.Error())
 	}

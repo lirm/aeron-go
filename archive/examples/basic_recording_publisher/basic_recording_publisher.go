@@ -45,7 +45,7 @@ func main() {
 	}
 
 	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.Config.DriverTimeout)
-	context := archive.NewArchiveContext()
+	context := aeron.NewContext()
 	context.AeronDir(*examples.Config.AeronPrefix)
 	context.MediaDriverTimeout(timeout)
 
@@ -55,7 +55,7 @@ func main() {
 	options.ResponseChannel = *examples.Config.ResponseChannel
 	options.ResponseStream = int32(*examples.Config.ResponseStream)
 
-	arch, err := archive.NewArchive(context, options)
+	arch, err := archive.NewArchive(options, context)
 	if err != nil {
 		logger.Fatalf("Failed to connect to media driver: %s\n", err.Error())
 	}

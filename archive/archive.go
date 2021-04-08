@@ -27,11 +27,13 @@ import (
 
 // Archive is the primary interface to the media driver for managing archiving
 type Archive struct {
-	aeron   *aeron.Aeron
-	Context *ArchiveContext
-	Proxy   *Proxy
-	Control *Control
-	Events  *RecordingEventsAdapter
+	aeron        *aeron.Aeron            // Embedded aeron
+	aeronContext *aeron.Context          // Embedded aeron context, see context.go for available wrapper functions
+	Options      *Options                // Configuration options
+	SessionId    int64                   // Allocated by the archiving media driver
+	Proxy        *Proxy                  // For outgoing protocol messages (publish/request)
+	Control      *Control                // For incoming protocol messages (subscribe/reponse)
+	Events       *RecordingEventsAdapter // For async recording events (must be enabled)
 }
 
 // constants relating to StartReplay
@@ -165,53 +167,52 @@ func AddSessionIdToChannel(channel string, sessionId int32) (string, error) {
 	return uri.String(), nil
 }
 
-// ArchiveConnect factory method to create a Archive instance from the ArchiveContext settings
-// You may provide your own archive context which may include an aeron context
-func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
+// Factory method to create a Archive instance
+// You may provide your own archive options, otherwise one will be created from defaults
+// You may provide your own aeron context, otherwise one will be created from defaults
+func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	var err error
 
 	archive := new(Archive)
 	archive.aeron = new(aeron.Aeron)
-
-	// Use they're context or allocate a default one for them
-	if context != nil {
-		archive.Context = context
-	} else {
-		archive.Context = NewArchiveContext()
-	}
+	archive.aeronContext = context
 
 	// Use the provided options or use our defaults
 	if options != nil {
-		archive.Context.Options = options
+		archive.Options = options
 	} else {
-		if archive.Context.Options == nil {
+		if archive.Options == nil {
 			// Create a new set
-			archive.Context.Options = DefaultOptions()
+			archive.Options = DefaultOptions()
 		}
 	}
 
 	// Set the logging levels
-	logging.SetLevel(archive.Context.Options.ArchiveLoglevel, "archive")
-	logging.SetLevel(archive.Context.Options.AeronLoglevel, "aeron")
-	logging.SetLevel(archive.Context.Options.AeronLoglevel, "memmap")
-	logging.SetLevel(archive.Context.Options.AeronLoglevel, "driver")
-	logging.SetLevel(archive.Context.Options.AeronLoglevel, "counters")
-	logging.SetLevel(archive.Context.Options.AeronLoglevel, "logbuffers")
-	logging.SetLevel(archive.Context.Options.AeronLoglevel, "buffer")
-	logging.SetLevel(archive.Context.Options.AeronLoglevel, "rb")
+	logging.SetLevel(archive.Options.ArchiveLoglevel, "archive")
+	logging.SetLevel(archive.Options.AeronLoglevel, "aeron")
+	logging.SetLevel(archive.Options.AeronLoglevel, "memmap")
+	logging.SetLevel(archive.Options.AeronLoglevel, "driver")
+	logging.SetLevel(archive.Options.AeronLoglevel, "counters")
+	logging.SetLevel(archive.Options.AeronLoglevel, "logbuffers")
+	logging.SetLevel(archive.Options.AeronLoglevel, "buffer")
+	logging.SetLevel(archive.Options.AeronLoglevel, "rb")
 
 	// Setup the Control (subscriber/response)
-	archive.Control = NewControl(context)
+	archive.Control = new(Control)
+	archive.Control.archive = archive
 
 	// Setup the Proxy (publisher/request)
-	archive.Proxy = NewProxy(context)
+	archive.Proxy = new(Proxy)
+	archive.Proxy.archive = archive
 
 	// Setup Recording Events (although it's not enabled by default)
-	archive.Events = NewRecordingEventsAdapter(context)
+	archive.Events = new(RecordingEventsAdapter)
+	archive.Events.archive = archive
 
 	// Create the listeners and populate
 	Listeners = new(ArchiveListeners)
 	Listeners.ErrorListener = LoggingErrorListener
+	archive.SetAeronErrorHandler(LoggingErrorListener)
 
 	// In Debug mode initialize our listeners with simple loggers
 	// Note that these actually log at INFO so you can do this manually for INFO if you like
@@ -230,23 +231,22 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 		Listeners.NewSubscriptionListener = LoggingNewSubscriptionListener
 		Listeners.NewPublicationListener = LoggingNewPublicationListener
 
-		archive.Context.aeronContext.NewSubscriptionHandler(Listeners.NewSubscriptionListener)
-		archive.Context.aeronContext.NewPublicationHandler(Listeners.NewPublicationListener)
+		archive.aeronContext.NewSubscriptionHandler(Listeners.NewSubscriptionListener)
+		archive.aeronContext.NewPublicationHandler(Listeners.NewPublicationListener)
 	}
 
 	// Connect the underlying aeron
-	logger.Debugf("Archive connecting with context: %v", context.aeronContext)
-	archive.aeron, err = aeron.Connect(archive.Context.aeronContext)
+	archive.aeron, err = aeron.Connect(archive.aeronContext)
 	if err != nil {
 		return archive, err
 	}
 
 	// and then the subscription, it's poller and initiate a connection
-	archive.Control.Subscription = <-archive.aeron.AddSubscription(archive.Context.Options.ResponseChannel, archive.Context.Options.ResponseStream)
+	archive.Control.Subscription = <-archive.aeron.AddSubscription(archive.Options.ResponseChannel, archive.Options.ResponseStream)
 	logger.Debugf("Control response subscription: %#v", archive.Control.Subscription)
 
 	// Create the publication half for the proxy that looks after sending requests on that
-	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Context.Options.RequestChannel, archive.Context.Options.RequestStream)
+	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Options.RequestChannel, archive.Options.RequestStream)
 	logger.Debugf("Proxy request publication: %#v", archive.Proxy.Publication)
 
 	// FIXME: Java and C++ use AUTH and Challenge/Response
@@ -257,7 +257,7 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	correlationsMap[correlationId] = archive.Control // Add it to our map so we can find it
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.ConnectRequest(correlationId, archive.Context.Options.ResponseStream, archive.Context.Options.ResponseChannel); err != nil {
+	if err := archive.Proxy.ConnectRequest(correlationId, archive.Options.ResponseStream, archive.Options.ResponseChannel); err != nil {
 		logger.Errorf("ConnectRequest failed: %s\n", err)
 		return nil, err
 	}
@@ -270,12 +270,12 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 		}
 
 		// Check for timeout
-		if time.Since(start) > archive.Context.Options.Timeout {
+		if time.Since(start) > archive.Options.Timeout {
 			archive.Control.State.state = ControlStateTimedOut
 			archive.Control.State.err = fmt.Errorf("Operation timed out")
 			break
 		} else {
-			archive.Context.Options.IdleStrategy.Idle(0)
+			archive.Options.IdleStrategy.Idle(0)
 		}
 	}
 
@@ -284,10 +284,10 @@ func NewArchive(context *ArchiveContext, options *Options) (*Archive, error) {
 	} else if archive.Control.State.state != ControlStateConnected {
 		logger.Error("Connect failed\n")
 	} else {
-		logger.Infof("Archive connection established for sessionId:%d\n", archive.Context.SessionId)
+		logger.Infof("Archive connection established for sessionId:%d\n", archive.SessionId)
 
 		// Store the SessionId
-		sessionsMap[archive.Context.SessionId] = archive.Control // Add it to our map so we can look it up
+		sessionsMap[archive.SessionId] = archive.Control // Add it to our map so we can look it up
 	}
 
 	return archive, archive.Control.State.err
@@ -298,15 +298,50 @@ func (archive *Archive) Close() error {
 	archive.Proxy.CloseSessionRequest()
 	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
-	delete(sessionsMap, archive.Context.SessionId)
+	delete(sessionsMap, archive.SessionId)
 	return archive.aeron.Close()
+}
+
+// Sets the aeron error handler
+func (archive *Archive) SetAeronErrorHandler(handler func(error)) {
+	archive.aeronContext.ErrorHandler(handler)
+}
+
+// AeronDir sets the root directory for media driver files
+func (archive *Archive) SetAeronDir(dir string) {
+	archive.aeronContext.AeronDir(dir)
+}
+
+// MediaDriverTimeout sets the timeout for keep alives to media driver
+func (archive *Archive) SetAeronMediaDriverTimeout(timeout time.Duration) {
+	archive.aeronContext.MediaDriverTimeout(timeout)
+}
+
+// ResourceLingerTimeout sets the timeout for resource cleanup after they're released
+func (archive *Archive) SetAeronResourceLingerTimeout(timeout time.Duration) {
+	archive.aeronContext.ResourceLingerTimeout(timeout)
+}
+
+// InterServiceTimeout sets the timeout for client heartbeat
+func (archive *Archive) SetAeronInterServiceTimeout(timeout time.Duration) {
+	archive.aeronContext.InterServiceTimeout(timeout)
+}
+
+// PublicationConnectionTimeout sets the timeout for publications
+func (archive *Archive) SetAeronPublicationConnectionTimeout(timeout time.Duration) {
+	archive.aeronContext.PublicationConnectionTimeout(timeout)
+}
+
+// CncFileName returns the name of the Counters file
+func (archive *Archive) AeronCncFileName() string {
+	return archive.aeronContext.CncFileName()
 }
 
 // Start recording events flowing
 // Events are returned via the three callbacks which should be
 // overridden from the default logging listeners defined in the Listeners
 func (archive *Archive) EnableRecordingEvents() {
-	archive.Events.Subscription = <-archive.aeron.AddSubscription(archive.Context.Options.RecordingEventsChannel, archive.Context.Options.RecordingEventsStream)
+	archive.Events.Subscription = <-archive.aeron.AddSubscription(archive.Options.RecordingEventsChannel, archive.Options.RecordingEventsStream)
 	archive.Events.Enabled = true
 	logger.Debugf("RecordingEvents subscription: %#v", archive.Events.Subscription)
 }
@@ -451,7 +486,7 @@ func (archive *Archive) StopRecordingByPublication(publication aeron.Publication
 //   Sending the request fails - see error for detail
 func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*aeron.Publication, error) {
 
-	// FIXME: check failure
+	// This can fail in aeron via log.Fatalf(), not much we can do
 	publication := <-archive.AddPublication(channel, stream)
 	if !publication.IsOriginal() {
 		return nil, fmt.Errorf("publication already added for channel=%s stream=%d", channel, stream)
@@ -656,15 +691,11 @@ func (archive *Archive) StopAllReplays(recordingId int64) error {
 	return err
 }
 
-// Extend an existing nont-active recording of a channel and stream
-// pairing. The channel must be configured for the initial position
-// from which it will be extended. This can be done with FIXME:
-// ChannelUriStringBuilder#initialPosition(long, int, int). The
-// details required to initialise can be found by calling FIXME:
-// listRecording(long, RecordingDescriptorConsumer).
+// Extend an existing non-active recording of a channel and stream pairing.
 //
-// Returns the subscriptionId of the recording that can be passed to
-// StopRecording()
+// The channel must be configured for the initial position from which it will be extended.
+//
+// Returns the subscriptionId of the recording that can be passed to StopRecording()
 func (archive *Archive) ExtendRecording(recordingId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) (int64, error) {
 	correlationId := NextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup
