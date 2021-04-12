@@ -135,7 +135,8 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		}
 
 	default:
-		fmt.Printf("ControlFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
+		// This can happen when testing
+		fmt.Printf("ControlFragmentHandler: Unexpected message type %d\n", hdr.TemplateId)
 	}
 
 	return
