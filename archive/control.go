@@ -232,7 +232,10 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 	logger.Debugf("PollNextResponse(%d) start", correlationId)
 
 	start := time.Now()
-	fragmentsWanted := 10 // FIXME: check is this safe to assume
+
+	// We can get async events whilst we're expecting our control response
+	// so we ask for more fragments than we want
+	fragmentsWanted := 10
 
 	for {
 		fragmentsWanted -= control.Poll(ControlFragmentHandler, fragmentsWanted)
@@ -301,11 +304,11 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 // Poll the response stream once for an error. If another message is
 // present then it will be skipped over so only call when not
 // expecting another response.
-//
-// FIXME: Need to adjust fragment counts in case something else async happens
 func (control *Control) PollForErrorResponse() error {
 
-	fragments := control.Poll(ControlFragmentHandler, 1)
+	// We can get async events whilst we're expecting our control response
+	// so we ask for more fragments than we want
+	fragments := control.Poll(ControlFragmentHandler, 10)
 	if fragments == 0 {
 		return nil
 	}
@@ -319,6 +322,7 @@ func (control *Control) PollForErrorResponse() error {
 // Poll for descriptors (both recording and subscription)
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via the control's Results
+// FIXME: Need to adjust fragment counts in case something async happens
 func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	// logger.Debugf("DescriptorFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
