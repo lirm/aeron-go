@@ -32,7 +32,7 @@ var TestConfig = struct {
 	ReplayChannel   *string
 	AeronPrefix     *string
 	ProfilerEnabled *bool
-	Verbose         *bool
+	Debug           *bool
 }{
 	flag.Int("samplestream", 1001, "default base response control stream to use"),
 	flag.String("samplechannel", "aeron:udp?endpoint=localhost:20121", "default response control channel to publish to"),
@@ -42,5 +42,5 @@ var TestConfig = struct {
 
 	flag.String("prefix", aeron.DefaultAeronDir+"/aeron-"+aeron.UserName, "root directory for aeron driver file"),
 	flag.Bool("profile", false, "enable CPU profiling"),
-	flag.Bool("verbose", false, "enable verbose (DEBUG) logging"),
+	flag.Bool("debug", false, "enable DEBUG logging"),
 }

@@ -15,6 +15,7 @@
 package archive
 
 import (
+	"flag"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	logging "github.com/op/go-logging"
@@ -31,7 +32,7 @@ import (
 // FIXME: this plan fails as aeron-go calls log.Fatalf() if the media driver is not running !!!
 var archive *Archive
 var haveArchive bool = false
-var DEBUG = false
+var DEBUG bool = false
 
 type TestCases struct {
 	sampleStream  int32
@@ -45,6 +46,7 @@ var testCases = []TestCases{
 }
 
 func TestMain(m *testing.M) {
+	flag.Parse()
 
 	var err error
 	context := aeron.NewContext()
@@ -60,10 +62,11 @@ func TestMain(m *testing.M) {
 		testCases[0].replayStream++
 	}
 
-	if *TestConfig.Verbose {
+	if *TestConfig.Debug {
 		log.Printf("Setting verbose logging")
 		log.Printf("Using %s/%d and %s/%d", testCases[0].sampleChannel, testCases[0].sampleStream, testCases[0].replayChannel, testCases[0].replayStream)
 		options.ArchiveLoglevel = logging.DEBUG
+		DEBUG = true
 	}
 
 	archive, err = NewArchive(options, context)
@@ -220,8 +223,11 @@ func TestListRecordings(t *testing.T) {
 	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
 
 	// Cleanup
-	if res, err := archive.StopRecordingByIdentity(recordingId); err != nil || !res {
+	res, err := archive.StopRecordingByIdentity(recordingId)
+	if err != nil {
 		t.Logf("StopRecordingByIdentity(%d) failed: %s", recordingId, err.Error())
+	} else if !res {
+		t.Logf("StopRecordingByIdentity(%d) failed", recordingId)
 	}
 	if err := archive.PurgeRecording(recordingId); err != nil {
 		t.Logf("PurgeRecording(%d) failed: %s", recordingId, err.Error())

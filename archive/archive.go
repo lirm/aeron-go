@@ -445,7 +445,11 @@ func (archive *Archive) StopRecordingByIdentity(recordingId int64) (bool, error)
 		return false, err
 	}
 	res, err := archive.Control.PollForResponse(correlationId)
-	return res != 0, err
+	if res != 0 {
+		logger.Debugf("StopRecordingByIdentity result was %d\n", res)
+	}
+
+	return res == 0, err
 }
 
 // StopRecording by SubscriptionId
