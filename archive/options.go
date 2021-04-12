@@ -38,12 +38,11 @@ type Options struct {
 	ResponseStream         int32              // [init] and stream
 	RecordingEventsChannel string             // [enable] Recording progress events
 	RecordingEventsStream  int32              // [enable] and stream
-	RecordingIdleStrategy  idlestrategy.Idler // [runtime] Idlestrategy for the recording poller
 }
 
 // These are the Options used by default for an Archive object
 var defaultOptions Options = Options{
-	RangeChecking:          true, // FIXME: turn off
+	RangeChecking:          false,
 	ArchiveLoglevel:        logging.INFO,
 	AeronLoglevel:          logging.NOTICE,
 	Timeout:                time.Second * 5,
@@ -54,7 +53,6 @@ var defaultOptions Options = Options{
 	ResponseStream:         20,
 	RecordingEventsChannel: "aeron:udp?control-mode=dynamic|control=localhost:8030",
 	RecordingEventsStream:  30,
-	RecordingIdleStrategy:  idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: unused
 }
 
 // Create and return a new options from the defaults.
