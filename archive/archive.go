@@ -249,7 +249,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Options.RequestChannel, archive.Options.RequestStream)
 	logger.Debugf("Proxy request publication: %#v", archive.Proxy.Publication)
 
-	// FIXME: Java and C++ use AUTH and Challenge/Response
+	// FIXME:auth Java and C++ use AUTH and Challenge/Response
 
 	// And intitiate the connection
 	archive.Control.State.state = ControlStateConnectRequestSent

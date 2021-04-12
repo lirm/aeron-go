@@ -16,6 +16,7 @@ package archive
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -58,18 +59,22 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 	marshaller := codecs.NewSbeGoMarshaller()
 
 	if err := hdr.Decode(marshaller, buf); err != nil {
-		// FIXME: Should we use an ErrorHandler?
-		logger.Error("Failed to decode message header", err)
-		return
+		// Not much to be done here as we can't correlate
+		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		// Call the global error handler, ugly but it's all we've got
+		if Listeners.ErrorListener != nil {
+			Listeners.ErrorListener(err2)
+		}
 	}
 
 	switch hdr.TemplateId {
 	case recordingStarted.SbeTemplateId():
 		logger.Debugf("Received RecordingStarted: length %d", buf.Len())
 		if err := recordingStarted.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			// FIXME: Listeners.ErrorListener()
-			logger.Error("Failed to decode RecordingStarted", err)
-
+			err2 := fmt.Errorf("Decode() of RecordingStarted failed: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
 		} else {
 			// Call the Listener
 			if Listeners.RecordingEventStartedListener != nil {
@@ -80,7 +85,10 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 	case recordingProgress.SbeTemplateId():
 		logger.Debugf("Received RecordingProgress: length %d", buf.Len())
 		if err := recordingProgress.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			logger.Error("Failed to decode RecordingProgress", err)
+			err2 := fmt.Errorf("Decode() of RecordingProgress failed: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
 		} else {
 			logger.Debugf("RecordingProgress: %#v\n", recordingProgress)
 			// Call the Listener
@@ -92,7 +100,10 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 	case recordingStopped.SbeTemplateId():
 		logger.Debugf("Received RecordingStopped: length %d", buf.Len())
 		if err := recordingStopped.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			logger.Error("Failed to decode RecordingStopped", err)
+			err2 := fmt.Errorf("Decode() of RecordingStopped failed: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
 		} else {
 			logger.Debugf("RecordingStopped: %#v\n", recordingStopped)
 			// Call the Listener

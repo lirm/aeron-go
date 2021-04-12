@@ -23,9 +23,9 @@ import (
 // creates a []byte suitable for sending over the wire by using the
 // generated encoders created using the simple-binary-encosing
 
-// FIXME: Reentrancy options: a) giant lock, b) parameterise, c) allocate on fly
-// FIXME: rangeCheckign needs to be global in the fragment assemblers but not here. Parameterize!
-
+// We use a global marshaller here as we're assuming non-reentrancy as the
+// underlying protocol does not allow for overlapping messages
+// It would be possible to parameterize the marshaller or allocate it on the fly
 var marshaller *codecs.SbeGoMarshaller = codecs.NewSbeGoMarshaller()
 
 func ConnectRequestPacket(correlationID int64, responseStream int32, responseChannel string) ([]byte, error) {

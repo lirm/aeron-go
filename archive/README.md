@@ -75,21 +75,21 @@ operations in progress when polling.
 Examples are provided for a [basic_recording_publisher](examples/basic_recording_publisher/basic_recording_publisher.go) and [basic_replayed_subscriber](examples/basic_replayed_subscriber/basic_replayed_subscriber.go) that interoperate with the Java examples
 
 # Backlog
+
+## Working Set
+ * [S] [Bug] RecordingSignalEvents currently throw off the count of
+   fragments/records we want. Need a mechanism to adjust for them.
  * [L] Expand testing
   * [M] So many tests to write
-  * [S] Test reliability
   * [?] archive-media-driver mocking/execution
  * [S} The archive state is largely unused. 
    * IsOpen()?
- * 41 FIXMEs
- * [?] AuthConnect, Challenge/Response
- * [?] [Bug] RecordingSignalEvents currently throw off the count of
-   fragments/records we want. Need a mechanism to adjust for them.
+ * 21 FIXMEs
+ * [?] Implement AuthConnect, Challenge/Response
  * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
- * [S] Is it worth having multiple Idletimers in different places? probably.
  * [?] Clean up and initial upstream push
 
-# Recently Done
+## Recently Done
  * Logging at level normal should be mostly quiet if nothing goes wrong
  * Improve the Error handling / Error listeners (mostly)a
  * Ephemeral port usage is dependent upon accessing the counters which is out of scope here and doesn't buy much
@@ -97,10 +97,12 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * Logging tidying
  * Removed the archive context, it was offering little value. Instead,
    the proxy, control, and recrodingevents all have a reference 
-
+ * Made tests more reliable
 
 # Bigger picture issues
  * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.
  * OnAvailableCounter noise (no can do)
  * Decided not to do locking in sync api, could subsequently add locks, or just async with locks if desired.
    It may be that the marshaller should be parameterized for this.
+ * Java and C++ poll the counters to determine when a recording has actually started but the counters are not
+   availabe in go. As a result we use delays and hope which isn't ideal.

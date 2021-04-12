@@ -29,7 +29,7 @@ import (
 // Rather than mock or spawn an archive-media-driver we're just seeing
 // if we can connect to one and if we can we'll run some tests. If the
 // init fails to connect then we'll skip the tests
-// FIXME: this plan fails as aeron-go calls log.Fatalf() if the media driver is not running !!!
+// FIXME:BiggerPicture this plan fails as aeron-go calls log.Fatalf() if the media driver is not running!
 var archive *Archive
 var haveArchive bool = false
 var DEBUG bool = false
@@ -358,7 +358,7 @@ func TestStartStopReplay(t *testing.T) {
 }
 
 // Test starting a replay
-// FIXME: Disabled as aeron calls log.Fatalf()
+// FIXME:BiggerPicture Disabled as aeron calls log.Fatalf()
 func DisabledTestAddRecordedPublicationFailure(t *testing.T) {
 	if !haveArchive {
 		return

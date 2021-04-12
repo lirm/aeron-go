@@ -33,11 +33,9 @@ type Control struct {
 	// Polling results
 	Results ControlResults
 
-	// FIXME: auth
+	// FIXME:auth implement
 	EncodedChallenge   []byte
-	challengeSessionId int64 // FIXME: Todo
-
-	marshaller *codecs.SbeGoMarshaller // FIXME: sort out
+	challengeSessionId int64 // FIXME:auth
 
 	archive *Archive // link to parent
 }
@@ -80,7 +78,8 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		err2 := fmt.Errorf("ControlFragmentHandler failed to decode control message header: %w", err)
+		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		// Call the global error handler, ugly but it's all we've got
 		if Listeners.ErrorListener != nil {
 			Listeners.ErrorListener(err2)
 		}
@@ -156,7 +155,8 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		err2 := fmt.Errorf("ConnectionControlFragmentHandler failed to decode control message header: %w", err)
+		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		// Call the global error handler, ugly but it's all we've got
 		if Listeners.ErrorListener != nil {
 			Listeners.ErrorListener(err2)
 		}
@@ -224,7 +224,6 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 	control.Results.ControlResponse = nil  // Clear old results
 	control.Results.IsPollComplete = false // Clear completion flag
 
-	// FIXME: check what controlledPoll might do instead
 	return control.Subscription.Poll(handler, fragmentLimit)
 }
 
@@ -323,7 +322,7 @@ func (control *Control) PollForErrorResponse() error {
 // Poll for descriptors (both recording and subscription)
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via the control's Results
-// FIXME: Need to adjust fragment counts in case something async happens
+// FIXME:Bug Need to adjust fragment counts in case something async happens
 func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	// logger.Debugf("DescriptorFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
@@ -339,17 +338,23 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		// FIXME: We could use an ErrorHandler/Listener
-		logger.Error("Failed to decode control message header", err)
-
+		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		// Call the global error handler, ugly but it's all we've got
+		if Listeners.ErrorListener != nil {
+			Listeners.ErrorListener(err2)
+		}
 	}
 
 	switch hdr.TemplateId {
 	case recordingDescriptor.SbeTemplateId():
 		// logger.Debugf("Received RecordingDescriptorResponse: length %d", buf.Len())
+		// Not much to be done here as we can't correlate
 		if err := recordingDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			// Not much to be done here as we can't correlate
-			logger.Error("Failed to decode RecordingDescriptor", err)
+			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
+			return
 		}
 		// logger.Debugf("RecordingDescriptor: %#v\n", recordingDescriptor)
 
