@@ -34,10 +34,10 @@ var TestConfig = struct {
 	ProfilerEnabled *bool
 	Verbose         *bool
 }{
-	flag.Int("samplestream", 1001, "default response control stream to use"),
+	flag.Int("samplestream", 1001, "default base response control stream to use"),
 	flag.String("samplechannel", "aeron:udp?endpoint=localhost:20121", "default response control channel to publish to"),
 
-	flag.Int("replaystream", 1002, "default replay stream to use"),
+	flag.Int("replaystream", 1002, "default base replay stream to use"),
 	flag.String("replaychannel", "aeron:udp?endpoint=localhost:20121", "default replay to receive from"),
 
 	flag.String("prefix", aeron.DefaultAeronDir+"/aeron-"+aeron.UserName, "root directory for aeron driver file"),

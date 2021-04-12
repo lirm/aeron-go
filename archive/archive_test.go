@@ -19,6 +19,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	logging "github.com/op/go-logging"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -49,8 +50,19 @@ func TestMain(m *testing.M) {
 	context := aeron.NewContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
 	options := DefaultOptions()
+
+	// Cleaning up after test runs can take a little time so we
+	// randomize the streams in use to make that less likely
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	testCases[0].sampleStream += int32(r.Intn(1000))
+	testCases[0].replayStream += int32(r.Intn(1000))
+	if testCases[0].sampleStream == testCases[0].replayStream {
+		testCases[0].replayStream++
+	}
+
 	if *TestConfig.Verbose {
 		log.Printf("Setting verbose logging")
+		log.Printf("Using %s/%d and %s/%d", testCases[0].sampleChannel, testCases[0].sampleStream, testCases[0].replayChannel, testCases[0].replayStream)
 		options.ArchiveLoglevel = logging.DEBUG
 	}
 
