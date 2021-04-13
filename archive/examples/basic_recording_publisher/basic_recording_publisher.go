@@ -34,8 +34,8 @@ func main() {
 	flag.Parse()
 
 	if !*examples.Config.Verbose {
-		logging.SetLevel(logging.INFO, "aeron")    // FIXME
-		logging.SetLevel(logging.DEBUG, "archive") // FIXME
+		logging.SetLevel(logging.INFO, "aeron") // FIXME
+		logging.SetLevel(logging.INFO, "archive")
 		logging.SetLevel(logging.INFO, "memmap")
 		logging.SetLevel(logging.INFO, "driver")
 		logging.SetLevel(logging.INFO, "counters")
@@ -74,7 +74,7 @@ func main() {
 	logger.Infof("Publication found %v", publication)
 	defer publication.Close()
 
-	// FIXME: counters unimplemented
+	// FIXME:counters unimplemented in aeron-go
 	// The Java RecordedBasicPublisher polls the counters to wait until
 	// the recording has actually started.
 	// For now we'll just delay a bit to let that get established
