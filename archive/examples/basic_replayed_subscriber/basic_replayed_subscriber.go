@@ -29,7 +29,8 @@ import (
 	"time"
 )
 
-var logger = logging.MustGetLogger("basic_recording_subscriber")
+var logId string = "basic_recording_subscriber"
+var logger = logging.MustGetLogger(logId)
 
 func main() {
 	flag.Parse()
@@ -50,10 +51,14 @@ func main() {
 	options.RequestStream = int32(*examples.Config.RequestStream)
 	options.ResponseChannel = *examples.Config.ResponseChannel
 	options.ResponseStream = int32(responseStream)
+
 	if *examples.Config.Verbose {
-		fmt.Printf("Setting loglevel: DEBUG/INFO\n")
+		fmt.Printf("Setting loglevel: archive.DEBUG/aeron.INFO\n")
 		options.ArchiveLoglevel = logging.DEBUG
-		options.AeronLoglevel = logging.INFO
+		options.AeronLoglevel = logging.DEBUG
+		logging.SetLevel(logging.DEBUG, logId)
+	} else {
+		logging.SetLevel(logging.NOTICE, logId)
 	}
 
 	arch, err := archive.NewArchive(options, context)
@@ -92,8 +97,7 @@ func main() {
 	counter := 0
 	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
-		// logger.Debugf("%8.d: Received fragment offset:%d length:%d payload:%s\n", counter, offset, length, bytes)
-		logger.Infof("%s\n", bytes)
+		logger.Noticef("%s\n", bytes)
 		counter++
 	}
 

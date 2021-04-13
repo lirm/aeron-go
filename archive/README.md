@@ -82,12 +82,12 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * [L] Expand testing
   * [M] So many tests to write
   * [?] archive-media-driver mocking/execution
+  * test cleanup in the media driver can be problematic
  * [S} The archive state is largely unused. 
    * IsOpen()?
- * 21 FIXMEs
+ * 10 FIXMEs
  * [?] Implement AuthConnect, Challenge/Response
  * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
- * [?] Clean up and initial upstream push
 
 ## Recently Done
  * Logging at level normal should be mostly quiet if nothing goes wrong
@@ -97,12 +97,12 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * Logging tidying
  * Removed the archive context, it was offering little value. Instead,
    the proxy, control, and recrodingevents all have a reference 
- * Made tests more reliable
+ * Made tests a little reliable but cleanup is still a problem
 
 # Bigger picture issues
- * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.
- * OnAvailableCounter noise (no can do)
  * Decided not to do locking in sync api, could subsequently add locks, or just async with locks if desired.
    It may be that the marshaller should be parameterized for this.
  * Java and C++ poll the counters to determine when a recording has actually started but the counters are not
    availabe in go. As a result we use delays and hope which isn't ideal.
+ * OnAvailableCounter noise
+ * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.

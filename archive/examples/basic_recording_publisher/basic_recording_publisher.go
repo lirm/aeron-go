@@ -23,26 +23,16 @@ import (
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/archive"
 	"github.com/lirm/aeron-go/archive/examples"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"os"
 	"time"
 )
 
-var logger = logging.MustGetLogger("basic_recording_publisher")
+var logId string = "basic_recording_publisher"
+var logger = logging.MustGetLogger(logId)
 
 func main() {
 	flag.Parse()
-
-	if !*examples.Config.Verbose {
-		logging.SetLevel(logging.INFO, "aeron") // FIXME
-		logging.SetLevel(logging.INFO, "archive")
-		logging.SetLevel(logging.INFO, "memmap")
-		logging.SetLevel(logging.INFO, "driver")
-		logging.SetLevel(logging.INFO, "counters")
-		logging.SetLevel(logging.INFO, "logbuffers")
-		logging.SetLevel(logging.INFO, "buffer")
-		logging.SetLevel(logging.INFO, "rb")
-	}
 
 	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.Config.DriverTimeout)
 	context := aeron.NewContext()
@@ -55,6 +45,16 @@ func main() {
 	options.ResponseChannel = *examples.Config.ResponseChannel
 	options.ResponseStream = int32(*examples.Config.ResponseStream)
 
+	if *examples.Config.Verbose {
+		fmt.Printf("Setting loglevel: archive.DEBUG/aeron.INFO\n")
+		options.ArchiveLoglevel = logging.DEBUG
+		options.AeronLoglevel = logging.DEBUG
+		logging.SetLevel(logging.DEBUG, logId)
+	} else {
+		logging.SetLevel(logging.NOTICE, logId)
+
+	}
+
 	arch, err := archive.NewArchive(options, context)
 	if err != nil {
 		logger.Fatalf("Failed to connect to media driver: %s\n", err.Error())
@@ -65,7 +65,7 @@ func main() {
 	stream := int32(*examples.Config.SampleStream)
 
 	if _, err := arch.StartRecording(channel, stream, true, true); err != nil {
-		logger.Infof("StartRecording failed: %s\n", err.Error())
+		logger.Errorf("StartRecording failed: %s\n", err.Error())
 		os.Exit(1)
 	}
 	logger.Infof("StartRecording succeeded\n")
@@ -88,20 +88,20 @@ func main() {
 		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
 		switch ret {
 		case aeron.NotConnected:
-			logger.Infof("%d, Not connected (yet)", counter)
+			logger.Warningf("%d, Not connected (yet)", counter)
 
 		case aeron.BackPressured:
-			logger.Infof("%d: back pressured", counter)
+			logger.Warningf("%d: back pressured", counter)
 		default:
 			if ret < 0 {
-				logger.Infof("%d: Unrecognized code: %d", counter, ret)
+				logger.Warningf("%d: Unrecognized code: %d", counter, ret)
 			} else {
-				logger.Infof("%d: success!", counter)
+				logger.Noticef("%d: success!", counter)
 			}
 		}
 
 		if !publication.IsConnected() {
-			logger.Infof("no subscribers detected")
+			logger.Warningf("no subscribers detected")
 		}
 		time.Sleep(time.Second)
 	}

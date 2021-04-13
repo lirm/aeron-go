@@ -43,7 +43,7 @@ type Options struct {
 // These are the Options used by default for an Archive object
 var defaultOptions Options = Options{
 	RangeChecking:          false,
-	ArchiveLoglevel:        logging.INFO,
+	ArchiveLoglevel:        logging.NOTICE,
 	AeronLoglevel:          logging.NOTICE,
 	Timeout:                time.Second * 5,
 	IdleStrategy:           idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
