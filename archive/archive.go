@@ -213,6 +213,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	// Setup the Proxy (publisher/request)
 	archive.Proxy = new(Proxy)
 	archive.Proxy.archive = archive
+	archive.Proxy.marshaller = codecs.NewSbeGoMarshaller()
 
 	// Setup Recording Events (although it's not enabled by default)
 	archive.Events = new(RecordingEventsAdapter)

@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package archive
+// Package codecs contains the archive protocol packet encoding and decoding
+package codecs
 
 import (
 	"bytes"
-	"github.com/lirm/aeron-go/archive/codecs"
 )
 
 // Encoders for all the protocol packets Each of these functions
 // creates a []byte suitable for sending over the wire by using the
-// generated encoders created using the simple-binary-encosing
-
-// We use a global marshaller here as we're assuming non-reentrancy as the
-// underlying protocol does not allow for overlapping messages
-// It would be possible to parameterize the marshaller or allocate it on the fly
-var marshaller *codecs.SbeGoMarshaller = codecs.NewSbeGoMarshaller()
-
-func ConnectRequestPacket(correlationID int64, responseStream int32, responseChannel string) ([]byte, error) {
-	var request codecs.ConnectRequest
+// generated encoders created using simple-binary-encoding.
+//
+// All the packet specificationss are defined in the aeron-archive protocol
+// maintained at:
+// http://github.com/real-logic/aeron/blob/master/aeron-archive/src/main/resources/archive/aeron-archive-codecs.xml)
+//
+// The codecs are generated from that specification using Simple
+// Binary Encoding (SBE) from https://github.com/real-logic/simple-binary-encoding
+func ConnectRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, correlationID int64, responseStream int32, responseChannel string) ([]byte, error) {
+	var request ConnectRequest
 
 	request.CorrelationId = correlationID
 	request.Version = SemanticVersion()
@@ -37,7 +38,7 @@ func ConnectRequestPacket(correlationID int64, responseStream int32, responseCha
 	request.ResponseChannel = []uint8(responseChannel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -49,13 +50,13 @@ func ConnectRequestPacket(correlationID int64, responseStream int32, responseCha
 	return buffer.Bytes(), nil
 }
 
-func CloseSessionRequestPacket(controlSessionId int64) ([]byte, error) {
-	var request codecs.CloseSessionRequest
+func CloseSessionRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64) ([]byte, error) {
+	var request CloseSessionRequest
 
 	request.ControlSessionId = controlSessionId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -68,28 +69,28 @@ func CloseSessionRequestPacket(controlSessionId int64) ([]byte, error) {
 }
 
 // deprecated
-func StartRecordingRequestPacket(controlSessionId int64, correlationId int64, stream int32, isLocal bool, channel string) ([]byte, error) {
-	return StartRecordingRequest2Packet(controlSessionId, correlationId, stream, isLocal, false, channel)
+func StartRecordingRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, stream int32, isLocal bool, channel string) ([]byte, error) {
+	return StartRecordingRequest2Packet(marshaller, rangeChecking, controlSessionId, correlationId, stream, isLocal, false, channel)
 }
 
-func StartRecordingRequest2Packet(controlSessionId int64, correlationId int64, stream int32, isLocal bool, autoStop bool, channel string) ([]byte, error) {
-	var request codecs.StartRecordingRequest2
+func StartRecordingRequest2Packet(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, stream int32, isLocal bool, autoStop bool, channel string) ([]byte, error) {
+	var request StartRecordingRequest2
 
 	request.Channel = []uint8(channel)
 	request.StreamId = stream
 	if isLocal {
-		request.SourceLocation = codecs.SourceLocation.LOCAL
+		request.SourceLocation = SourceLocation.LOCAL
 	} else {
-		request.SourceLocation = codecs.SourceLocation.REMOTE
+		request.SourceLocation = SourceLocation.REMOTE
 	}
 	if autoStop {
-		request.AutoStop = codecs.BooleanType.TRUE
+		request.AutoStop = BooleanType.TRUE
 	} // else FALSE by default
 	request.CorrelationId = correlationId
 	request.ControlSessionId = controlSessionId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -101,8 +102,8 @@ func StartRecordingRequest2Packet(controlSessionId int64, correlationId int64, s
 	return buffer.Bytes(), nil
 }
 
-func StopRecordingRequestPacket(controlSessionId int64, correlationId int64, stream int32, channel string) ([]byte, error) {
-	var request codecs.StopRecordingRequest
+func StopRecordingRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, stream int32, channel string) ([]byte, error) {
+	var request StopRecordingRequest
 
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
@@ -110,7 +111,7 @@ func StopRecordingRequestPacket(controlSessionId int64, correlationId int64, str
 	request.Channel = []uint8(channel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -122,8 +123,8 @@ func StopRecordingRequestPacket(controlSessionId int64, correlationId int64, str
 	return buffer.Bytes(), nil
 }
 
-func ReplayRequestPacket(controlSessionId int64, correlationId int64, recordingId int64, position int64, length int64, replayStream int32, replayChannel string) ([]byte, error) {
-	var request codecs.ReplayRequest
+func ReplayRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64, position int64, length int64, replayStream int32, replayChannel string) ([]byte, error) {
+	var request ReplayRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
@@ -133,7 +134,7 @@ func ReplayRequestPacket(controlSessionId int64, correlationId int64, recordingI
 	request.ReplayChannel = []uint8(replayChannel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -145,14 +146,14 @@ func ReplayRequestPacket(controlSessionId int64, correlationId int64, recordingI
 	return buffer.Bytes(), nil
 }
 
-func StopReplayRequestPacket(controlSessionId int64, correlationId int64, replaySessionId int64) ([]byte, error) {
-	var request codecs.StopReplayRequest
+func StopReplayRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, replaySessionId int64) ([]byte, error) {
+	var request StopReplayRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.ReplaySessionId = replaySessionId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -164,15 +165,15 @@ func StopReplayRequestPacket(controlSessionId int64, correlationId int64, replay
 	return buffer.Bytes(), nil
 }
 
-func ListRecordingsRequestPacket(controlSessionId int64, correlationId int64, fromRecordingId int64, recordCount int32) ([]byte, error) {
-	var request codecs.ListRecordingsRequest
+func ListRecordingsRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, fromRecordingId int64, recordCount int32) ([]byte, error) {
+	var request ListRecordingsRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.FromRecordingId = fromRecordingId
 	request.RecordCount = recordCount
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -184,8 +185,8 @@ func ListRecordingsRequestPacket(controlSessionId int64, correlationId int64, fr
 	return buffer.Bytes(), nil
 }
 
-func ListRecordingsForUriRequestPacket(controlSessionId int64, correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) ([]byte, error) {
-	var request codecs.ListRecordingsForUriRequest
+func ListRecordingsForUriRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) ([]byte, error) {
+	var request ListRecordingsForUriRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.FromRecordingId = fromRecordingId
@@ -194,7 +195,7 @@ func ListRecordingsForUriRequestPacket(controlSessionId int64, correlationId int
 	request.Channel = []uint8(channel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -206,14 +207,14 @@ func ListRecordingsForUriRequestPacket(controlSessionId int64, correlationId int
 	return buffer.Bytes(), nil
 }
 
-func ListRecordingRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.ListRecordingRequest
+func ListRecordingRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request ListRecordingRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -226,24 +227,24 @@ func ListRecordingRequestPacket(controlSessionId int64, correlationId int64, rec
 }
 
 // deprecated
-func ExtendRecordingRequestPacket(controlSessionId int64, correlationId int64, recordingId int64, stream int32, sourceLocation codecs.SourceLocationEnum, channel string) ([]byte, error) {
-	return ExtendRecordingRequest2Packet(controlSessionId, correlationId, recordingId, stream, sourceLocation, false, channel)
+func ExtendRecordingRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64, stream int32, sourceLocation SourceLocationEnum, channel string) ([]byte, error) {
+	return ExtendRecordingRequest2Packet(marshaller, rangeChecking, controlSessionId, correlationId, recordingId, stream, sourceLocation, false, channel)
 }
 
-func ExtendRecordingRequest2Packet(controlSessionId int64, correlationId int64, recordingId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) ([]byte, error) {
-	var request codecs.ExtendRecordingRequest2
+func ExtendRecordingRequest2Packet(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64, stream int32, sourceLocation SourceLocationEnum, autoStop bool, channel string) ([]byte, error) {
+	var request ExtendRecordingRequest2
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 	request.StreamId = stream
 	request.SourceLocation = sourceLocation
 	if autoStop {
-		request.AutoStop = codecs.BooleanType.TRUE
+		request.AutoStop = BooleanType.TRUE
 	} // else FALSE by default
 	request.Channel = []uint8(channel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -255,14 +256,14 @@ func ExtendRecordingRequest2Packet(controlSessionId int64, correlationId int64, 
 	return buffer.Bytes(), nil
 }
 
-func RecordingPositionRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.RecordingPositionRequest
+func RecordingPositionRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request RecordingPositionRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -274,15 +275,15 @@ func RecordingPositionRequestPacket(controlSessionId int64, correlationId int64,
 	return buffer.Bytes(), nil
 }
 
-func TruncateRecordingRequestPacket(controlSessionId int64, correlationId int64, recordingId int64, position int64) ([]byte, error) {
-	var request codecs.TruncateRecordingRequest
+func TruncateRecordingRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64, position int64) ([]byte, error) {
+	var request TruncateRecordingRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 	request.Position = position
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -294,14 +295,14 @@ func TruncateRecordingRequestPacket(controlSessionId int64, correlationId int64,
 	return buffer.Bytes(), nil
 }
 
-func StopRecordingSubscriptionPacket(controlSessionId int64, correlationId int64, subscriptionId int64) ([]byte, error) {
-	var request codecs.StopRecordingSubscriptionRequest
+func StopRecordingSubscriptionPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, subscriptionId int64) ([]byte, error) {
+	var request StopRecordingSubscriptionRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.SubscriptionId = subscriptionId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -313,14 +314,14 @@ func StopRecordingSubscriptionPacket(controlSessionId int64, correlationId int64
 	return buffer.Bytes(), nil
 }
 
-func StopRecordingByIdentityPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.StopRecordingByIdentityRequest
+func StopRecordingByIdentityPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request StopRecordingByIdentityRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -332,14 +333,14 @@ func StopRecordingByIdentityPacket(controlSessionId int64, correlationId int64, 
 	return buffer.Bytes(), nil
 }
 
-func StopPositionPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.StopPositionRequest
+func StopPositionPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request StopPositionRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -351,8 +352,8 @@ func StopPositionPacket(controlSessionId int64, correlationId int64, recordingId
 	return buffer.Bytes(), nil
 }
 
-func FindLastMatchingRecordingPacket(controlSessionId int64, correlationId int64, minRecordingId int64, sessionId int32, stream int32, channel string) ([]byte, error) {
-	var request codecs.FindLastMatchingRecordingRequest
+func FindLastMatchingRecordingPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, minRecordingId int64, sessionId int32, stream int32, channel string) ([]byte, error) {
+	var request FindLastMatchingRecordingRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.MinRecordingId = minRecordingId
@@ -361,7 +362,7 @@ func FindLastMatchingRecordingPacket(controlSessionId int64, correlationId int64
 	request.Channel = []uint8(channel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -373,20 +374,20 @@ func FindLastMatchingRecordingPacket(controlSessionId int64, correlationId int64
 	return buffer.Bytes(), nil
 }
 
-func ListRecordingSubscriptionsPacket(controlSessionId int64, correlationId int64, pseudoIndex int32, subscriptionCount int32, applyStreamId bool, stream int32, channel string) ([]byte, error) {
-	var request codecs.ListRecordingSubscriptionsRequest
+func ListRecordingSubscriptionsPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, pseudoIndex int32, subscriptionCount int32, applyStreamId bool, stream int32, channel string) ([]byte, error) {
+	var request ListRecordingSubscriptionsRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.PseudoIndex = pseudoIndex
 	request.SubscriptionCount = subscriptionCount
 	if applyStreamId {
-		request.ApplyStreamId = codecs.BooleanType.TRUE
+		request.ApplyStreamId = BooleanType.TRUE
 	} // else FALSE by default
 	request.StreamId = stream
 	request.Channel = []uint8(channel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -398,8 +399,8 @@ func ListRecordingSubscriptionsPacket(controlSessionId int64, correlationId int6
 	return buffer.Bytes(), nil
 }
 
-func BoundedReplayPacket(controlSessionId int64, correlationId int64, recordingId int64, position int64, length int64, limitCounterId int32, replayStream int32, replayChannel string) ([]byte, error) {
-	var request codecs.BoundedReplayRequest
+func BoundedReplayPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64, position int64, length int64, limitCounterId int32, replayStream int32, replayChannel string) ([]byte, error) {
+	var request BoundedReplayRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
@@ -410,7 +411,7 @@ func BoundedReplayPacket(controlSessionId int64, correlationId int64, recordingI
 	request.ReplayChannel = []uint8(replayChannel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -422,14 +423,14 @@ func BoundedReplayPacket(controlSessionId int64, correlationId int64, recordingI
 	return buffer.Bytes(), nil
 }
 
-func StopAllReplaysPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.StopAllReplaysRequest
+func StopAllReplaysPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request StopAllReplaysRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -441,15 +442,15 @@ func StopAllReplaysPacket(controlSessionId int64, correlationId int64, recording
 	return buffer.Bytes(), nil
 }
 
-func CatalogHeaderPacket(version int32, length int32, nextRecordingId int64, alignment int32) ([]byte, error) {
-	var request codecs.CatalogHeader
+func CatalogHeaderPacket(marshaller *SbeGoMarshaller, rangeChecking bool, version int32, length int32, nextRecordingId int64, alignment int32) ([]byte, error) {
+	var request CatalogHeader
 	request.Version = version
 	request.Length = length
 	request.NextRecordingId = nextRecordingId
 	request.Alignment = alignment
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -461,8 +462,8 @@ func CatalogHeaderPacket(version int32, length int32, nextRecordingId int64, ali
 	return buffer.Bytes(), nil
 }
 
-func ReplicateRequestPacket(controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) ([]byte, error) {
-	var request codecs.ReplicateRequest
+func ReplicateRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) ([]byte, error) {
+	var request ReplicateRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.SrcRecordingId = srcRecordingId
@@ -472,7 +473,7 @@ func ReplicateRequestPacket(controlSessionId int64, correlationId int64, srcReco
 	request.LiveDestination = []uint8(liveDestination)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -484,14 +485,14 @@ func ReplicateRequestPacket(controlSessionId int64, correlationId int64, srcReco
 	return buffer.Bytes(), nil
 }
 
-func StopReplicationRequestPacket(controlSessionId int64, correlationId int64, replicationId int64) ([]byte, error) {
-	var request codecs.StopReplicationRequest
+func StopReplicationRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, replicationId int64) ([]byte, error) {
+	var request StopReplicationRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.ReplicationId = replicationId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -503,14 +504,14 @@ func StopReplicationRequestPacket(controlSessionId int64, correlationId int64, r
 	return buffer.Bytes(), nil
 }
 
-func StartPositionRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.StartPositionRequest
+func StartPositionRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request StartPositionRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -522,54 +523,15 @@ func StartPositionRequestPacket(controlSessionId int64, correlationId int64, rec
 	return buffer.Bytes(), nil
 }
 
-func DetachSegmentsRequestPacket(controlSessionId int64, correlationId int64, recordingId int64, newStartPosition int64) ([]byte, error) {
-	var request codecs.DetachSegmentsRequest
-	request.ControlSessionId = controlSessionId
-	request.CorrelationId = correlationId
-	request.RecordingId = recordingId
-	request.NewStartPosition = newStartPosition
-
-	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
-	buffer := new(bytes.Buffer)
-	if err := header.Encode(marshaller, buffer); err != nil {
-		return nil, err
-	}
-	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
-		return nil, err
-	}
-
-	return buffer.Bytes(), nil
-}
-
-func DeleteDetachedSegmentsRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.DeleteDetachedSegmentsRequest
-	request.ControlSessionId = controlSessionId
-	request.CorrelationId = correlationId
-	request.RecordingId = recordingId
-
-	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
-	buffer := new(bytes.Buffer)
-	if err := header.Encode(marshaller, buffer); err != nil {
-		return nil, err
-	}
-	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
-		return nil, err
-	}
-
-	return buffer.Bytes(), nil
-}
-
-func PurgeSegmentsRequestPacket(controlSessionId int64, correlationId int64, recordingId int64, newStartPosition int64) ([]byte, error) {
-	var request codecs.PurgeSegmentsRequest
+func DetachSegmentsRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64, newStartPosition int64) ([]byte, error) {
+	var request DetachSegmentsRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 	request.NewStartPosition = newStartPosition
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -581,14 +543,14 @@ func PurgeSegmentsRequestPacket(controlSessionId int64, correlationId int64, rec
 	return buffer.Bytes(), nil
 }
 
-func AttachSegmentsRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.AttachSegmentsRequest
+func DeleteDetachedSegmentsRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request DeleteDetachedSegmentsRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -600,8 +562,47 @@ func AttachSegmentsRequestPacket(controlSessionId int64, correlationId int64, re
 	return buffer.Bytes(), nil
 }
 
-func AuthConnectRequestPacket(correlationID int64, responseStream int32, responseChannel string, encodedCredentials []uint8) ([]byte, error) {
-	var request codecs.AuthConnectRequest
+func PurgeSegmentsRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64, newStartPosition int64) ([]byte, error) {
+	var request PurgeSegmentsRequest
+	request.ControlSessionId = controlSessionId
+	request.CorrelationId = correlationId
+	request.RecordingId = recordingId
+	request.NewStartPosition = newStartPosition
+
+	// Marshal it
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func AttachSegmentsRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request AttachSegmentsRequest
+	request.ControlSessionId = controlSessionId
+	request.CorrelationId = correlationId
+	request.RecordingId = recordingId
+
+	// Marshal it
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func AuthConnectRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, correlationID int64, responseStream int32, responseChannel string, encodedCredentials []uint8) ([]byte, error) {
+	var request AuthConnectRequest
 
 	request.CorrelationId = correlationID
 	request.Version = SemanticVersion()
@@ -610,7 +611,7 @@ func AuthConnectRequestPacket(correlationID int64, responseStream int32, respons
 	request.EncodedCredentials = encodedCredentials
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -622,15 +623,15 @@ func AuthConnectRequestPacket(correlationID int64, responseStream int32, respons
 	return buffer.Bytes(), nil
 }
 
-func MigrateSegmentsRequestPacket(controlSessionId int64, correlationId int64, srcRecordingId int64, destRecordingId int64) ([]byte, error) {
-	var request codecs.MigrateSegmentsRequest
+func MigrateSegmentsRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, srcRecordingId int64, destRecordingId int64) ([]byte, error) {
+	var request MigrateSegmentsRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.SrcRecordingId = srcRecordingId
 	request.DstRecordingId = destRecordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -642,13 +643,13 @@ func MigrateSegmentsRequestPacket(controlSessionId int64, correlationId int64, s
 	return buffer.Bytes(), nil
 }
 
-func KeepAliveRequestPacket(controlSessionId int64, correlationId int64) ([]byte, error) {
-	var request codecs.KeepAliveRequest
+func KeepAliveRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64) ([]byte, error) {
+	var request KeepAliveRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -660,8 +661,8 @@ func KeepAliveRequestPacket(controlSessionId int64, correlationId int64) ([]byte
 	return buffer.Bytes(), nil
 }
 
-func TaggedReplicateRequestPacket(controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, channelTagId int64, subscriptionTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) ([]byte, error) {
-	var request codecs.TaggedReplicateRequest
+func TaggedReplicateRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, channelTagId int64, subscriptionTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) ([]byte, error) {
+	var request TaggedReplicateRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.SrcRecordingId = srcRecordingId
@@ -673,7 +674,7 @@ func TaggedReplicateRequestPacket(controlSessionId int64, correlationId int64, s
 	request.LiveDestination = []uint8(liveDestination)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -685,8 +686,8 @@ func TaggedReplicateRequestPacket(controlSessionId int64, correlationId int64, s
 	return buffer.Bytes(), nil
 }
 
-func ReplicateRequest2Packet(controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, stopPosition int64, channelTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string, replicationChannel string) ([]byte, error) {
-	var request codecs.ReplicateRequest2
+func ReplicateRequest2Packet(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, srcRecordingId int64, dstRecordingId int64, stopPosition int64, channelTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string, replicationChannel string) ([]byte, error) {
+	var request ReplicateRequest2
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.SrcRecordingId = srcRecordingId
@@ -699,7 +700,7 @@ func ReplicateRequest2Packet(controlSessionId int64, correlationId int64, srcRec
 	request.ReplicationChannel = []uint8(replicationChannel)
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
@@ -711,14 +712,14 @@ func ReplicateRequest2Packet(controlSessionId int64, correlationId int64, srcRec
 	return buffer.Bytes(), nil
 }
 
-func PurgeRecordingRequestPacket(controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
-	var request codecs.PurgeRecordingRequest
+func PurgeRecordingRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, recordingId int64) ([]byte, error) {
+	var request PurgeRecordingRequest
 	request.ControlSessionId = controlSessionId
 	request.CorrelationId = correlationId
 	request.RecordingId = recordingId
 
 	// Marshal it
-	header := codecs.MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
 	buffer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, buffer); err != nil {
 		return nil, err
