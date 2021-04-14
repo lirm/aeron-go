@@ -50,14 +50,17 @@ type ControlResults struct {
 	IsPollComplete                   bool
 }
 
-// An archive "connection" involves some to and fro
-const ControlStateError = -1
-const ControlStateNew = 0
-const ControlStateConnectRequestSent = 1
-const ControlStateConnectRequestOk = 2
-const ControlStateConnected = 3
-const ControlStateTimedOut = 4
+// Archive Connection State used internally for connection establishment
+const (
+	ControlStateError              = -1
+	ControlStateNew                = 0
+	ControlStateConnectRequestSent = 1
+	ControlStateConnectRequestOk   = 2
+	ControlStateConnected          = 3
+	ControlStateTimedOut           = 4
+)
 
+// Used internally to handle connection state
 type ControlState struct {
 	state int
 	err   error

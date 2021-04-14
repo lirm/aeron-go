@@ -76,6 +76,13 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
 
 # Backlog
 
+## Questions
+ * godoc
+  * Lots of typoes,
+  * Lots of undocumented things
+   * I think I should make all the packet handling private or a sub-package
+  
+
 ## Working Set
  * [S] [Bug] RecordingSignalEvents currently throw off the count of
    fragments/records we want. Need a mechanism to adjust for them.
