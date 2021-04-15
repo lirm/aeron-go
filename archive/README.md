@@ -77,13 +77,10 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
 # Backlog
 
 ## Questions
- * godoc
-  * Lots of typoes,
-  * Lots of undocumented things
-   * I think I should make all the packet handling private or a sub-package
-  
+ * performance
 
 ## Working Set
+ * godoc improvements
  * [S] [Bug] RecordingSignalEvents currently throw off the count of
    fragments/records we want. Need a mechanism to adjust for them.
  * [L] Expand testing
@@ -97,14 +94,8 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
 
 ## Recently Done
- * Logging at level normal should be mostly quiet if nothing goes wrong
- * Improve the Error handling / Error listeners (mostly)a
- * Ephemeral port usage is dependent upon accessing the counters which is out of scope here and doesn't buy much
- * Error listener
- * Logging tidying
- * Removed the archive context, it was offering little value. Instead,
-   the proxy, control, and recrodingevents all have a reference 
- * Made tests a little reliable but cleanup is still a problem
+ * Bunch of documentation
+ * Restructured the encoders into the codecs package for better doc and fewer globals
 
 # Bigger picture issues
  * Decided not to do locking in sync api, could subsequently add locks, or just async with locks if desired.
