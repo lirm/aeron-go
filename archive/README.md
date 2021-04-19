@@ -81,10 +81,8 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
 
 ## Working Set
  * godoc improvements
- * [S] [Bug] RecordingSignalEvents currently throw off the count of
-   fragments/records we want. Need a mechanism to adjust for them.
  * [L] Expand testing
-  * [M] So many tests to write
+  * [M] Many tests to write
   * [?] archive-media-driver mocking/execution
   * test cleanup in the media driver can be problematic
  * [S} The archive state is largely unused. 
@@ -92,10 +90,15 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * 10 FIXMEs
  * [?] Implement AuthConnect, Challenge/Response
  * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
+ * We can perform a small but frequent optimization by invoking the
+   decoder SbeTemplateId functions in init() and only allocating the
+   structure we need. It's arguable that SBE should provide a static
+   function version of this.
 
 ## Recently Done
  * Bunch of documentation
  * Restructured the encoders into the codecs package for better doc and fewer globals
+ * [Fixed] RecordingSignalEvents currently throw off the count of fragments/records we want. 
 
 # Bigger picture issues
  * Decided not to do locking in sync api, could subsequently add locks, or just async with locks if desired.

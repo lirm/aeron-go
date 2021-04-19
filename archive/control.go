@@ -48,6 +48,7 @@ type ControlResults struct {
 	RecordingDescriptors             []*codecs.RecordingDescriptor
 	RecordingSubscriptionDescriptors []*codecs.RecordingSubscriptionDescriptor
 	IsPollComplete                   bool
+	ExtraFragments                   int
 }
 
 // Archive Connection State used internally for connection establishment
@@ -100,16 +101,6 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		}
 
 		// Check this is for our session
-		_, ok := sessionsMap[controlResponse.ControlSessionId]
-		if !ok {
-			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("ControlFragmentHandler: Unexpected sessionId in control response: %d", controlResponse.ControlSessionId)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err)
-			}
-			return
-		}
-
 		// Look it up
 		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
@@ -118,6 +109,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
+			logger.Infof("ControlFragmentHandler/controlResponse: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
 			return
 		}
 
@@ -135,6 +127,15 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		if Listeners.RecordingSignalListener != nil {
 			Listeners.RecordingSignalListener(recordingSignalEvent)
 		}
+
+		// If we can locate this correlationId then we can let our parent know we
+		// will want an extra fragment
+		control, ok := correlationsMap[recordingSignalEvent.CorrelationId]
+		if !ok {
+			logger.Infof("ControlFragmentHandler/recordingSignalEvent: Uncorrelated recordingSignalEvent correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent) // Not much to be done here as we can't correlate
+			return
+		}
+		control.Results.ExtraFragments++
 
 	default:
 		// This can happen when testing
@@ -226,6 +227,7 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 
 	control.Results.ControlResponse = nil  // Clear old results
 	control.Results.IsPollComplete = false // Clear completion flag
+	control.Results.ExtraFragments = 0     // Clear extra fragment count
 
 	return control.Subscription.Poll(handler, fragmentLimit)
 }
@@ -236,12 +238,15 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 
 	start := time.Now()
 
-	// We can get async events whilst we're expecting our control response
-	// so we ask for more fragments than we want
+	// Poll for events
+	// As we can get async events we need to track how many/ extra events we might be wanting
+	// but we're also generous in how many we request as here we only want one
 	fragmentsWanted := 10
-
+	control.Results.ExtraFragments = 0
 	for {
-		fragmentsWanted -= control.Poll(ControlFragmentHandler, fragmentsWanted)
+		fragmentsReceived := control.Poll(ControlFragmentHandler, fragmentsWanted)
+		fragmentsWanted = fragmentsWanted - fragmentsReceived + control.Results.ExtraFragments
+		control.Results.ExtraFragments = 0
 
 		// Check result
 		if control.Results.IsPollComplete {
@@ -309,17 +314,30 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 // expecting another response.
 func (control *Control) PollForErrorResponse() error {
 
-	// We can get async events whilst we're expecting our control response
-	// so we ask for more fragments than we want
-	fragments := control.Poll(ControlFragmentHandler, 10)
-	if fragments == 0 {
-		return nil
-	}
-	if control.Results.ControlResponse.Code == codecs.ControlResponseCode.ERROR {
-		return fmt.Errorf(string(control.Results.ControlResponse.ErrorMessage))
-	}
+	// Poll for events
+	// As we can get async events we need to track how many/ extra events we might be wanting
+	// but we're also generous in how many we request as here we only want one
+	fragmentsWanted := 10
+	control.Results.ExtraFragments = 0
+	for {
+		fragmentsReceived := control.Poll(ControlFragmentHandler, 1)
+		fragmentsWanted = fragmentsWanted - fragmentsReceived + control.Results.ExtraFragments
+		control.Results.ExtraFragments = 0
 
-	return nil
+		if fragmentsWanted >= 1 {
+			continue
+		}
+
+		// If we received a response with an error then return it
+		if fragmentsWanted == 0 {
+			if control.Results.ControlResponse.Code == codecs.ControlResponseCode.ERROR {
+				return fmt.Errorf(string(control.Results.ControlResponse.ErrorMessage))
+			}
+		} else {
+			// Nothing there yet
+			return nil
+		}
+	}
 }
 
 // Poll for descriptors (both recording and subscription)
@@ -451,6 +469,15 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			Listeners.RecordingSignalListener(recordingSignalEvent)
 		}
 
+		// If we can locate this correlationId then we can let our parent know we
+		// will want an extra fragment
+		control, ok := correlationsMap[controlResponse.CorrelationId]
+		if !ok {
+			logger.Infof("ControlFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
+			return
+		}
+		control.Results.ExtraFragments++
+
 	default:
 		logger.Debugf("DescriptorFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
 		fmt.Printf("DescriptorFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
@@ -464,8 +491,15 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 	logger.Debugf("PollNextDescriptor(%d) start", correlationId)
 	start := time.Now()
 
+	// Poll for events
+	// As we can get async events we need to track how many/ extra events we might be wanting
+	// but we're also generous in how many we request as here we only want one
 	for !control.Results.IsPollComplete {
 		fragmentsWanted -= control.Poll(DescriptorFragmentHandler, fragmentsWanted)
+
+		// Adjust the fragment count for oob things like recordingsignals
+		fragmentsWanted += control.Results.ExtraFragments
+		control.Results.ExtraFragments = 0
 
 		if fragmentsWanted <= 0 {
 			logger.Debugf("PollNextDescriptor(%d) all fragments received", fragmentsWanted)
@@ -503,6 +537,7 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 
 	control.Results.ControlResponse = nil                  // Clear old results
 	control.Results.IsPollComplete = false                 // Clear completion flag
+	control.Results.ExtraFragments = 0                     // Clear extra fragment count
 	control.Results.RecordingDescriptors = nil             // Clear previous search
 	control.Results.RecordingSubscriptionDescriptors = nil // Clear previous search
 
