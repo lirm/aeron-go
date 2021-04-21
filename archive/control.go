@@ -371,9 +371,9 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// logger.Debugf("Received RecordingDescriptorResponse: length %d", buf.Len())
 		// Not much to be done here as we can't correlate
 		if err := recordingDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse)
+			err2 := fmt.Errorf("Failed to decode RecordingDescriptor: %w", err)
 			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err)
+				Listeners.ErrorListener(err2)
 			}
 			return
 		}
