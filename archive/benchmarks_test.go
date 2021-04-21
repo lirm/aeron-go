@@ -15,6 +15,8 @@
 package archive
 
 import (
+	"bytes"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/archive/codecs"
 	"testing"
 )
@@ -30,4 +32,52 @@ func BenchmarkCodecObjectCreation(b *testing.B) {
 	if recordingStarted == nil {
 		b.Logf("all done")
 	}
+}
+
+// Benchmark the Descriptor Fragment Handler using a recording descriptor as the example.
+// Used to evaluate whether optimizations are worthwhile here
+func BenchmarkDescriptorFragmentHandler(b *testing.B) {
+	rd := codecs.RecordingDescriptor{
+		ControlSessionId:  1,
+		CorrelationId:     2,
+		RecordingId:       3,
+		StartTimestamp:    4,
+		StopTimestamp:     5,
+		StartPosition:     6,
+		StopPosition:      7,
+		InitialTermId:     8,
+		SegmentFileLength: 9,
+		TermBufferLength:  10,
+		MtuLength:         11,
+		SessionId:         12,
+		StreamId:          13,
+		StrippedChannel:   []uint8("stripped"),
+		OriginalChannel:   []uint8("original"),
+		SourceIdentity:    []uint8("source")}
+
+	marshaller := codecs.NewSbeGoMarshaller()
+	buffer := new(bytes.Buffer)
+
+	header := codecs.MessageHeader{BlockLength: rd.SbeBlockLength(), TemplateId: rd.SbeTemplateId(), SchemaId: rd.SbeSchemaId(), Version: rd.SbeSchemaVersion()}
+
+	if err := header.Encode(marshaller, buffer); err != nil {
+		b.Logf("header encode failed")
+		b.FailNow()
+	}
+	if err := rd.Encode(marshaller, buffer, rangeChecking); err != nil {
+		b.Logf("header encode failed")
+		b.FailNow()
+	}
+
+	bytes := buffer.Bytes()
+	length := int32(len(bytes))
+	atomicbuffer := atomic.MakeBuffer(bytes, len(bytes))
+
+	// Mock the correlationId to Control map
+	correlationsMap[rd.CorrelationId] = new(Control)
+
+	for n := 0; n < b.N; n++ {
+		DescriptorFragmentHandler(atomicbuffer, 0, length, nil)
+	}
+
 }

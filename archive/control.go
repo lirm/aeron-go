@@ -67,14 +67,44 @@ type ControlState struct {
 	err   error
 }
 
+// This stops us allocating every object when we need only one
+// Arguably SBE should give us a static value
+type CodecIds struct {
+	controlResponse                 uint16
+	recordingDescriptor             uint16
+	recordingSubscriptionDescriptor uint16
+	recordingSignalEvent            uint16
+	recordingStarted                uint16
+	recordingProgress               uint16
+	recordingStopped                uint16
+}
+
+var codecIds CodecIds
+
+func init() {
+	var controlResponse codecs.ControlResponse
+	var recordingDescriptor codecs.RecordingDescriptor
+	var recordingSubscriptionDescriptor codecs.RecordingSubscriptionDescriptor
+	var recordingSignalEvent codecs.RecordingSignalEvent
+	var recordingStarted = new(codecs.RecordingStarted)
+	var recordingProgress = new(codecs.RecordingProgress)
+	var recordingStopped = new(codecs.RecordingStopped)
+
+	codecIds.controlResponse = controlResponse.SbeTemplateId()
+	codecIds.recordingDescriptor = recordingDescriptor.SbeTemplateId()
+	codecIds.recordingSubscriptionDescriptor = recordingSubscriptionDescriptor.SbeTemplateId()
+	codecIds.recordingSignalEvent = recordingSignalEvent.SbeTemplateId()
+	codecIds.recordingStarted = recordingStarted.SbeTemplateId()
+	codecIds.recordingProgress = recordingProgress.SbeTemplateId()
+	codecIds.recordingStopped = recordingStopped.SbeTemplateId()
+}
+
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via the control's Results
 func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	logger.Debugf("ControlFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
-	var controlResponse = new(codecs.ControlResponse)
-	var recordingSignalEvent = new(codecs.RecordingSignalEvent)
 
 	buf := new(bytes.Buffer)
 	buffer.WriteBytes(buf, offset, length)
@@ -90,7 +120,8 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	}
 
 	switch hdr.TemplateId {
-	case controlResponse.SbeTemplateId():
+	case codecIds.controlResponse:
+		var controlResponse = new(codecs.ControlResponse)
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
@@ -116,7 +147,9 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		control.Results.ControlResponse = controlResponse
 		control.Results.IsPollComplete = true
 
-	case recordingSignalEvent.SbeTemplateId():
+	case codecIds.recordingSignalEvent:
+		var recordingSignalEvent = new(codecs.RecordingSignalEvent)
+
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("ControlFargamentHandler failed to decode recording signal: %w", err)
@@ -151,7 +184,6 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
-	var controlResponse = new(codecs.ControlResponse)
 
 	buf := new(bytes.Buffer)
 	buffer.WriteBytes(buf, offset, length)
@@ -167,7 +199,8 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	}
 
 	switch hdr.TemplateId {
-	case controlResponse.SbeTemplateId():
+	case codecIds.controlResponse:
+		var controlResponse = new(codecs.ControlResponse)
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
@@ -348,10 +381,6 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 	// logger.Debugf("DescriptorFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
-	var recordingDescriptor = new(codecs.RecordingDescriptor)
-	var recordingSubscriptionDescriptor = new(codecs.RecordingSubscriptionDescriptor)
-	var controlResponse = new(codecs.ControlResponse)
-	var recordingSignalEvent = new(codecs.RecordingSignalEvent)
 
 	buf := new(bytes.Buffer)
 	buffer.WriteBytes(buf, offset, length)
@@ -367,7 +396,8 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 	}
 
 	switch hdr.TemplateId {
-	case recordingDescriptor.SbeTemplateId():
+	case codecIds.recordingDescriptor:
+		var recordingDescriptor = new(codecs.RecordingDescriptor)
 		// logger.Debugf("Received RecordingDescriptorResponse: length %d", buf.Len())
 		// Not much to be done here as we can't correlate
 		if err := recordingDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
@@ -383,7 +413,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		control, ok := correlationsMap[recordingDescriptor.CorrelationId]
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse)
+			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationId=%d\n%#v", recordingDescriptor.CorrelationId, recordingDescriptor)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -393,7 +423,8 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// Set our state to let the caller of Poll() which triggered this know they have something
 		control.Results.RecordingDescriptors = append(control.Results.RecordingDescriptors, recordingDescriptor)
 
-	case recordingSubscriptionDescriptor.SbeTemplateId():
+	case codecIds.recordingSubscriptionDescriptor:
+		var recordingSubscriptionDescriptor = new(codecs.RecordingSubscriptionDescriptor)
 		if err := recordingSubscriptionDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("Failed to decode RecordingSubscriptioDescriptor: %w", err)
@@ -407,7 +438,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		control, ok := correlationsMap[recordingSubscriptionDescriptor.CorrelationId]
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("Uncorrelated recordingSubscriptionDescriptor correlationId=%d\n%#v", controlResponse.CorrelationId, controlResponse)
+			err := fmt.Errorf("Uncorrelated recordingSubscriptionDescriptor correlationId=%d\n%#v", recordingSubscriptionDescriptor.CorrelationId, recordingSubscriptionDescriptor)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -417,7 +448,8 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// Set our state to let the caller of Poll() which triggered this know they have something
 		control.Results.RecordingSubscriptionDescriptors = append(control.Results.RecordingSubscriptionDescriptors, recordingSubscriptionDescriptor)
 
-	case controlResponse.SbeTemplateId():
+	case codecIds.controlResponse:
+		var controlResponse = new(codecs.ControlResponse)
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
@@ -455,7 +487,8 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			return
 		}
 
-	case recordingSignalEvent.SbeTemplateId():
+	case codecIds.recordingSignalEvent:
+		var recordingSignalEvent = new(codecs.RecordingSignalEvent)
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("Failed to decode recording signal: %w", err)
@@ -471,9 +504,9 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 
 		// If we can locate this correlationId then we can let our parent know we
 		// will want an extra fragment
-		control, ok := correlationsMap[controlResponse.CorrelationId]
+		control, ok := correlationsMap[recordingSignalEvent.CorrelationId]
 		if !ok {
-			logger.Infof("ControlFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
+			logger.Infof("ControlFragmentHandler: Uncorrelated control response correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent)
 			return
 		}
 		control.Results.ExtraFragments++

@@ -49,9 +49,6 @@ func (rea *RecordingEventsAdapter) Poll(handler term.FragmentHandler, fragmentLi
 
 func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	var hdr codecs.SbeGoMessageHeader
-	var recordingStarted = new(codecs.RecordingStarted)
-	var recordingProgress = new(codecs.RecordingProgress)
-	var recordingStopped = new(codecs.RecordingStopped)
 
 	buf := new(bytes.Buffer)
 	buffer.WriteBytes(buf, offset, length)
@@ -68,7 +65,8 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 	}
 
 	switch hdr.TemplateId {
-	case recordingStarted.SbeTemplateId():
+	case codecIds.recordingStarted:
+		var recordingStarted = new(codecs.RecordingStarted)
 		logger.Debugf("Received RecordingStarted: length %d", buf.Len())
 		if err := recordingStarted.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			err2 := fmt.Errorf("Decode() of RecordingStarted failed: %w", err)
@@ -82,7 +80,8 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 			}
 		}
 
-	case recordingProgress.SbeTemplateId():
+	case codecIds.recordingProgress:
+		var recordingProgress = new(codecs.RecordingProgress)
 		logger.Debugf("Received RecordingProgress: length %d", buf.Len())
 		if err := recordingProgress.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			err2 := fmt.Errorf("Decode() of RecordingProgress failed: %w", err)
@@ -97,7 +96,8 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 			}
 		}
 
-	case recordingStopped.SbeTemplateId():
+	case codecIds.recordingStopped:
+		var recordingStopped = new(codecs.RecordingStopped)
 		logger.Debugf("Received RecordingStopped: length %d", buf.Len())
 		if err := recordingStopped.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			err2 := fmt.Errorf("Decode() of RecordingStopped failed: %w", err)
