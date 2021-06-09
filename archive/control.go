@@ -54,11 +54,12 @@ type ControlResults struct {
 // Archive Connection State used internally for connection establishment
 const (
 	ControlStateError              = -1
-	ControlStateNew                = 0
-	ControlStateConnectRequestSent = 1
-	ControlStateConnectRequestOk   = 2
-	ControlStateConnected          = 3
-	ControlStateTimedOut           = 4
+	ControlStateNew                = iota
+	ControlStateConnectRequestSent = iota
+	ControlStateChallenged         = iota
+	ControlStateConnectRequestOk   = iota
+	ControlStateConnected          = iota
+	ControlStateTimedOut           = iota
 )
 
 // Used internally to handle connection state
@@ -71,6 +72,7 @@ type ControlState struct {
 // Arguably SBE should give us a static value
 type CodecIds struct {
 	controlResponse                 uint16
+	challenge                       uint16
 	recordingDescriptor             uint16
 	recordingSubscriptionDescriptor uint16
 	recordingSignalEvent            uint16
@@ -83,6 +85,7 @@ var codecIds CodecIds
 
 func init() {
 	var controlResponse codecs.ControlResponse
+	var challenge codecs.Challenge
 	var recordingDescriptor codecs.RecordingDescriptor
 	var recordingSubscriptionDescriptor codecs.RecordingSubscriptionDescriptor
 	var recordingSignalEvent codecs.RecordingSignalEvent
@@ -91,6 +94,7 @@ func init() {
 	var recordingStopped = new(codecs.RecordingStopped)
 
 	codecIds.controlResponse = controlResponse.SbeTemplateId()
+	codecIds.challenge = challenge.SbeTemplateId()
 	codecIds.recordingDescriptor = recordingDescriptor.SbeTemplateId()
 	codecIds.recordingSubscriptionDescriptor = recordingSubscriptionDescriptor.SbeTemplateId()
 	codecIds.recordingSignalEvent = recordingSignalEvent.SbeTemplateId()
@@ -229,6 +233,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(control.State.err)
 			}
+			return
 		}
 
 		// assert state change
@@ -244,6 +249,45 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		control.State.state = ControlStateConnected
 		control.State.err = nil
 		control.archive.SessionId = controlResponse.ControlSessionId
+
+	case codecIds.challenge:
+		var challenge = new(codecs.Challenge)
+
+		if err := challenge.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			err2 := fmt.Errorf("ControlFargamentHandler failed to decode challenge: %w", err)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err2)
+			}
+		}
+
+		logger.Infof("ControlFragmentHandler: challenge:%s, session:%d, correlationId:%d", challenge.EncodedChallenge, challenge.ControlSessionId, challenge.CorrelationId)
+
+		// Look it up
+		control, ok := correlationsMap[challenge.CorrelationId]
+		if !ok {
+			// Not much to be done here as we can't correlate
+			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated challenge correlationId=%d", challenge.CorrelationId)
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(err)
+			}
+			return
+		}
+
+		// Check the challenge is expected iff our option for this is not nil
+		if control.archive.Options.AuthChallenge != nil {
+			if !bytes.Equal(control.archive.Options.AuthChallenge, challenge.EncodedChallenge) {
+				control.State.err = fmt.Errorf("ChallengeResponse Unexpected: expected:%v received:%v", control.archive.Options.AuthChallenge, challenge.EncodedChallenge)
+				return
+			}
+		}
+
+		// Send the response
+		// Looking good, so update state and store the SessionId
+		control.State.state = ControlStateChallenged
+		control.State.err = nil
+		control.archive.SessionId = challenge.ControlSessionId
+		control.archive.Proxy.ChallengeResponse(challenge.CorrelationId, control.archive.Options.AuthResponse)
 
 	default:
 		fmt.Printf("ConnectionControlFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)

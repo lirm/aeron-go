@@ -39,6 +39,10 @@ type Options struct {
 	Timeout                time.Duration      // [runtime] How long to try sending/receiving control messages
 	IdleStrategy           idlestrategy.Idler // [runtime] Idlestrategy for sending/receiving control messages
 	RangeChecking          bool               // [runtime] archive protocol marshalling checks
+	AuthEnabled            bool               // [init] enable to require AuthConnect() over Connect()
+	AuthCredentials        []uint8            // [init] The credentials to be provided to AuthConnect()
+	AuthChallenge          []uint8            // [init] The challenge string we are to expect (checked iff not nil)
+	AuthResponse           []uint8            // [init] The challengeResponse we should provide
 }
 
 // These are the Options used by default for an Archive object
@@ -54,6 +58,10 @@ var defaultOptions Options = Options{
 	Timeout:                time.Second * 5,
 	IdleStrategy:           idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
 	RangeChecking:          false,
+	AuthEnabled:            false,
+	AuthCredentials:        nil,
+	AuthChallenge:          nil,
+	AuthResponse:           nil,
 }
 
 // Create and return a new options from the defaults.

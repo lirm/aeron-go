@@ -493,6 +493,20 @@ func (proxy *Proxy) AuthConnectRequest(correlationId int64, responseStream int32
 	return nil
 }
 
+func (proxy *Proxy) ChallengeResponse(correlationId int64, encodedCredentials []uint8) error {
+	// Create a packet and send it
+	bytes, err := codecs.ChallengeResponsePacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, encodedCredentials)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("Offer failed: %d", ret)
+	}
+
+	return nil
+}
+
 func (proxy *Proxy) KeepAliveRequest(correlationId int64) error {
 	// Create a packet and send it
 	bytes, err := codecs.KeepAliveRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId)

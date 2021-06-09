@@ -76,9 +76,6 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
 
 # Backlog
 
-## Questions
- * performance
-
 ## Working Set
  * godoc improvements
  * [L] Expand testing
@@ -88,22 +85,13 @@ Examples are provided for a [basic_recording_publisher](examples/basic_recording
  * [S} The archive state is largely unused. 
    * IsOpen()?
  * 10 FIXMEs
- * [?] Implement AuthConnect, Challenge/Response
+ * [M] Implement AuthConnect, Challenge/Response
  * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
- * We can perform a small but frequent optimization by invoking the
-   decoder SbeTemplateId functions in init() and only allocating the
-   structure we need. It's arguable that SBE should provide a static
-   function version of this.
-
-## Recently Done
- * Bunch of documentation
- * Restructured the encoders into the codecs package for better doc and fewer globals
- * [Fixed] RecordingSignalEvents currently throw off the count of fragments/records we want. 
 
 # Bigger picture issues
- * Decided not to do locking in sync api, could subsequently add locks, or just async with locks if desired.
-   It may be that the marshaller should be parameterized for this.
+ * Decided not to do locking in sync api, could subsequently add locks, or just async with locks.
+   It may be that the control marshaller should be parameterized for this.
  * Java and C++ poll the counters to determine when a recording has actually started but the counters are not
-   availabe in go. As a result we use delays and hope which isn't ideal.
- * OnAvailableCounter noise
+   availabe in go. As a result we use delays and 'hope' which isn't ideal.
+ * It would be nice to silence the OnAvailableCounter noise
  * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.

@@ -259,24 +259,30 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Options.RequestChannel, archive.Options.RequestStream)
 	logger.Debugf("Proxy request publication: %#v", archive.Proxy.Publication)
 
-	// FIXME:auth Java and C++ use AUTH and Challenge/Response
-
 	// And intitiate the connection
 	archive.Control.State.state = ControlStateConnectRequestSent
 	correlationId := nextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Add it to our map so we can find it
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
-	if err := archive.Proxy.ConnectRequest(correlationId, archive.Options.ResponseStream, archive.Options.ResponseChannel); err != nil {
-		logger.Errorf("ConnectRequest failed: %s\n", err)
-		return nil, err
+	// Use Auth if requested
+	if archive.Options.AuthEnabled {
+		if err := archive.Proxy.AuthConnectRequest(correlationId, archive.Options.ResponseStream, archive.Options.ResponseChannel, archive.Options.AuthCredentials); err != nil {
+			logger.Errorf("ConnectRequest failed: %s\n", err)
+			return nil, err
+		}
+	} else {
+		if err := archive.Proxy.ConnectRequest(correlationId, archive.Options.ResponseStream, archive.Options.ResponseChannel); err != nil {
+			logger.Errorf("ConnectRequest failed: %s\n", err)
+			return nil, err
+		}
 	}
 
 	start := time.Now()
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
 		fragments := archive.Control.Poll(ConnectionControlFragmentHandler, 1)
 		if fragments > 0 {
-			logger.Debugf("Read %d fragments\n", fragments)
+			logger.Debugf("Read %d fragment(s)\n", fragments)
 		}
 
 		// Check for timeout
@@ -290,7 +296,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	}
 
 	if archive.Control.State.err != nil {
-		logger.Errorf("Connect failed: %s\n", err)
+		logger.Errorf("Connect failed: %s\n", archive.Control.State.err)
 	} else if archive.Control.State.state != ControlStateConnected {
 		logger.Error("Connect failed\n")
 	} else {

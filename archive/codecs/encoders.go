@@ -19,9 +19,11 @@ import (
 	"bytes"
 )
 
-// Encoders for all the protocol packets Each of these functions
-// creates a []byte suitable for sending over the wire by using the
-// generated encoders created using simple-binary-encoding.
+// Encoders for all the protocol packets
+//
+// Each of these functions creates a []byte suitable for sending over
+// the wire by using the generated encoders created using
+// simple-binary-encoding.
 //
 // All the packet specificationss are defined in the aeron-archive protocol
 // maintained at:
@@ -608,6 +610,25 @@ func AuthConnectRequestPacket(marshaller *SbeGoMarshaller, rangeChecking bool, c
 	request.Version = SemanticVersion()
 	request.ResponseStreamId = responseStream
 	request.ResponseChannel = []uint8(responseChannel)
+	request.EncodedCredentials = encodedCredentials
+
+	// Marshal it
+	header := MessageHeader{BlockLength: request.SbeBlockLength(), TemplateId: request.SbeTemplateId(), SchemaId: request.SbeSchemaId(), Version: request.SbeSchemaVersion()}
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func ChallengeResponsePacket(marshaller *SbeGoMarshaller, rangeChecking bool, controlSessionId int64, correlationId int64, encodedCredentials []uint8) ([]byte, error) {
+	var request ChallengeResponse
+	request.ControlSessionId = controlSessionId
+	request.CorrelationId = correlationId
 	request.EncodedCredentials = encodedCredentials
 
 	// Marshal it
