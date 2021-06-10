@@ -7,7 +7,7 @@ protocol](http://github.com/real-logic/aeron/blob/master/aeron-archive/src/main/
 is specified in xml using the [Simple Binary Encoding (SBE)](https://github.com/real-logic/simple-binary-encoding)
 
 ## Current State
-The implementation is an alpha release. The API is not yet considered 100% stable.
+The implementation is the first beta release. The API will be changed only if required for bugfixes.
 
 # Design
 
@@ -74,19 +74,21 @@ operations in progress when polling.
 
 Examples are provided for a [basic_recording_publisher](examples/basic_recording_publisher/basic_recording_publisher.go) and [basic_replayed_subscriber](examples/basic_replayed_subscriber/basic_replayed_subscriber.go) that interoperate with the Java examples
 
-# Backlog
+## Security
 
-## Working Set
+Enabling security is done via setting the various auth options. [config_test.go](config_test.go) and [archive_test.go](archive_test.go) provide an example.
+
+The actual semantics of the security are dependent upon which authenticator aupplier you use and is tested agains [secure-logging-archiving-media-driver](secure-logging-archiving-media-driver).
+
+# Backlog
  * godoc improvements
- * [L] Expand testing
-  * [M] Many tests to write
-  * [?] archive-media-driver mocking/execution
+ * more testing
+  * archive-media-driver mocking/execution
   * test cleanup in the media driver can be problematic
- * [S} The archive state is largely unused. 
-   * IsOpen()?
- * 10 FIXMEs
- * [M] Implement AuthConnect, Challenge/Response
- * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
+ * The archive state is largely unused. 
+   * Add? and use? IsOpen()
+ * Auth should provide some callout mechanism
+ * various FIXMEs
 
 # Bigger picture issues
  * Decided not to do locking in sync api, could subsequently add locks, or just async with locks.
