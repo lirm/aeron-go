@@ -33,10 +33,6 @@ type Control struct {
 	// Polling results
 	Results ControlResults
 
-	// FIXME:auth implement
-	EncodedChallenge   []byte
-	challengeSessionId int64 // FIXME:auth
-
 	archive *Archive // link to parent
 }
 
