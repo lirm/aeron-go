@@ -78,6 +78,33 @@ func TestMain(m *testing.M) {
 	}
 
 	result := m.Run()
+	if result != 0 {
+		archive.Close()
+		os.Exit(result)
+	}
+
+	// Test auth
+	options.AuthEnabled = true
+	options.AuthCredentials = []uint8(*TestConfig.AuthCredentials)
+	options.AuthChallenge = []uint8(*TestConfig.AuthChallenge)
+	options.AuthResponse = []uint8(*TestConfig.AuthResponse)
+
+	testCases[0].sampleStream += int32(r.Intn(1000))
+	testCases[0].replayStream += int32(r.Intn(1000))
+	if testCases[0].sampleStream == testCases[0].replayStream {
+		testCases[0].replayStream++
+	}
+
+	archive, err = NewArchive(options, context)
+	if err != nil || archive == nil {
+		log.Printf("secure-archive-media-driver connection failed, skipping allsecure  archive_tests:%s", err.Error())
+		haveArchive = false
+		return
+	} else {
+		haveArchive = true
+	}
+	result = m.Run()
+
 	archive.Close()
 	os.Exit(result)
 }

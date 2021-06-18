@@ -7,7 +7,7 @@ protocol](http://github.com/real-logic/aeron/blob/master/aeron-archive/src/main/
 is specified in xml using the [Simple Binary Encoding (SBE)](https://github.com/real-logic/simple-binary-encoding)
 
 ## Current State
-The implementation is an alpha release. The API is not yet considered 100% stable.
+The implementation is the first beta release. The API will be changed only if required for bugfixes.
 
 # Design
 
@@ -74,35 +74,26 @@ operations in progress when polling.
 
 Examples are provided for a [basic_recording_publisher](examples/basic_recording_publisher/basic_recording_publisher.go) and [basic_replayed_subscriber](examples/basic_replayed_subscriber/basic_replayed_subscriber.go) that interoperate with the Java examples
 
+## Security
+
+Enabling security is done via setting the various auth options. [config_test.go](config_test.go) and [archive_test.go](archive_test.go) provide an example.
+
+The actual semantics of the security are dependent upon which authenticator aupplier you use and is tested agains [secure-logging-archiving-media-driver](secure-logging-archiving-media-driver).
+
 # Backlog
-
-## Working Set
- * [S] [Bug] RecordingSignalEvents currently throw off the count of
-   fragments/records we want. Need a mechanism to adjust for them.
- * [L] Expand testing
-  * [M] So many tests to write
-  * [?] archive-media-driver mocking/execution
+ * godoc improvements
+ * more testing
+  * archive-media-driver mocking/execution
   * test cleanup in the media driver can be problematic
- * [S} The archive state is largely unused. 
-   * IsOpen()?
- * 10 FIXMEs
- * [?] Implement AuthConnect, Challenge/Response
- * [?] Add remaining archive protocol packets to proxy, control, archive API, and tests.
-
-## Recently Done
- * Logging at level normal should be mostly quiet if nothing goes wrong
- * Improve the Error handling / Error listeners (mostly)a
- * Ephemeral port usage is dependent upon accessing the counters which is out of scope here and doesn't buy much
- * Error listener
- * Logging tidying
- * Removed the archive context, it was offering little value. Instead,
-   the proxy, control, and recrodingevents all have a reference 
- * Made tests a little reliable but cleanup is still a problem
+ * The archive state is largely unused. 
+   * Add? and use? IsOpen()
+ * Auth should provide some callout mechanism
+ * various FIXMEs
 
 # Bigger picture issues
- * Decided not to do locking in sync api, could subsequently add locks, or just async with locks if desired.
-   It may be that the marshaller should be parameterized for this.
+ * Decided not to do locking in sync api, could subsequently add locks, or just async with locks.
+   It may be that the control marshaller should be parameterized for this.
  * Java and C++ poll the counters to determine when a recording has actually started but the counters are not
-   availabe in go. As a result we use delays and hope which isn't ideal.
- * OnAvailableCounter noise
+   availabe in go. As a result we use delays and 'hope' which isn't ideal.
+ * It would be nice to silence the OnAvailableCounter noise
  * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.

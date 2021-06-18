@@ -26,6 +26,10 @@ func getuser() string {
 }
 
 var TestConfig = struct {
+	AuthEnabled     *bool
+	AuthCredentials *string
+	AuthChallenge   *string
+	AuthResponse    *string
 	SampleStream    *int
 	SampleChannel   *string
 	ReplayStream    *int
@@ -34,7 +38,13 @@ var TestConfig = struct {
 	ProfilerEnabled *bool
 	Debug           *bool
 }{
-	flag.Int("samplestream", 1001, "default base response control stream to use"),
+	flag.Bool("authenabled", false, "enable authentication"),
+	// Credentials requiring a challenge
+	flag.String("authcredentials", "admin:adminC", "credentials to use for connection"),
+	flag.String("authchallenge", "challenge!", "challenge to use for connection"),
+	flag.String("authresponse", "admin:CSadmin", "challenge response for authentication"),
+
+	flag.Int("samplestream", 1001, "default response control stream to use"),
 	flag.String("samplechannel", "aeron:udp?endpoint=localhost:20121", "default response control channel to publish to"),
 
 	flag.Int("replaystream", 1002, "default base replay stream to use"),

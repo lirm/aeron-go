@@ -12,18 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package archive
+package codecs
 
 import (
 	"testing"
 )
 
-var channel = *TestConfig.SampleChannel
-var stream = int32(*TestConfig.SampleStream)
+var channel = "aeron:udp?endpoint=localhost:20121"
+var stream = int32(1001)
 
 // Execute all the encoders as a sanity check
 func TestEncoders(t *testing.T) {
-	packet, err := ConnectRequestPacket(99, stream, channel)
+	marshaller := NewSbeGoMarshaller()
+	rangeChecking := true
+
+	packet, err := ConnectRequestPacket(marshaller, rangeChecking, 99, stream, channel)
 	if err != nil {
 		t.Log("ConnectRequestPacket() failed")
 		t.Fail()
@@ -32,7 +35,7 @@ func TestEncoders(t *testing.T) {
 		t.Logf("ConnectRequestPacket failed length check: %d", len(packet))
 		t.Fail()
 	}
-	packet, err = StartRecordingRequest2Packet(1234, 5678, stream, true, true, channel)
+	packet, err = StartRecordingRequest2Packet(marshaller, rangeChecking, 1234, 5678, stream, true, true, channel)
 	if err != nil {
 		t.Log("StartRecordingRequestPacket() failed")
 		t.Fail()
