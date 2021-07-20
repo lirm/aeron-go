@@ -442,11 +442,12 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 			cc.subs[subcnt-1] = nil
 			subcnt--
 
-			for _, image := range images {
+			for i := range images {
+				image := &images[i]
 				if cc.onUnavailableImageHandler != nil {
-					cc.onUnavailableImageHandler(&image)
+					cc.onUnavailableImageHandler(image)
 				}
-				cc.lingeringResources <- lingerResourse{now, &image}
+				cc.lingeringResources <- lingerResourse{now, image}
 			}
 		}
 	}
