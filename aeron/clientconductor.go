@@ -19,6 +19,7 @@ package aeron
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"runtime"
 	"sync"
@@ -99,7 +100,7 @@ func (sub *subscriptionStateDefn) Init(ch string, regID int64, sID int32, now in
 
 type lingerResourse struct {
 	lastTime int64
-	resource *Image
+	resource io.Closer
 }
 
 type ClientConductor struct {
@@ -258,12 +259,6 @@ func (cc *ClientConductor) AddPublication(channel string, streamID int32) int64 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	for _, pub := range cc.pubs {
-		if pub.streamID == streamID && pub.channel == channel {
-			return pub.regID
-		}
-	}
-
 	now := time.Now().UnixNano()
 
 	regID := cc.driverProxy.AddPublication(channel, streamID)
@@ -284,12 +279,6 @@ func (cc *ClientConductor) AddExclusivePublication(channel string, streamID int3
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
-
-	for _, pub := range cc.pubs {
-		if pub.streamID == streamID && pub.channel == channel {
-			return pub.regID
-		}
-	}
 
 	now := time.Now().UnixNano()
 
@@ -347,6 +336,8 @@ func (cc *ClientConductor) releasePublication(regID int64) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
+	now := time.Now().UnixNano()
+
 	pubcnt := len(cc.pubs)
 	for i, pub := range cc.pubs {
 		if pub != nil && pub.regID == regID {
@@ -355,6 +346,10 @@ func (cc *ClientConductor) releasePublication(regID int64) {
 			cc.pubs[i] = cc.pubs[pubcnt-1]
 			cc.pubs[pubcnt-1] = nil
 			pubcnt--
+
+			if pub.buffers.DecRef() == 0 {
+				cc.lingeringResources <- lingerResourse{now, pub.buffers}
+			}
 		}
 	}
 	cc.pubs = cc.pubs[:pubcnt]
@@ -470,6 +465,7 @@ func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, pos
 			pubDef.posLimitCounterID = posLimitCounterID
 			pubDef.channelStatusIndicatorID = channelStatusIndicatorID
 			pubDef.buffers = logbuffer.Wrap(logFileName)
+			pubDef.buffers.IncRef()
 			pubDef.origRegID = origRegID
 
 			logger.Debugf("Updated publication: %v", pubDef)
@@ -498,6 +494,7 @@ func (cc *ClientConductor) OnNewExclusivePublication(streamID int32, sessionID i
 			pubDef.posLimitCounterID = posLimitCounterID
 			pubDef.channelStatusIndicatorID = channelStatusIndicatorID
 			pubDef.buffers = logbuffer.Wrap(logFileName)
+			pubDef.buffers.IncRef()
 			pubDef.origRegID = origRegID
 
 			logger.Debugf("Updated publication: %v", pubDef)
