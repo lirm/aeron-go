@@ -811,7 +811,7 @@ func (archive *Archive) GetStartPosition(recordingId int64) (int64, error) {
 // Get the stop position for a recording.
 //
 // Return the stop position, or RecordingPositionNull if still active.
-func (archive *Archive) GetStopPosition(recordingId int64, position int64) (int64, error) {
+func (archive *Archive) GetStopPosition(recordingId int64) (int64, error) {
 	correlationId := nextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup
 	defer correlationsMapClean(correlationId)        // Clear the lookup
