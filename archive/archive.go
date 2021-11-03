@@ -269,7 +269,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	// Use Auth if requested
 	if archive.Options.AuthEnabled {
 		if err := archive.Proxy.AuthConnectRequest(correlationId, archive.Options.ResponseStream, archive.Options.ResponseChannel, archive.Options.AuthCredentials); err != nil {
-			logger.Errorf("ConnectRequest failed: %s\n", err)
+			logger.Errorf("AuthConnectRequest failed: %s\n", err)
 			return nil, err
 		}
 	} else {
