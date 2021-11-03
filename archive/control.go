@@ -28,7 +28,7 @@ import (
 // Control contains everything required for the archive subscription/response side
 type Control struct {
 	Subscription *aeron.Subscription
-	State        ControlState
+	State        controlState
 
 	// Polling results
 	Results ControlResults
@@ -36,6 +36,7 @@ type Control struct {
 	archive *Archive // link to parent
 }
 
+// ControlResults for holding state over a Control request/response
 // The polling mechanism is not parameterizsed so we need to set state for the results as we go
 // These pieces are filled out by various ResponsePollers which will set IsPollComplete to true
 type ControlResults struct {
@@ -59,12 +60,12 @@ const (
 )
 
 // Used internally to handle connection state
-type ControlState struct {
+type controlState struct {
 	state int
 	err   error
 }
 
-// This stops us allocating every object when we need only one
+// CodecIds stops us allocating every object when we need only one
 // Arguably SBE should give us a static value
 type CodecIds struct {
 	controlResponse                 uint16
@@ -101,8 +102,8 @@ func init() {
 
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via the control's Results
-func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	logger.Debugf("ControlFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
+func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	logger.Debugf("controlFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 
@@ -112,7 +113,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		err2 := fmt.Errorf("controlFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
 		if Listeners.ErrorListener != nil {
 			Listeners.ErrorListener(err2)
@@ -125,7 +126,7 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			err2 := fmt.Errorf("ControlFragmentHandler failed to decode control response:%w", err)
+			err2 := fmt.Errorf("controlFragmentHandler failed to decode control response:%w", err)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err2)
 			}
@@ -136,11 +137,11 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		control, ok := correlationsMap[controlResponse.CorrelationId]
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("ControlFragmentHandler uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			err := fmt.Errorf("controlFragmentHandler uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
-			logger.Infof("ControlFragmentHandler/controlResponse: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
+			logger.Infof("controlFragmentHandler/controlResponse: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
 			return
 		}
 
@@ -165,20 +166,20 @@ func ControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		// will want an extra fragment
 		control, ok := correlationsMap[recordingSignalEvent.CorrelationId]
 		if !ok {
-			logger.Infof("ControlFragmentHandler/recordingSignalEvent: Uncorrelated recordingSignalEvent correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent) // Not much to be done here as we can't correlate
+			logger.Infof("controlFragmentHandler/recordingSignalEvent: Uncorrelated recordingSignalEvent correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent) // Not much to be done here as we can't correlate
 			return
 		}
 		control.Results.ExtraFragments++
 
 	default:
 		// This can happen when testing
-		fmt.Printf("ControlFragmentHandler: Unexpected message type %d\n", hdr.TemplateId)
+		fmt.Printf("controlFragmentHandler: Unexpected message type %d\n", hdr.TemplateId)
 	}
 
 	return
 }
 
-// The connection handling specific fragment handler.
+// ConnectionControlFragmentHandler is the connection handling specific fragment handler.
 // This mechanism only alows us to pass results back via global state which we do in control.State
 func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v\n", offset, length, header)
@@ -191,7 +192,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	marshaller := codecs.NewSbeGoMarshaller()
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		err2 := fmt.Errorf("ConnectionControlFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
 		if Listeners.ErrorListener != nil {
 			Listeners.ErrorListener(err2)
@@ -292,7 +293,8 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	return
 }
 
-// The control response poller uses local state to pass back information from the underlying subscription
+// Poll provides rhe control response poller uses local state to pass
+// back data from the underlying subscription
 func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
@@ -305,7 +307,7 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 	return control.Subscription.Poll(handler, fragmentLimit)
 }
 
-// Poll for a matching ControlReponse
+// PollNextResponse for a matching ControlReponse
 func (control *Control) PollNextResponse(correlationId int64) error {
 	logger.Debugf("PollNextResponse(%d) start", correlationId)
 
@@ -317,7 +319,7 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 	fragmentsWanted := 10
 	control.Results.ExtraFragments = 0
 	for {
-		fragmentsReceived := control.Poll(ControlFragmentHandler, fragmentsWanted)
+		fragmentsReceived := control.Poll(controlFragmentHandler, fragmentsWanted)
 		fragmentsWanted = fragmentsWanted - fragmentsReceived + control.Results.ExtraFragments
 		control.Results.ExtraFragments = 0
 
@@ -328,9 +330,8 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 				err := fmt.Errorf("Control Response failure: %s", control.Results.ControlResponse.ErrorMessage)
 				logger.Debug(err)
 				return err
-			} else {
-				return nil
 			}
+			return nil
 		}
 
 		if control.Subscription.IsClosed() {
@@ -344,7 +345,7 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 	}
 }
 
-// Poll for a specific correlationId
+// PollForResponse polls for a specific correlationId
 // Returns nil, relevantId on success, error, 0 failure
 // More complex responses are contained in Control.ControlResponse after the call
 func (control *Control) PollForResponse(correlationId int64) (int64, error) {
@@ -382,9 +383,9 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 	}
 }
 
-// Poll the response stream once for an error. If another message is
-// present then it will be skipped over so only call when not
-// expecting another response.
+// PollForErrorResponse polls the response stream once for an
+// error. If another message is present then it will be skipped over
+// so only call when not expecting another response.
 func (control *Control) PollForErrorResponse() error {
 
 	// Poll for events
@@ -393,7 +394,7 @@ func (control *Control) PollForErrorResponse() error {
 	fragmentsWanted := 10
 	control.Results.ExtraFragments = 0
 	for {
-		fragmentsReceived := control.Poll(ControlFragmentHandler, 1)
+		fragmentsReceived := control.Poll(controlFragmentHandler, 1)
 		fragmentsWanted = fragmentsWanted - fragmentsReceived + control.Results.ExtraFragments
 		control.Results.ExtraFragments = 0
 
@@ -413,7 +414,7 @@ func (control *Control) PollForErrorResponse() error {
 	}
 }
 
-// Poll for descriptors (both recording and subscription)
+// DescriptorFragmentHandler is used to poll for descriptors (both recording and subscription)
 // The current subscription handler doesn't provide a mechanism for passing a rock
 // so we return data via the control's Results
 // FIXME:Bug Need to adjust fragment counts in case something async happens
@@ -546,7 +547,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// will want an extra fragment
 		control, ok := correlationsMap[recordingSignalEvent.CorrelationId]
 		if !ok {
-			logger.Infof("ControlFragmentHandler: Uncorrelated control response correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent)
+			logger.Infof("DescriptorFragmentHandler: Uncorrelated control response correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent)
 			return
 		}
 		control.Results.ExtraFragments++
@@ -559,7 +560,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 	return
 }
 
-// Poll for a fragmentLimit of Descriptors
+// PollNextDescriptor to poll for a fragmentLimit of Descriptors
 func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted int) error {
 	logger.Debugf("PollNextDescriptor(%d) start", correlationId)
 	start := time.Now()
@@ -601,7 +602,7 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 	return nil
 }
 
-// Poll for recording descriptors, adding them to the set in the control
+// PollForDescriptors to poll for recording descriptors, adding them to the set in the control
 func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted int32) error {
 	logger.Debugf("PollForDescriptors(%d)", correlationId)
 
