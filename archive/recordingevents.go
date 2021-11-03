@@ -24,13 +24,14 @@ import (
 	"github.com/lirm/aeron-go/archive/codecs"
 )
 
+// RecordingEventsAdapter is used to poll for recording events on a subscription.
 type RecordingEventsAdapter struct {
 	Subscription *aeron.Subscription
 	Enabled      bool
 	archive      *Archive // link to parent
 }
 
-// The response poller wraps the aeron subscription handler.
+// Poll the aeron subscription handler.
 // If you pass it a nil handler it will use the builtin and call the Listeners
 // If you ask for 0 fragments it will only return one fragment (if available)
 func (rea *RecordingEventsAdapter) Poll(handler term.FragmentHandler, fragmentLimit int) int {
@@ -39,7 +40,7 @@ func (rea *RecordingEventsAdapter) Poll(handler term.FragmentHandler, fragmentLi
 	rangeChecking = rea.archive.Options.RangeChecking
 
 	if handler == nil {
-		handler = ReFragmentHandler
+		handler = reFragmentHandler
 	}
 	if fragmentLimit == 0 {
 		fragmentLimit = 1
@@ -47,7 +48,7 @@ func (rea *RecordingEventsAdapter) Poll(handler term.FragmentHandler, fragmentLi
 	return rea.Subscription.Poll(handler, fragmentLimit)
 }
 
-func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func reFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	var hdr codecs.SbeGoMessageHeader
 
 	buf := new(bytes.Buffer)
@@ -57,7 +58,7 @@ func ReFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
-		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		err2 := fmt.Errorf("reFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
 		if Listeners.ErrorListener != nil {
 			Listeners.ErrorListener(err2)
