@@ -115,7 +115,7 @@ func LoggingNewSubscriptionListener(channel string, stream int32, correlationId 
 	logger.Infof("NewSubscriptionListener(channel:%s stream:%d correlationId:%d)\n", channel, stream, correlationId)
 }
 
-// LoggingNewSubscriptionListener from underlying aeron (called by default only in DEBUG)
+// LoggingNewPublicationListener from underlying aeron (called by default only in DEBUG)
 func LoggingNewPublicationListener(channel string, stream int32, session int32, regId int64) {
 	logger.Infof("NewPublicationListener(channel:%s stream:%d, session:%d, regId:%d)", channel, stream, session, regId)
 }
@@ -159,13 +159,13 @@ func nextCorrelationId() int64 {
 	return _correlationId.Inc()
 }
 
-// Utility function to convert a ReplaySessionId into a streamId
+// ReplaySessionIdToStreamId utility function to convert a ReplaySessionId into a streamId
 func ReplaySessionIdToStreamId(replaySessionId int64) int32 {
 	// It's actually just the least significant 32 bits
 	return int32(replaySessionId)
 }
 
-// Utility function to add a session to a channel URI
+// AddSessionIdToChannel utility function to add a session to a channel URI
 // On failure it will return the original and an error
 func AddSessionIdToChannel(channel string, sessionId int32) (string, error) {
 	uri, err := aeron.ParseChannelUri(channel)
@@ -176,7 +176,7 @@ func AddSessionIdToChannel(channel string, sessionId int32) (string, error) {
 	return uri.String(), nil
 }
 
-// Factory method to create a Archive instance
+// NewArchive factory method to create an Archive instance
 // You may provide your own archive Options or otherwise one will be created from defaults
 // You may provide your own aeron Context or otherwise one will be created from defaults
 func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
@@ -318,42 +318,42 @@ func (archive *Archive) Close() error {
 	return archive.aeron.Close()
 }
 
-// Sets the aeron error handler
+// SetAeronErrorHandler sets the aeron error handler
 func (archive *Archive) SetAeronErrorHandler(handler func(error)) {
 	archive.aeronContext.ErrorHandler(handler)
 }
 
-// AeronDir sets the root directory for media driver files
+// SetAeronDir sets the root directory for media driver files
 func (archive *Archive) SetAeronDir(dir string) {
 	archive.aeronContext.AeronDir(dir)
 }
 
-// MediaDriverTimeout sets the timeout for keep alives to media driver
+// SetAeronMediaDriverTimeout sets the timeout for keep alives to media driver
 func (archive *Archive) SetAeronMediaDriverTimeout(timeout time.Duration) {
 	archive.aeronContext.MediaDriverTimeout(timeout)
 }
 
-// ResourceLingerTimeout sets the timeout for resource cleanup after they're released
+// SetAeronResourceLingerTimeout sets the timeout for resource cleanup after they're released
 func (archive *Archive) SetAeronResourceLingerTimeout(timeout time.Duration) {
 	archive.aeronContext.ResourceLingerTimeout(timeout)
 }
 
-// InterServiceTimeout sets the timeout for client heartbeat
+// SetAeronInterServiceTimeout sets the timeout for client heartbeat
 func (archive *Archive) SetAeronInterServiceTimeout(timeout time.Duration) {
 	archive.aeronContext.InterServiceTimeout(timeout)
 }
 
-// PublicationConnectionTimeout sets the timeout for publications
+// SetAeronPublicationConnectionTimeout sets the timeout for publications
 func (archive *Archive) SetAeronPublicationConnectionTimeout(timeout time.Duration) {
 	archive.aeronContext.PublicationConnectionTimeout(timeout)
 }
 
-// CncFileName returns the name of the Counters file
+// AeronCncFileName returns the name of the Counters file
 func (archive *Archive) AeronCncFileName() string {
 	return archive.aeronContext.CncFileName()
 }
 
-// Start recording events flowing
+// EnableRecordingEvents starts recording events flowing
 // Events are returned via the three callbacks which should be
 // overridden from the default logging listeners defined in the Listeners
 func (archive *Archive) EnableRecordingEvents() {
@@ -362,14 +362,14 @@ func (archive *Archive) EnableRecordingEvents() {
 	logger.Debugf("RecordingEvents subscription: %#v", archive.Events.Subscription)
 }
 
-// Stop recording events flowing
+// DisableRecordingEvents stops recording events flowing
 func (archive *Archive) DisableRecordingEvents() {
 	archive.Events.Subscription.Close()
 	archive.Events.Enabled = false
 	logger.Debugf("RecordingEvents subscription closed")
 }
 
-// Poll for recording events
+// RecordingEventsPoll is used to poll for recording events
 func (archive *Archive) RecordingEventsPoll() int {
 	return archive.Events.Poll(nil, 1)
 }
@@ -413,7 +413,7 @@ func correlationsMapClean(correlationId int64) {
 	delete(correlationsMap, correlationId)
 }
 
-// Start recording a channel/stream
+// StartRecording a channel/stream
 //
 // Channels that include sessionId parameters are considered different
 // than channels without sessionIds. If a publication matches both a
@@ -458,7 +458,7 @@ func (archive *Archive) StopRecording(channel string, stream int32) error {
 	return err
 }
 
-// StopRecording by RecordingId as looked up in ListRecording*()
+// StopRecordingByIdentity for the RecordingIdentity looked up in ListRecording*()
 //
 // Returns True if the recording was stopped or false if the recording is not currently active
 // and (false, error) if something went wrong
@@ -480,7 +480,7 @@ func (archive *Archive) StopRecordingByIdentity(recordingId int64) (bool, error)
 	return res == 0, err
 }
 
-// StopRecording by SubscriptionId
+// StopRecordingBySubscriptionId as returned by StartRecording
 //
 // Channels that include sessionId parameters are considered different than channels without sessionIds. Stopping
 // recording on a channel without a sessionId parameter will not stop the recording of any sessionId specific
@@ -501,9 +501,8 @@ func (archive *Archive) StopRecordingBySubscriptionId(subscriptionId int64) erro
 	return err
 }
 
-// StopRecording by Publication
-//
-// Stop recording a sessionId specific recording that pertains to the given Publication
+// StopRecordingByPublication to stop recording a sessionId specific
+// recording that pertains to the given Publication
 //
 // Returns error on failure, nil on success
 func (archive *Archive) StopRecordingByPublication(publication aeron.Publication) error {
@@ -514,7 +513,7 @@ func (archive *Archive) StopRecordingByPublication(publication aeron.Publication
 	return archive.StopRecording(channel, publication.StreamID())
 }
 
-// Add a Recorded Publication and set it up to be recorded.
+// AddRecordedPublication to set it up forrecording.
 //
 // This creates a per-session recording which can fail if:
 // Sending the request fails - see error for detail
@@ -550,7 +549,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	return publication, nil
 }
 
-// List up to recordCount recording descriptors
+// ListRecordings up to recordCount recording descriptors
 func (archive *Archive) ListRecordings(fromRecordingId int64, recordCount int32) ([]*codecs.RecordingDescriptor, error) {
 	correlationId := nextCorrelationId()
 	correlationsMap[correlationId] = archive.Control // Set the lookup
@@ -579,7 +578,7 @@ func (archive *Archive) ListRecordings(fromRecordingId int64, recordCount int32)
 	return archive.Control.Results.RecordingDescriptors, nil
 }
 
-// List up to recordCount recording descriptors from fromRecordingId
+// ListRecordingsForUri will list up to recordCount recording descriptors from fromRecordingId
 // with a limit of recordCount for a given channel and stream.
 //
 // Returns the number of descriptors consumed. If fromRecordingId is
@@ -614,7 +613,7 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingId int64, recordCount 
 	return archive.Control.Results.RecordingDescriptors, nil
 }
 
-// Fetch the recording descriptor for a recordingId
+// ListRecording will fetch the recording descriptor for a recordingId
 //
 // Returns a single recording descriptor or nil if there was no match
 func (archive *Archive) ListRecording(recordingId int64) (*codecs.RecordingDescriptor, error) {
@@ -645,7 +644,7 @@ func (archive *Archive) ListRecording(recordingId int64) (*codecs.RecordingDescr
 	return archive.Control.Results.RecordingDescriptors[0], nil
 }
 
-// Start a replay for a length in bytes of a recording from a position.
+// StartReplay for a length in bytes of a recording from a position.
 //
 // If the position is RecordingPositionNull (-1) then the stream will
 // be replayed from the start.
@@ -675,8 +674,8 @@ func (archive *Archive) StartReplay(recordingId int64, position int64, length in
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Start a replay for a length in bytes of a recording from a position
-// bounded by a position counter.
+// BoundedReplay to start a replay for a length in bytes of a
+// recording from a position bounded by a position counter.
 //
 // If the position is RecordingPositionNull (-1) then the stream will
 // be replayed from the start.
@@ -705,7 +704,7 @@ func (archive *Archive) BoundedReplay(recordingId int64, position int64, length 
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Stop a Replay session.
+// StopReplay for a  session.
 //
 // Returns error on failure, nil on success
 func (archive *Archive) StopReplay(replaySessionId int64) error {
@@ -721,7 +720,7 @@ func (archive *Archive) StopReplay(replaySessionId int64) error {
 	return err
 }
 
-// Stop all Replays for a given recordingId
+// StopAllReplays for a given recordingId
 //
 // Returns error on failure, nil on success
 func (archive *Archive) StopAllReplays(recordingId int64) error {
@@ -737,7 +736,7 @@ func (archive *Archive) StopAllReplays(recordingId int64) error {
 	return err
 }
 
-// Extend an existing non-active recording of a channel and stream pairing.
+// ExtendRecording to extend an existing non-active recording of a channel and stream pairing.
 //
 // The channel must be configured for the initial position from which it will be extended.
 //
@@ -754,7 +753,7 @@ func (archive *Archive) ExtendRecording(recordingId int64, stream int32, sourceL
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Get the position recorded for an active recording.
+// GetRecordingPosition of the position recorded for an active recording.
 //
 // Returns the recording position or if there are no active
 // recordings then RecordingPositionNull.
@@ -770,14 +769,14 @@ func (archive *Archive) GetRecordingPosition(recordingId int64) (int64, error) {
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Truncate a stopped recording to a given position that is less than
-// the stopped position. The provided position must be on a fragment
-// boundary. Truncating a recording to the start position effectively
-// deletes the recording. If the truncate operation will result in
-// deleting segments then this will occur asynchronously. Before
-// extending a truncated recording which has segments being
-// asynchronously being deleted then you should await completion
-// via the RecordingSignal Delete
+// TruncateRecording of a stopped recording to a given position that
+// is less than the stopped position. The provided position must be on
+// a fragment boundary. Truncating a recording to the start position
+// effectively deletes the recording. If the truncate operation will
+// result in deleting segments then this will occur
+// asynchronously. Before extending a truncated recording which has
+// segments being asynchronously being deleted then you should await
+// completion via the RecordingSignal Delete
 //
 // Returns nil on success, error on failre
 func (archive *Archive) TruncateRecording(recordingId int64, position int64) error {
@@ -793,7 +792,7 @@ func (archive *Archive) TruncateRecording(recordingId int64, position int64) err
 	return err
 }
 
-// Get the start position for a recording.
+// GetStartPosition for a recording.
 //
 // Return the start position of the recording or (0, error) on failure
 func (archive *Archive) GetStartPosition(recordingId int64) (int64, error) {
@@ -808,7 +807,7 @@ func (archive *Archive) GetStartPosition(recordingId int64) (int64, error) {
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Get the stop position for a recording.
+// GetStopPosition for a recording.
 //
 // Return the stop position, or RecordingPositionNull if still active.
 func (archive *Archive) GetStopPosition(recordingId int64) (int64, error) {
@@ -823,7 +822,7 @@ func (archive *Archive) GetStopPosition(recordingId int64) (int64, error) {
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Find the last recording that matches the given criteria.
+// FindLastMatchingRecording that matches the given criteria.
 //
 // Returns the RecordingId or RecordingIdNullValue if no match
 func (archive *Archive) FindLastMatchingRecording(minRecordingId int64, sessionId int32, stream int32, channel string) (int64, error) {
@@ -838,7 +837,9 @@ func (archive *Archive) FindLastMatchingRecording(minRecordingId int64, sessionI
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// List active recording subscriptions in the archive create via StartRecording or ExtendRecording.
+// ListRecordingSubscriptions to list the active recording
+// subscriptions in the archive create via StartRecording or
+// ExtendRecording.
 //
 // Returns a (possibly empty) list of RecordingSubscriptionDescriptors
 func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscriptionCount int32, applyStreamId bool, stream int32, channelFragment string) ([]*codecs.RecordingSubscriptionDescriptor, error) {
@@ -871,7 +872,7 @@ func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscripti
 
 }
 
-// Detach segments from the beginning of a recording up to the
+// DetachSegments from the beginning of a recording up to the
 // provided new start position. The new start position must be first
 // byte position of a segment after the existing start position.  It
 // is not possible to detach segments which are active for recording
@@ -891,7 +892,7 @@ func (archive *Archive) DetachSegments(recordingId int64, newStartPosition int64
 	return err
 }
 
-// Delete segments which have been previously detached from a recording.
+// DeleteDetachedSegments which have been previously detached from a recording.
 //
 // Returns the count of deleted segment files.
 func (archive *Archive) DeleteDetachedSegments(recordingId int64) (int64, error) {
@@ -906,8 +907,8 @@ func (archive *Archive) DeleteDetachedSegments(recordingId int64) (int64, error)
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Purge (detach and delete) segments from the beginning of a
-// recording up to the provided new start position. The new start
+// PurgeSegments (detach and delete) to segments from the beginning of
+// a recording up to the provided new start position. The new start
 // position must be first byte position of a segment after the
 // existing start position. It is not possible to detach segments
 // which are active for recording or being replayed.
@@ -925,7 +926,7 @@ func (archive *Archive) PurgeSegments(recordingId int64, newStartPosition int64)
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Attach segments to the beginning of a recording to restore history
+// AttachSegments to the beginning of a recording to restore history
 // that was previously detached.
 // Segment files must match the existing recording and join exactly to
 // the start position of the recording they are being attached to.
@@ -943,7 +944,7 @@ func (archive *Archive) AttachSegments(recordingId int64) (int64, error) {
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Migrate segments from a source recording and attach them to the
+// MigrateSegments from a source recording and attach them to the
 // beginning of a destination recording.
 //
 // The source recording must match the destination recording for
@@ -1015,14 +1016,14 @@ func (archive *Archive) Replicate(srcRecordingId int64, dstRecordingId int64, sr
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Replicate a recording from a source archive to a destination which
-// can be considered a backup for a primary archive. The source
-// recording will be replayed via the provided replay channel and use
-// the original stream id.  If the destination recording id is
-// RecordingIdNullValue (-1) then a new destination recording is
-// created, otherwise the provided destination recording id will be
-// extended. The details of the source recording descriptor will be
-// replicated.
+// Replicate2 will replicate a recording from a source archive to a
+// destination which can be considered a backup for a primary
+// archive. The source recording will be replayed via the provided
+// replay channel and use the original stream id.  If the destination
+// recording id is RecordingIdNullValue (-1) then a new destination
+// recording is created, otherwise the provided destination recording
+// id will be extended. The details of the source recording descriptor
+// will be replicated.
 //
 // For a source recording that is still active the replay can merge
 // with the live stream and then follow it directly and no longer
@@ -1053,14 +1054,14 @@ func (archive *Archive) Replicate2(srcRecordingId int64, dstRecordingId int64, s
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Replicate a recording from a source archive to a destination which
-// can be considered a backup for a primary archive. The source
-// recording will be replayed via the provided replay channel and use
-// the original stream id.  If the destination recording id is
-// RecordingIdNullValue (-1) then a new destination recording is
-// created, otherwise the provided destination recording id will be
-// extended. The details of the source recording descriptor will be
-// replicated.
+// TaggedReplicate to replicate a recording from a source archive to a
+// destination which can be considered a backup for a primary
+// archive. The source recording will be replayed via the provided
+// replay channel and use the original stream id.  If the destination
+// recording id is RecordingIdNullValue (-1) then a new destination
+// recording is created, otherwise the provided destination recording
+// id will be extended. The details of the source recording descriptor
+// will be replicated.
 //
 // The subscription used in the archive will be tagged
 // with the provided tags. For a source recording that is still active
@@ -1092,7 +1093,7 @@ func (archive *Archive) TaggedReplicate(srcRecordingId int64, dstRecordingId int
 	return archive.Control.PollForResponse(correlationId)
 }
 
-// Stop a replication request
+// StopReplication of a replication request
 //
 // Returns error on failure, nil on success
 func (archive *Archive) StopReplication(replicationId int64) error {
@@ -1108,9 +1109,9 @@ func (archive *Archive) StopReplication(replicationId int64) error {
 	return err
 }
 
-// Purge a stopped recording, i.e. mark recording as Invalid and
-// delete the corresponding segment files. The space in the Catalog
-// will be reclaimed upon compaction.
+// PurgeRecording of a stopped recording, i.e. mark recording as
+// Invalid and delete the corresponding segment files. The space in
+// the Catalog will be reclaimed upon compaction.
 //
 // Returns error on failure, nil on success
 func (archive *Archive) PurgeRecording(recordingId int64) error {
