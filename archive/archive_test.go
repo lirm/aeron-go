@@ -31,8 +31,8 @@ import (
 // init fails to connect then we'll skip the tests
 // FIXME:BiggerPicture this plan fails as aeron-go calls log.Fatalf() if the media driver is not running!
 var archive *Archive
-var haveArchive bool = false
-var DEBUG bool = false
+var haveArchive = false
+var DEBUG = false
 
 type TestCases struct {
 	sampleStream  int32
@@ -73,9 +73,8 @@ func TestMain(m *testing.M) {
 	if err != nil || archive == nil {
 		log.Printf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
 		return
-	} else {
-		haveArchive = true
 	}
+	haveArchive = true
 
 	result := m.Run()
 	if result != 0 {
@@ -100,9 +99,9 @@ func TestMain(m *testing.M) {
 		log.Printf("secure-archive-media-driver connection failed, skipping allsecure  archive_tests:%s", err.Error())
 		haveArchive = false
 		return
-	} else {
-		haveArchive = true
 	}
+
+	haveArchive = true
 	result = m.Run()
 
 	archive.Close()

@@ -55,6 +55,7 @@ const (
 // example protocol unmarshalling goes wrong.
 var Listeners *ArchiveListeners
 
+// ArchiveListeners contains all the callbacks
 // By default only the ErrorListener is set to a logging listener.  If
 // "archive" is at loglevel DEBUG then logging listeners are set for
 // all listeners.
