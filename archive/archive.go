@@ -143,14 +143,12 @@ var rangeChecking bool
 var logger = logging.MustGetLogger("archive")
 var _correlationId atomic.Long
 var correlationsMap map[int64]*Control // Used for connection establishment and commands, correlationId lookup
-var recordingsMap map[int64]*Control   // Used for recordings, recordingId lookup
 
 // Inititialization
 func init() {
 	_correlationId.Set(time.Now().UnixNano())
 
 	correlationsMap = make(map[int64]*Control)
-	recordingsMap = make(map[int64]*Control)
 }
 
 // Utility to create a new correlation Id
