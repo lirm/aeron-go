@@ -263,6 +263,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	// And intitiate the connection
 	archive.Control.State.state = ControlStateConnectRequestSent
 	correlationId := nextCorrelationId()
+	logger.Debugf("NewArchive correlationId is %d", correlationId)
 	correlationsMap[correlationId] = archive.Control // Add it to our map so we can find it
 	defer correlationsMapClean(correlationId)        // Clear the lookup
 
