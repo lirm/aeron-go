@@ -142,7 +142,6 @@ var rangeChecking bool
 // Other globals used internally
 var logger = logging.MustGetLogger("archive")
 var _correlationId atomic.Long
-var sessionsMap map[int64]*Control     // Used for recording signal sessionId lookup
 var correlationsMap map[int64]*Control // Used for connection establishment and commands, correlationId lookup
 var recordingsMap map[int64]*Control   // Used for recordings, recordingId lookup
 
@@ -150,7 +149,6 @@ var recordingsMap map[int64]*Control   // Used for recordings, recordingId looku
 func init() {
 	_correlationId.Set(time.Now().UnixNano())
 
-	sessionsMap = make(map[int64]*Control)
 	correlationsMap = make(map[int64]*Control)
 	recordingsMap = make(map[int64]*Control)
 }
@@ -303,9 +301,6 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 		logger.Error("Connect failed\n")
 	} else {
 		logger.Infof("Archive connection established for sessionId:%d\n", archive.SessionId)
-
-		// Store the SessionId
-		sessionsMap[archive.SessionId] = archive.Control // Add it to our map so we can look it up
 	}
 
 	return archive, archive.Control.State.err
@@ -316,7 +311,6 @@ func (archive *Archive) Close() error {
 	archive.Proxy.CloseSessionRequest()
 	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
-	delete(sessionsMap, archive.SessionId)
 	return archive.aeron.Close()
 }
 
