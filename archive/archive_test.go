@@ -22,6 +22,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -83,7 +84,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Test auth
-	options.AuthEnabled = true
+	options.AuthEnabled = false
 	options.AuthCredentials = []uint8(*TestConfig.AuthCredentials)
 	options.AuthChallenge = []uint8(*TestConfig.AuthChallenge)
 	options.AuthResponse = []uint8(*TestConfig.AuthResponse)
@@ -395,4 +396,41 @@ func DisabledTestAddRecordedPublicationFailure(t *testing.T) {
 		t.Logf("Add recorded publication succeeded and should have failed. error:%s, pub%#v", err, pub)
 		t.FailNow()
 	}
+}
+
+// Test concurrency
+func TestConcurrentConnections(t *testing.T) {
+	var wg sync.WaitGroup
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go ConcurrentSimple(&wg, i)
+	}
+	wg.Wait()
+
+}
+
+func ConcurrentSimple(wg *sync.WaitGroup, n int) {
+
+	var err error
+	context := aeron.NewContext()
+	context.AeronDir(*TestConfig.AeronPrefix)
+	options := DefaultOptions()
+	options.ArchiveLoglevel = logging.DEBUG
+
+	defer wg.Done()
+	log.Printf("Worker %d starting", n)
+
+	// Randomize our stream
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	testCases[0].sampleStream += int32(r.Intn(10000))
+
+	archive, err = NewArchive(options, context)
+	if err != nil || archive == nil {
+		log.Printf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
+		return
+	}
+	archive.Close()
+
+	log.Printf("Worker %d exiting", n)
 }
