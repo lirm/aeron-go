@@ -134,7 +134,7 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 
 		// Check this is for our session
 		// Look it up
-		control, ok := correlationsMap[controlResponse.CorrelationId]
+		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
 			err := fmt.Errorf("controlFragmentHandler uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
@@ -144,7 +144,7 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 			logger.Infof("controlFragmentHandler/controlResponse: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
 			return
 		}
-
+		control := c.(*Control)
 		control.Results.ControlResponse = controlResponse
 		control.Results.IsPollComplete = true
 
@@ -164,11 +164,12 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 
 		// If we can locate this correlationId then we can let our parent know we
 		// will want an extra fragment
-		control, ok := correlationsMap[recordingSignalEvent.CorrelationId]
+		c, ok := correlations.Load(recordingSignalEvent.CorrelationId)
 		if !ok {
 			logger.Infof("controlFragmentHandler/recordingSignalEvent: Uncorrelated recordingSignalEvent correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent) // Not much to be done here as we can't correlate
 			return
 		}
+		control := c.(*Control)
 		control.Results.ExtraFragments++
 
 	default:
@@ -213,7 +214,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		}
 
 		// Look it up
-		control, ok := correlationsMap[controlResponse.CorrelationId]
+		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
 			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
@@ -222,6 +223,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 			}
 			return
 		}
+		control := c.(*Control)
 
 		// Check result
 		if controlResponse.Code != codecs.ControlResponseCode.OK {
@@ -261,7 +263,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		logger.Infof("ControlFragmentHandler: challenge:%s, session:%d, correlationId:%d", challenge.EncodedChallenge, challenge.ControlSessionId, challenge.CorrelationId)
 
 		// Look it up
-		control, ok := correlationsMap[challenge.CorrelationId]
+		c, ok := correlations.Load(challenge.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
 			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated challenge correlationId=%d", challenge.CorrelationId)
@@ -270,6 +272,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 			}
 			return
 		}
+		control := c.(*Control)
 
 		// Check the challenge is expected iff our option for this is not nil
 		if control.archive.Options.AuthChallenge != nil {
@@ -451,7 +454,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// logger.Debugf("RecordingDescriptor: %#v\n", recordingDescriptor)
 
 		// Look it up
-		control, ok := correlationsMap[recordingDescriptor.CorrelationId]
+		c, ok := correlations.Load(recordingDescriptor.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
 			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationId=%d\n%#v", recordingDescriptor.CorrelationId, recordingDescriptor)
@@ -460,6 +463,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			}
 			return
 		}
+		control := c.(*Control)
 
 		// Set our state to let the caller of Poll() which triggered this know they have something
 		control.Results.RecordingDescriptors = append(control.Results.RecordingDescriptors, recordingDescriptor)
@@ -476,7 +480,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		}
 
 		// Look it up
-		control, ok := correlationsMap[recordingSubscriptionDescriptor.CorrelationId]
+		c, ok := correlations.Load(recordingSubscriptionDescriptor.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
 			err := fmt.Errorf("Uncorrelated recordingSubscriptionDescriptor correlationId=%d\n%#v", recordingSubscriptionDescriptor.CorrelationId, recordingSubscriptionDescriptor)
@@ -485,6 +489,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			}
 			return
 		}
+		control := c.(*Control)
 
 		// Set our state to let the caller of Poll() which triggered this know they have something
 		control.Results.RecordingSubscriptionDescriptors = append(control.Results.RecordingSubscriptionDescriptors, recordingSubscriptionDescriptor)
@@ -502,7 +507,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		}
 
 		// Look it up
-		control, ok := correlationsMap[controlResponse.CorrelationId]
+		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
 			err := fmt.Errorf("DescriptorFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
@@ -511,6 +516,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			}
 			return
 		}
+		control := c.(*Control)
 
 		// We're basically finished so prepare our OOB return values and log some info if we can
 		control.Results.ControlResponse = controlResponse
@@ -545,11 +551,12 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 
 		// If we can locate this correlationId then we can let our parent know we
 		// will want an extra fragment
-		control, ok := correlationsMap[recordingSignalEvent.CorrelationId]
+		c, ok := correlations.Load(recordingSignalEvent.CorrelationId)
 		if !ok {
 			logger.Infof("DescriptorFragmentHandler: Uncorrelated control response correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent)
 			return
 		}
+		control := c.(*Control)
 		control.Results.ExtraFragments++
 
 	default:

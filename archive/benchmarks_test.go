@@ -74,7 +74,7 @@ func BenchmarkDescriptorFragmentHandler(b *testing.B) {
 	atomicbuffer := atomic.MakeBuffer(bytes, len(bytes))
 
 	// Mock the correlationId to Control map
-	correlationsMap[rd.CorrelationId] = new(Control)
+	correlations.Store(rd.CorrelationId, new(Control))
 
 	for n := 0; n < b.N; n++ {
 		DescriptorFragmentHandler(atomicbuffer, 0, length, nil)
