@@ -137,11 +137,11 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("controlFragmentHandler uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			err := fmt.Errorf("controlFragmentHandler uncorrelated control response correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
-			logger.Infof("controlFragmentHandler/controlResponse: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
+			logger.Infof("controlFragmentHandler/controlResponse: Uncorrelated control response correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse) // Not much to be done here as we can't correlate
 			return
 		}
 		control := c.(*Control)
@@ -162,11 +162,11 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 			Listeners.RecordingSignalListener(recordingSignalEvent)
 		}
 
-		// If we can locate this correlationId then we can let our parent know we
+		// If we can locate this correlationID then we can let our parent know we
 		// will want an extra fragment
 		c, ok := correlations.Load(recordingSignalEvent.CorrelationId)
 		if !ok {
-			logger.Infof("controlFragmentHandler/recordingSignalEvent: Uncorrelated recordingSignalEvent correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent) // Not much to be done here as we can't correlate
+			logger.Infof("controlFragmentHandler/recordingSignalEvent: Uncorrelated recordingSignalEvent correlationID=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent) // Not much to be done here as we can't correlate
 			return
 		}
 		control := c.(*Control)
@@ -217,7 +217,7 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated control response correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -260,13 +260,13 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 			}
 		}
 
-		logger.Infof("ControlFragmentHandler: challenge:%s, session:%d, correlationId:%d", challenge.EncodedChallenge, challenge.ControlSessionId, challenge.CorrelationId)
+		logger.Infof("ControlFragmentHandler: challenge:%s, session:%d, correlationID:%d", challenge.EncodedChallenge, challenge.ControlSessionId, challenge.CorrelationId)
 
 		// Look it up
 		c, ok := correlations.Load(challenge.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated challenge correlationId=%d", challenge.CorrelationId)
+			err := fmt.Errorf("ConnectionControlFragmentHandler: Uncorrelated challenge correlationID=%d", challenge.CorrelationId)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -311,8 +311,8 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 }
 
 // PollNextResponse for a matching ControlReponse
-func (control *Control) PollNextResponse(correlationId int64) error {
-	logger.Debugf("PollNextResponse(%d) start", correlationId)
+func (control *Control) PollNextResponse(correlationID int64) error {
+	logger.Debugf("PollNextResponse(%d) start", correlationID)
 
 	start := time.Now()
 
@@ -328,7 +328,7 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 
 		// Check result
 		if control.Results.IsPollComplete {
-			logger.Debugf("PollNextResponse(%d) complete", correlationId)
+			logger.Debugf("PollNextResponse(%d) complete", correlationID)
 			if control.Results.ControlResponse.Code != codecs.ControlResponseCode.OK {
 				err := fmt.Errorf("Control Response failure: %s", control.Results.ControlResponse.ErrorMessage)
 				logger.Debug(err)
@@ -342,21 +342,21 @@ func (control *Control) PollNextResponse(correlationId int64) error {
 		}
 
 		if time.Since(start) > control.archive.Options.Timeout {
-			return fmt.Errorf("timeout waiting for correlationId %d", correlationId)
+			return fmt.Errorf("timeout waiting for correlationID %d", correlationID)
 		}
 		control.archive.Options.IdleStrategy.Idle(0)
 	}
 }
 
-// PollForResponse polls for a specific correlationId
+// PollForResponse polls for a specific correlationID
 // Returns nil, relevantId on success, error, 0 failure
 // More complex responses are contained in Control.ControlResponse after the call
-func (control *Control) PollForResponse(correlationId int64) (int64, error) {
-	logger.Debugf("PollForResponse(%d)", correlationId)
+func (control *Control) PollForResponse(correlationID int64) (int64, error) {
+	logger.Debugf("PollForResponse(%d)", correlationID)
 
 	for {
 		// Check for error
-		if err := control.PollNextResponse(correlationId); err != nil {
+		if err := control.PollNextResponse(correlationID); err != nil {
 			return 0, err
 		}
 
@@ -370,18 +370,18 @@ func (control *Control) PollForResponse(correlationId int64) (int64, error) {
 			return 0, err
 		}
 
-		// Check we've got the right correlationId
+		// Check we've got the right correlationID
 		// This is usually a sign of a logic error in handling the protocol so we'll log it and move on
 		// This can also happen on reconnection to same control subscription
-		if control.Results.ControlResponse.CorrelationId != correlationId {
-			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId)
+		if control.Results.ControlResponse.CorrelationId != correlationID {
+			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationID, control.Results.ControlResponse.CorrelationId)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
 		}
 
 		control.Results.IsPollComplete = true
-		logger.Debugf("PollForResponse(%d) complete", correlationId)
+		logger.Debugf("PollForResponse(%d) complete", correlationID)
 		return control.Results.ControlResponse.RelevantId, nil
 	}
 }
@@ -457,7 +457,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		c, ok := correlations.Load(recordingDescriptor.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationId=%d\n%#v", recordingDescriptor.CorrelationId, recordingDescriptor)
+			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationID=%d\n%#v", recordingDescriptor.CorrelationId, recordingDescriptor)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -483,7 +483,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		c, ok := correlations.Load(recordingSubscriptionDescriptor.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("Uncorrelated recordingSubscriptionDescriptor correlationId=%d\n%#v", recordingSubscriptionDescriptor.CorrelationId, recordingSubscriptionDescriptor)
+			err := fmt.Errorf("Uncorrelated recordingSubscriptionDescriptor correlationID=%d\n%#v", recordingSubscriptionDescriptor.CorrelationId, recordingSubscriptionDescriptor)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -510,7 +510,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("DescriptorFragmentHandler: Uncorrelated control response correlationId=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			err := fmt.Errorf("DescriptorFragmentHandler: Uncorrelated control response correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -549,11 +549,11 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			Listeners.RecordingSignalListener(recordingSignalEvent)
 		}
 
-		// If we can locate this correlationId then we can let our parent know we
+		// If we can locate this correlationID then we can let our parent know we
 		// will want an extra fragment
 		c, ok := correlations.Load(recordingSignalEvent.CorrelationId)
 		if !ok {
-			logger.Infof("DescriptorFragmentHandler: Uncorrelated control response correlationId=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent)
+			logger.Infof("DescriptorFragmentHandler: Uncorrelated control response correlationID=%d\n%#v", recordingSignalEvent.CorrelationId, recordingSignalEvent)
 			return
 		}
 		control := c.(*Control)
@@ -568,8 +568,8 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 }
 
 // PollNextDescriptor to poll for a fragmentLimit of Descriptors
-func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted int) error {
-	logger.Debugf("PollNextDescriptor(%d) start", correlationId)
+func (control *Control) PollNextDescriptor(correlationID int64, fragmentsWanted int) error {
+	logger.Debugf("PollNextDescriptor(%d) start", correlationID)
 	start := time.Now()
 
 	// Poll for events
@@ -592,7 +592,7 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 		}
 
 		if control.Results.IsPollComplete {
-			logger.Debugf("PollNextDescriptor(%d) complete", correlationId)
+			logger.Debugf("PollNextDescriptor(%d) complete", correlationID)
 			return nil
 		}
 
@@ -601,7 +601,7 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 		}
 
 		if time.Since(start) > control.archive.Options.Timeout {
-			return fmt.Errorf("timeout waiting for correlationId %d", correlationId)
+			return fmt.Errorf("timeout waiting for correlationID %d", correlationID)
 		}
 		control.archive.Options.IdleStrategy.Idle(0)
 	}
@@ -610,8 +610,8 @@ func (control *Control) PollNextDescriptor(correlationId int64, fragmentsWanted 
 }
 
 // PollForDescriptors to poll for recording descriptors, adding them to the set in the control
-func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted int32) error {
-	logger.Debugf("PollForDescriptors(%d)", correlationId)
+func (control *Control) PollForDescriptors(correlationID int64, fragmentsWanted int32) error {
+	logger.Debugf("PollForDescriptors(%d)", correlationID)
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = control.archive.Options.RangeChecking
@@ -624,13 +624,13 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 
 	for {
 		// Check for error
-		if err := control.PollNextDescriptor(correlationId, int(fragmentsWanted)); err != nil {
+		if err := control.PollNextDescriptor(correlationID, int(fragmentsWanted)); err != nil {
 			control.Results.IsPollComplete = true
 			return err
 		}
 
 		if control.Results.IsPollComplete {
-			logger.Debugf("PollForDescriptors(%d) complete", correlationId)
+			logger.Debugf("PollForDescriptors(%d) complete", correlationID)
 			return nil
 		}
 
@@ -646,9 +646,9 @@ func (control *Control) PollForDescriptors(correlationId int64, fragmentsWanted 
 			return nil
 		}
 
-		// Check we've got the right correlationId
-		if control.Results.ControlResponse.CorrelationId != correlationId {
-			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationId, control.Results.ControlResponse.CorrelationId)
+		// Check we've got the right correlationID
+		if control.Results.ControlResponse.CorrelationId != correlationID {
+			err := fmt.Errorf("Control Response expected CorrelationId %d, received %d", correlationID, control.Results.ControlResponse.CorrelationId)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}

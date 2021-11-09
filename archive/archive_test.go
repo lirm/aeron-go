@@ -171,12 +171,12 @@ func TestStartStopRecordingBySubscription(t *testing.T) {
 	}
 
 	// Start snd stop by subscription
-	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
+	subscriptionID, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	err = archive.StopRecordingBySubscriptionId(subscriptionId)
+	err = archive.StopRecordingBySubscriptionId(subscriptionID)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -227,12 +227,12 @@ func TestListRecordings(t *testing.T) {
 	t.Logf("Initial count is %d", initial)
 
 	// Add a recording
-	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
+	subscriptionID, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	t.Logf("SubscriptionId is %d", subscriptionId)
+	t.Logf("SubscriptionID is %d", subscriptionID)
 
 	// Add a publication on that
 	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
@@ -245,19 +245,19 @@ func TestListRecordings(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	//  Grab the recordingId
-	recordingId := recordings[len(recordings)-1].RecordingId
-	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
+	//  Grab the recordingID
+	recordingID := recordings[len(recordings)-1].RecordingId
+	t.Logf("Working count is %d, recordingID is %d", len(recordings), recordingID)
 
 	// Cleanup
-	res, err := archive.StopRecordingByIdentity(recordingId)
+	res, err := archive.StopRecordingByIdentity(recordingID)
 	if err != nil {
-		t.Logf("StopRecordingByIdentity(%d) failed: %s", recordingId, err.Error())
+		t.Logf("StopRecordingByIdentity(%d) failed: %s", recordingID, err.Error())
 	} else if !res {
-		t.Logf("StopRecordingByIdentity(%d) failed", recordingId)
+		t.Logf("StopRecordingByIdentity(%d) failed", recordingID)
 	}
-	if err := archive.PurgeRecording(recordingId); err != nil {
-		t.Logf("PurgeRecording(%d) failed: %s", recordingId, err.Error())
+	if err := archive.PurgeRecording(recordingID); err != nil {
+		t.Logf("PurgeRecording(%d) failed: %s", recordingID, err.Error())
 	}
 	publication.Close()
 
@@ -282,12 +282,12 @@ func TestStartStopReplay(t *testing.T) {
 	}
 
 	// Add a recording to make sure there is one
-	subscriptionId, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
+	subscriptionID, err := archive.StartRecording(testCases[0].sampleChannel, testCases[0].sampleStream, true, true)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	t.Logf("SubscriptionId is %d", subscriptionId)
+	t.Logf("SubscriptionID is %d", subscriptionID)
 
 	// Add a publication on that
 	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
@@ -304,16 +304,16 @@ func TestStartStopReplay(t *testing.T) {
 
 	}
 
-	// That should give us a recordingId
-	recordingId := recordings[len(recordings)-1].RecordingId
+	// That should give us a recordingID
+	recordingID := recordings[len(recordings)-1].RecordingId
 
-	replayId, err := archive.StartReplay(recordingId, 0, RecordingLengthNull, testCases[0].replayChannel, testCases[0].replayStream)
+	replayID, err := archive.StartReplay(recordingID, 0, RecordingLengthNull, testCases[0].replayChannel, testCases[0].replayStream)
 	if err != nil {
-		t.Logf("StartReplay failed: %d, %s", replayId, err.Error())
+		t.Logf("StartReplay failed: %d, %s", replayID, err.Error())
 		t.FailNow()
 	}
-	if err := archive.StopReplay(replayId); err != nil {
-		t.Logf("StopReplay(%d) failed: %s", replayId, err.Error())
+	if err := archive.StopReplay(replayID); err != nil {
+		t.Logf("StopReplay(%d) failed: %s", replayID, err.Error())
 	}
 
 	// So ListRecordingsForUri should find something
@@ -322,7 +322,7 @@ func TestStartStopReplay(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
+	t.Logf("Working count is %d, recordingID is %d", len(recordings), recordingID)
 
 	// And ListRecordings should also find something
 	recordings, err = archive.ListRecordings(0, 10)
@@ -330,20 +330,20 @@ func TestStartStopReplay(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	recordingId = recordings[len(recordings)-1].RecordingId
-	t.Logf("Working count is %d, recordingId is %d", len(recordings), recordingId)
+	recordingID = recordings[len(recordings)-1].RecordingId
+	t.Logf("Working count is %d, recordingID is %d", len(recordings), recordingID)
 
 	// ListRecording should find one by the above Id
-	recording, err := archive.ListRecording(recordingId)
+	recording, err := archive.ListRecording(recordingID)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	if recordingId != recording.RecordingId {
+	if recordingID != recording.RecordingId {
 		t.Log("ListRecording did not return the correct record descriptor")
 		t.FailNow()
 	}
-	t.Logf("ListRecording(%d) returned %#v", recordingId, *recording)
+	t.Logf("ListRecording(%d) returned %#v", recordingID, *recording)
 
 	// ListRecording should not find one with a bad Id
 	badId := int64(-127)
@@ -371,13 +371,13 @@ func TestStartStopReplay(t *testing.T) {
 	t.Logf("ListRecordingSubscriptions() returned %d descriptor(s)", len(descriptors))
 
 	// Cleanup
-	res, err := archive.StopRecordingByIdentity(recordingId)
+	res, err := archive.StopRecordingByIdentity(recordingID)
 	if err != nil {
-		t.Logf("StopRecordingByIdentity(%d) failed: %s", recordingId, err.Error())
+		t.Logf("StopRecordingByIdentity(%d) failed: %s", recordingID, err.Error())
 		t.FailNow()
 	}
 	if !res {
-		t.Logf("StopRecordingByIdentity(%d) failed", recordingId)
+		t.Logf("StopRecordingByIdentity(%d) failed", recordingID)
 	}
 
 	return

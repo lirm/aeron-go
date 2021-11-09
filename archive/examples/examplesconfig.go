@@ -21,6 +21,7 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 )
 
+// Config defaults
 var Config = struct {
 	RequestStream   *int
 	RequestChannel  *string

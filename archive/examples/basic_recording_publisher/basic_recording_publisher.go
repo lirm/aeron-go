@@ -28,8 +28,8 @@ import (
 	"time"
 )
 
-var logId string = "basic_recording_publisher"
-var logger = logging.MustGetLogger(logId)
+var logID = "basic_recording_publisher"
+var logger = logging.MustGetLogger(logID)
 
 func main() {
 	flag.Parse()
@@ -49,9 +49,9 @@ func main() {
 		fmt.Printf("Setting loglevel: archive.DEBUG/aeron.INFO\n")
 		options.ArchiveLoglevel = logging.DEBUG
 		options.AeronLoglevel = logging.DEBUG
-		logging.SetLevel(logging.DEBUG, logId)
+		logging.SetLevel(logging.DEBUG, logID)
 	} else {
-		logging.SetLevel(logging.NOTICE, logId)
+		logging.SetLevel(logging.NOTICE, logID)
 
 	}
 

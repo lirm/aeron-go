@@ -57,10 +57,10 @@ func (proxy *Proxy) Offer(buffer *atomic.Buffer, offset int32, length int32, res
 // publication. Responses will be processed on the control
 
 // ConnectRequest packet and offer
-func (proxy *Proxy) ConnectRequest(correlationId int64, responseStream int32, responseChannel string) error {
+func (proxy *Proxy) ConnectRequest(correlationID int64, responseStream int32, responseChannel string) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.ConnectRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, correlationId, responseStream, responseChannel)
+	bytes, err := codecs.ConnectRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, correlationID, responseStream, responseChannel)
 	if err != nil {
 		return err
 	}
@@ -89,9 +89,9 @@ func (proxy *Proxy) CloseSessionRequest() error {
 
 // StartRecordingRequest packet and offer
 // Uses the more recent protocol addition StartdRecordingRequest2 which added autoStop
-func (proxy *Proxy) StartRecordingRequest(correlationId int64, stream int32, isLocal bool, autoStop bool, channel string) error {
+func (proxy *Proxy) StartRecordingRequest(correlationID int64, stream int32, isLocal bool, autoStop bool, channel string) error {
 
-	bytes, err := codecs.StartRecordingRequest2Packet(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, stream, isLocal, autoStop, channel)
+	bytes, err := codecs.StartRecordingRequest2Packet(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, stream, isLocal, autoStop, channel)
 	if err != nil {
 		return err
 	}
@@ -104,9 +104,9 @@ func (proxy *Proxy) StartRecordingRequest(correlationId int64, stream int32, isL
 }
 
 // StopRecordingRequest packet and offer
-func (proxy *Proxy) StopRecordingRequest(correlationId int64, stream int32, channel string) error {
+func (proxy *Proxy) StopRecordingRequest(correlationID int64, stream int32, channel string) error {
 	// Create a packet and send it
-	bytes, err := codecs.StopRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, stream, channel)
+	bytes, err := codecs.StopRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, stream, channel)
 	if err != nil {
 		return err
 	}
@@ -119,10 +119,10 @@ func (proxy *Proxy) StopRecordingRequest(correlationId int64, stream int32, chan
 }
 
 // ReplayRequest packet and offer
-func (proxy *Proxy) ReplayRequest(correlationId int64, recordingId int64, position int64, length int64, replayChannel string, replayStream int32) error {
+func (proxy *Proxy) ReplayRequest(correlationID int64, recordingID int64, position int64, length int64, replayChannel string, replayStream int32) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.ReplayRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId, position, length, replayStream, replayChannel)
+	bytes, err := codecs.ReplayRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID, position, length, replayStream, replayChannel)
 	if err != nil {
 		return err
 	}
@@ -135,9 +135,9 @@ func (proxy *Proxy) ReplayRequest(correlationId int64, recordingId int64, positi
 }
 
 // StopReplayRequest packet and offer
-func (proxy *Proxy) StopReplayRequest(correlationId int64, replaySessionId int64) error {
+func (proxy *Proxy) StopReplayRequest(correlationID int64, replaySessionID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.StopReplayRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, replaySessionId)
+	bytes, err := codecs.StopReplayRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, replaySessionID)
 	if err != nil {
 		return err
 	}
@@ -150,10 +150,10 @@ func (proxy *Proxy) StopReplayRequest(correlationId int64, replaySessionId int64
 }
 
 // ListRecordingsRequest packet and offer
-// Lists up to recordCount recordings starting at fromRecordingId
-func (proxy *Proxy) ListRecordingsRequest(correlationId int64, fromRecordingId int64, recordCount int32) error {
+// Lists up to recordCount recordings starting at fromRecordingID
+func (proxy *Proxy) ListRecordingsRequest(correlationID int64, fromRecordingID int64, recordCount int32) error {
 	// Create a packet and send it
-	bytes, err := codecs.ListRecordingsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, fromRecordingId, recordCount)
+	bytes, err := codecs.ListRecordingsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, fromRecordingID, recordCount)
 	if err != nil {
 		return err
 	}
@@ -167,9 +167,9 @@ func (proxy *Proxy) ListRecordingsRequest(correlationId int64, fromRecordingId i
 
 // ListRecordingsForUriRequest packet and offer
 // Lists up to recordCount recordings that match the channel and stream
-func (proxy *Proxy) ListRecordingsForUriRequest(correlationId int64, fromRecordingId int64, recordCount int32, stream int32, channel string) error {
+func (proxy *Proxy) ListRecordingsForUriRequest(correlationID int64, fromRecordingID int64, recordCount int32, stream int32, channel string) error {
 
-	bytes, err := codecs.ListRecordingsForUriRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, fromRecordingId, recordCount, stream, channel)
+	bytes, err := codecs.ListRecordingsForUriRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, fromRecordingID, recordCount, stream, channel)
 
 	if err != nil {
 		return err
@@ -183,10 +183,10 @@ func (proxy *Proxy) ListRecordingsForUriRequest(correlationId int64, fromRecordi
 }
 
 // ListRecordingRequest packet and offer
-// Retrieves a recording descriptor for a specific recordingId
-func (proxy *Proxy) ListRecordingRequest(correlationId int64, fromRecordingId int64) error {
+// Retrieves a recording descriptor for a specific recordingID
+func (proxy *Proxy) ListRecordingRequest(correlationID int64, fromRecordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.ListRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, fromRecordingId)
+	bytes, err := codecs.ListRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, fromRecordingID)
 	if err != nil {
 		return err
 	}
@@ -200,9 +200,9 @@ func (proxy *Proxy) ListRecordingRequest(correlationId int64, fromRecordingId in
 
 // ExtendRecordingRequest packet and offer
 // Uses the more recent protocol addition ExtendRecordingRequest2 which added autoStop
-func (proxy *Proxy) ExtendRecordingRequest(correlationId int64, recordingId int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
+func (proxy *Proxy) ExtendRecordingRequest(correlationID int64, recordingID int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) error {
 	// Create a packet and send it
-	bytes, err := codecs.ExtendRecordingRequest2Packet(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId, stream, sourceLocation, autoStop, channel)
+	bytes, err := codecs.ExtendRecordingRequest2Packet(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID, stream, sourceLocation, autoStop, channel)
 	if err != nil {
 		return err
 	}
@@ -215,9 +215,9 @@ func (proxy *Proxy) ExtendRecordingRequest(correlationId int64, recordingId int6
 }
 
 // RecordingPositionRequest packet and offer
-func (proxy *Proxy) RecordingPositionRequest(correlationId int64, recordingId int64) error {
+func (proxy *Proxy) RecordingPositionRequest(correlationID int64, recordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.RecordingPositionRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId)
+	bytes, err := codecs.RecordingPositionRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID)
 	if err != nil {
 		return err
 	}
@@ -230,9 +230,9 @@ func (proxy *Proxy) RecordingPositionRequest(correlationId int64, recordingId in
 }
 
 // TruncateRecordingRequest packet and offer
-func (proxy *Proxy) TruncateRecordingRequest(correlationId int64, recordingId int64, position int64) error {
+func (proxy *Proxy) TruncateRecordingRequest(correlationID int64, recordingID int64, position int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.TruncateRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId, position)
+	bytes, err := codecs.TruncateRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID, position)
 	if err != nil {
 		return err
 	}
@@ -245,9 +245,9 @@ func (proxy *Proxy) TruncateRecordingRequest(correlationId int64, recordingId in
 }
 
 // StopRecordingSubscriptionRequest packet and offer
-func (proxy *Proxy) StopRecordingSubscriptionRequest(correlationId int64, subscriptionId int64) error {
+func (proxy *Proxy) StopRecordingSubscriptionRequest(correlationID int64, subscriptionID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.StopRecordingSubscriptionPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, subscriptionId)
+	bytes, err := codecs.StopRecordingSubscriptionPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, subscriptionID)
 	if err != nil {
 		return err
 	}
@@ -260,9 +260,9 @@ func (proxy *Proxy) StopRecordingSubscriptionRequest(correlationId int64, subscr
 }
 
 // StopRecordingByIdentityRequest packet and offer
-func (proxy *Proxy) StopRecordingByIdentityRequest(correlationId int64, recordingId int64) error {
+func (proxy *Proxy) StopRecordingByIdentityRequest(correlationID int64, recordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.StopRecordingByIdentityPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId)
+	bytes, err := codecs.StopRecordingByIdentityPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID)
 	if err != nil {
 		return err
 	}
@@ -275,9 +275,9 @@ func (proxy *Proxy) StopRecordingByIdentityRequest(correlationId int64, recordin
 }
 
 // StopPositionRequest packet and offer
-func (proxy *Proxy) StopPositionRequest(correlationId int64, recordingId int64) error {
+func (proxy *Proxy) StopPositionRequest(correlationID int64, recordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.StopPositionPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId)
+	bytes, err := codecs.StopPositionPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID)
 	if err != nil {
 		return err
 	}
@@ -290,10 +290,10 @@ func (proxy *Proxy) StopPositionRequest(correlationId int64, recordingId int64) 
 }
 
 // FindLastMatchingRecordingRequest packet and offer
-func (proxy *Proxy) FindLastMatchingRecordingRequest(correlationId int64, minRecordingId int64, sessionId int32, stream int32, channel string) error {
+func (proxy *Proxy) FindLastMatchingRecordingRequest(correlationID int64, minRecordingID int64, sessionID int32, stream int32, channel string) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.FindLastMatchingRecordingPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, minRecordingId, sessionId, stream, channel)
+	bytes, err := codecs.FindLastMatchingRecordingPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, minRecordingID, sessionID, stream, channel)
 	if err != nil {
 		return err
 	}
@@ -306,10 +306,10 @@ func (proxy *Proxy) FindLastMatchingRecordingRequest(correlationId int64, minRec
 }
 
 // ListRecordingSubscriptionsRequest packet and offer
-func (proxy *Proxy) ListRecordingSubscriptionsRequest(correlationId int64, pseudoIndex int32, subscriptionCount int32, applyStreamId bool, stream int32, channel string) error {
+func (proxy *Proxy) ListRecordingSubscriptionsRequest(correlationID int64, pseudoIndex int32, subscriptionCount int32, applyStreamID bool, stream int32, channel string) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.ListRecordingSubscriptionsPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, pseudoIndex, subscriptionCount, applyStreamId, stream, channel)
+	bytes, err := codecs.ListRecordingSubscriptionsPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, pseudoIndex, subscriptionCount, applyStreamID, stream, channel)
 	if err != nil {
 		return err
 	}
@@ -322,10 +322,10 @@ func (proxy *Proxy) ListRecordingSubscriptionsRequest(correlationId int64, pseud
 }
 
 // BoundedReplayRequest packet and offer
-func (proxy *Proxy) BoundedReplayRequest(correlationId int64, recordingId int64, position int64, length int64, limitCounterId int32, replayStream int32, replayChannel string) error {
+func (proxy *Proxy) BoundedReplayRequest(correlationID int64, recordingID int64, position int64, length int64, limitCounterID int32, replayStream int32, replayChannel string) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.BoundedReplayPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId, position, length, limitCounterId, replayStream, replayChannel)
+	bytes, err := codecs.BoundedReplayPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID, position, length, limitCounterID, replayStream, replayChannel)
 	if err != nil {
 		return err
 	}
@@ -338,10 +338,10 @@ func (proxy *Proxy) BoundedReplayRequest(correlationId int64, recordingId int64,
 }
 
 // StopAllReplaysRequest packet and offer
-func (proxy *Proxy) StopAllReplaysRequest(correlationId int64, recordingId int64) error {
+func (proxy *Proxy) StopAllReplaysRequest(correlationID int64, recordingID int64) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.StopAllReplaysPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId)
+	bytes, err := codecs.StopAllReplaysPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID)
 	if err != nil {
 		return err
 	}
@@ -354,10 +354,10 @@ func (proxy *Proxy) StopAllReplaysRequest(correlationId int64, recordingId int64
 }
 
 // CatalogHeaderRequest packet and offer
-func (proxy *Proxy) CatalogHeaderRequest(version int32, length int32, nextRecordingId int64, alignment int32) error {
+func (proxy *Proxy) CatalogHeaderRequest(version int32, length int32, nextRecordingID int64, alignment int32) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.CatalogHeaderPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, version, length, nextRecordingId, alignment)
+	bytes, err := codecs.CatalogHeaderPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, version, length, nextRecordingID, alignment)
 	if err != nil {
 		return err
 	}
@@ -370,9 +370,9 @@ func (proxy *Proxy) CatalogHeaderRequest(version int32, length int32, nextRecord
 }
 
 // ReplicateRequest packet and offer
-func (proxy *Proxy) ReplicateRequest(correlationId int64, srcRecordingId int64, dstRecordingId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) error {
+func (proxy *Proxy) ReplicateRequest(correlationID int64, srcRecordingID int64, dstRecordingID int64, srcControlStreamID int32, srcControlChannel string, liveDestination string) error {
 	// Create a packet and send it
-	bytes, err := codecs.ReplicateRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, srcRecordingId, dstRecordingId, srcControlStreamId, srcControlChannel, liveDestination)
+	bytes, err := codecs.ReplicateRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, srcRecordingID, dstRecordingID, srcControlStreamID, srcControlChannel, liveDestination)
 	if err != nil {
 		return err
 	}
@@ -385,9 +385,9 @@ func (proxy *Proxy) ReplicateRequest(correlationId int64, srcRecordingId int64, 
 }
 
 // ReplicateRequest2 packet and offer
-func (proxy *Proxy) ReplicateRequest2(correlationId int64, srcRecordingId int64, dstRecordingId int64, stopPosition int64, channelTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string, replicationChannel string) error {
+func (proxy *Proxy) ReplicateRequest2(correlationID int64, srcRecordingID int64, dstRecordingID int64, stopPosition int64, channelTagID int64, srcControlStreamID int32, srcControlChannel string, liveDestination string, replicationChannel string) error {
 	// Create a packet and send it
-	bytes, err := codecs.ReplicateRequest2Packet(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, srcRecordingId, dstRecordingId, stopPosition, channelTagId, srcControlStreamId, srcControlChannel, liveDestination, replicationChannel)
+	bytes, err := codecs.ReplicateRequest2Packet(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, srcRecordingID, dstRecordingID, stopPosition, channelTagID, srcControlStreamID, srcControlChannel, liveDestination, replicationChannel)
 	if err != nil {
 		return err
 	}
@@ -400,9 +400,9 @@ func (proxy *Proxy) ReplicateRequest2(correlationId int64, srcRecordingId int64,
 }
 
 // StopReplicationRequest packet and offer
-func (proxy *Proxy) StopReplicationRequest(correlationId int64, replicationId int64) error {
+func (proxy *Proxy) StopReplicationRequest(correlationID int64, replicationID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.StopReplicationRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, replicationId)
+	bytes, err := codecs.StopReplicationRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, replicationID)
 	if err != nil {
 		return err
 	}
@@ -415,9 +415,9 @@ func (proxy *Proxy) StopReplicationRequest(correlationId int64, replicationId in
 }
 
 // StartPositionRequest packet and offer
-func (proxy *Proxy) StartPositionRequest(correlationId int64, recordingId int64) error {
+func (proxy *Proxy) StartPositionRequest(correlationID int64, recordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.StartPositionRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId)
+	bytes, err := codecs.StartPositionRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID)
 	if err != nil {
 		return err
 	}
@@ -430,9 +430,9 @@ func (proxy *Proxy) StartPositionRequest(correlationId int64, recordingId int64)
 }
 
 // DetachSegmentsRequest packet and offer
-func (proxy *Proxy) DetachSegmentsRequest(correlationId int64, recordingId int64, newStartPosition int64) error {
+func (proxy *Proxy) DetachSegmentsRequest(correlationID int64, recordingID int64, newStartPosition int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.DetachSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId, newStartPosition)
+	bytes, err := codecs.DetachSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID, newStartPosition)
 	if err != nil {
 		return err
 	}
@@ -445,9 +445,9 @@ func (proxy *Proxy) DetachSegmentsRequest(correlationId int64, recordingId int64
 }
 
 // DeleteDetachedSegmentsRequest packet and offer
-func (proxy *Proxy) DeleteDetachedSegmentsRequest(correlationId int64, recordingId int64) error {
+func (proxy *Proxy) DeleteDetachedSegmentsRequest(correlationID int64, recordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.DeleteDetachedSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId)
+	bytes, err := codecs.DeleteDetachedSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID)
 	if err != nil {
 		return err
 	}
@@ -460,9 +460,9 @@ func (proxy *Proxy) DeleteDetachedSegmentsRequest(correlationId int64, recording
 }
 
 // PurgeSegmentsRequest packet and offer
-func (proxy *Proxy) PurgeSegmentsRequest(correlationId int64, recordingId int64, newStartPosition int64) error {
+func (proxy *Proxy) PurgeSegmentsRequest(correlationID int64, recordingID int64, newStartPosition int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.PurgeSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId, newStartPosition)
+	bytes, err := codecs.PurgeSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID, newStartPosition)
 	if err != nil {
 		return err
 	}
@@ -475,9 +475,9 @@ func (proxy *Proxy) PurgeSegmentsRequest(correlationId int64, recordingId int64,
 }
 
 // AttachSegmentsRequest packet and offer
-func (proxy *Proxy) AttachSegmentsRequest(correlationId int64, recordingId int64) error {
+func (proxy *Proxy) AttachSegmentsRequest(correlationID int64, recordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.AttachSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, recordingId)
+	bytes, err := codecs.AttachSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, recordingID)
 	if err != nil {
 		return err
 	}
@@ -490,9 +490,9 @@ func (proxy *Proxy) AttachSegmentsRequest(correlationId int64, recordingId int64
 }
 
 // MigrateSegmentsRequest packet and offer
-func (proxy *Proxy) MigrateSegmentsRequest(correlationId int64, srcRecordingId int64, destRecordingId int64) error {
+func (proxy *Proxy) MigrateSegmentsRequest(correlationID int64, srcRecordingID int64, destRecordingID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.MigrateSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, srcRecordingId, destRecordingId)
+	bytes, err := codecs.MigrateSegmentsRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, srcRecordingID, destRecordingID)
 	if err != nil {
 		return err
 	}
@@ -505,10 +505,10 @@ func (proxy *Proxy) MigrateSegmentsRequest(correlationId int64, srcRecordingId i
 }
 
 // AuthConnectRequest packet and offer
-func (proxy *Proxy) AuthConnectRequest(correlationId int64, responseStream int32, responseChannel string, encodedCredentials []uint8) error {
+func (proxy *Proxy) AuthConnectRequest(correlationID int64, responseStream int32, responseChannel string, encodedCredentials []uint8) error {
 
 	// Create a packet and send it
-	bytes, err := codecs.AuthConnectRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, correlationId, responseStream, responseChannel, encodedCredentials)
+	bytes, err := codecs.AuthConnectRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, correlationID, responseStream, responseChannel, encodedCredentials)
 	if err != nil {
 		return err
 	}
@@ -521,9 +521,9 @@ func (proxy *Proxy) AuthConnectRequest(correlationId int64, responseStream int32
 }
 
 // ChallengeResponse packet and offer
-func (proxy *Proxy) ChallengeResponse(correlationId int64, encodedCredentials []uint8) error {
+func (proxy *Proxy) ChallengeResponse(correlationID int64, encodedCredentials []uint8) error {
 	// Create a packet and send it
-	bytes, err := codecs.ChallengeResponsePacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, encodedCredentials)
+	bytes, err := codecs.ChallengeResponsePacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, encodedCredentials)
 	if err != nil {
 		return err
 	}
@@ -536,9 +536,9 @@ func (proxy *Proxy) ChallengeResponse(correlationId int64, encodedCredentials []
 }
 
 // KeepAliveRequest packet and offer
-func (proxy *Proxy) KeepAliveRequest(correlationId int64) error {
+func (proxy *Proxy) KeepAliveRequest(correlationID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.KeepAliveRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId)
+	bytes, err := codecs.KeepAliveRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID)
 	if err != nil {
 		return err
 	}
@@ -551,9 +551,9 @@ func (proxy *Proxy) KeepAliveRequest(correlationId int64) error {
 }
 
 // TaggedReplicateRequest packet and offer
-func (proxy *Proxy) TaggedReplicateRequest(correlationId int64, srcRecordingId int64, dstRecordingId int64, channelTagId int64, subscriptionTagId int64, srcControlStreamId int32, srcControlChannel string, liveDestination string) error {
+func (proxy *Proxy) TaggedReplicateRequest(correlationID int64, srcRecordingID int64, dstRecordingID int64, channelTagID int64, subscriptionTagID int64, srcControlStreamID int32, srcControlChannel string, liveDestination string) error {
 	// Create a packet and send it
-	bytes, err := codecs.TaggedReplicateRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, srcRecordingId, dstRecordingId, channelTagId, subscriptionTagId, srcControlStreamId, srcControlChannel, liveDestination)
+	bytes, err := codecs.TaggedReplicateRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, srcRecordingID, dstRecordingID, channelTagID, subscriptionTagID, srcControlStreamID, srcControlChannel, liveDestination)
 	if err != nil {
 		return err
 	}
@@ -566,9 +566,9 @@ func (proxy *Proxy) TaggedReplicateRequest(correlationId int64, srcRecordingId i
 }
 
 // PurgeRecordingRequest packet and offer
-func (proxy *Proxy) PurgeRecordingRequest(correlationId int64, replaySessionId int64) error {
+func (proxy *Proxy) PurgeRecordingRequest(correlationID int64, replaySessionID int64) error {
 	// Create a packet and send it
-	bytes, err := codecs.PurgeRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationId, replaySessionId)
+	bytes, err := codecs.PurgeRecordingRequestPacket(proxy.marshaller, proxy.archive.Options.RangeChecking, proxy.archive.SessionId, correlationID, replaySessionID)
 	if err != nil {
 		return err
 	}

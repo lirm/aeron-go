@@ -25,6 +25,7 @@ func getuser() string {
 	return user.Username
 }
 
+// TestConfig defaults
 var TestConfig = struct {
 	AuthEnabled     *bool
 	AuthCredentials *string
