@@ -399,7 +399,7 @@ func DisabledTestAddRecordedPublicationFailure(t *testing.T) {
 }
 
 // Test concurrency
-func TestConcurrentConnections(t *testing.T) {
+func xTestConcurrentConnections(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < 10; i++ {
