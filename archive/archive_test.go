@@ -379,9 +379,6 @@ func TestStartStopReplay(t *testing.T) {
 	if !res {
 		t.Logf("StopRecordingByIdentity(%d) failed", recordingID)
 	}
-
-	return
-
 }
 
 // Test starting a replay

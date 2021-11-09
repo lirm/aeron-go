@@ -176,8 +176,6 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		// This can happen when testing
 		fmt.Printf("controlFragmentHandler: Unexpected message type %d\n", hdr.TemplateId)
 	}
-
-	return
 }
 
 // ConnectionControlFragmentHandler is the connection handling specific fragment handler.
@@ -292,8 +290,6 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 	default:
 		fmt.Printf("ConnectionControlFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
 	}
-
-	return
 }
 
 // Poll provides rhe control response poller uses local state to pass
@@ -445,7 +441,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// logger.Debugf("Received RecordingDescriptorResponse: length %d", buf.Len())
 		// Not much to be done here as we can't correlate
 		if err := recordingDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
-			err2 := fmt.Errorf("Failed to decode RecordingDescriptor: %w", err)
+			err2 := fmt.Errorf("failed to decode RecordingDescriptor: %w", err)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err2)
 			}
@@ -457,7 +453,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		c, ok := correlations.Load(recordingDescriptor.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("Uncorrelated recordingDesciptor correlationID=%d\n%#v", recordingDescriptor.CorrelationId, recordingDescriptor)
+			err := fmt.Errorf("uncorrelated recordingDesciptor correlationID=%d\n%#v", recordingDescriptor.CorrelationId, recordingDescriptor)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -472,7 +468,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		var recordingSubscriptionDescriptor = new(codecs.RecordingSubscriptionDescriptor)
 		if err := recordingSubscriptionDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			err2 := fmt.Errorf("Failed to decode RecordingSubscriptioDescriptor: %w", err)
+			err2 := fmt.Errorf("failed to decode RecordingSubscriptioDescriptor: %w", err)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err2)
 			}
@@ -483,7 +479,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		c, ok := correlations.Load(recordingSubscriptionDescriptor.CorrelationId)
 		if !ok {
 			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("Uncorrelated recordingSubscriptionDescriptor correlationID=%d\n%#v", recordingSubscriptionDescriptor.CorrelationId, recordingSubscriptionDescriptor)
+			err := fmt.Errorf("uncorrelated recordingSubscriptionDescriptor correlationID=%d\n%#v", recordingSubscriptionDescriptor.CorrelationId, recordingSubscriptionDescriptor)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err)
 			}
@@ -499,7 +495,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		logger.Debugf("Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			err2 := fmt.Errorf("Failed to decode control response: %w", err)
+			err2 := fmt.Errorf("failed to decode control response: %w", err)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err2)
 			}
@@ -538,7 +534,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		var recordingSignalEvent = new(codecs.RecordingSignalEvent)
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
-			err2 := fmt.Errorf("Failed to decode recording signal: %w", err)
+			err2 := fmt.Errorf("failed to decode recording signal: %w", err)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err2)
 			}
@@ -563,8 +559,6 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		logger.Debugf("DescriptorFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
 		fmt.Printf("DescriptorFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
 	}
-
-	return
 }
 
 // PollNextDescriptor to poll for a fragmentLimit of Descriptors

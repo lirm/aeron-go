@@ -119,7 +119,7 @@ func FindLatestRecording(arch *archive.Archive, channel string, stream int32) (i
 	}
 
 	if len(descriptors) == 0 {
-		return 0, fmt.Errorf("No recordings found\n")
+		return 0, fmt.Errorf("no recordings found")
 	}
 
 	// Return the last recordingID

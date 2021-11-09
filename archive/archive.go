@@ -299,7 +299,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 		// Check for timeout
 		if time.Since(start) > archive.Options.Timeout {
 			archive.Control.State.state = ControlStateTimedOut
-			archive.Control.State.err = fmt.Errorf("Operation timed out")
+			archive.Control.State.err = fmt.Errorf("operation timed out")
 			break
 		} else {
 			archive.Options.IdleStrategy.Idle(0)
@@ -569,7 +569,7 @@ func (archive *Archive) ListRecordings(fromRecordingID int64, recordCount int32)
 	if response != nil {
 		switch response.Code {
 		case codecs.ControlResponseCode.ERROR:
-			return nil, fmt.Errorf("Response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
+			return nil, fmt.Errorf("response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
 
 		case codecs.ControlResponseCode.RECORDING_UNKNOWN:
 			return archive.Control.Results.RecordingDescriptors, nil
@@ -604,7 +604,7 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingID int64, recordCount 
 	if response != nil {
 		switch response.Code {
 		case codecs.ControlResponseCode.ERROR:
-			return nil, fmt.Errorf("Response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
+			return nil, fmt.Errorf("response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
 
 		case codecs.ControlResponseCode.RECORDING_UNKNOWN:
 			return archive.Control.Results.RecordingDescriptors, nil
@@ -636,7 +636,7 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 	if response != nil {
 		switch response.Code {
 		case codecs.ControlResponseCode.ERROR:
-			return nil, fmt.Errorf("Response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
+			return nil, fmt.Errorf("response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
 
 		case codecs.ControlResponseCode.RECORDING_UNKNOWN:
 			return nil, nil
@@ -874,7 +874,7 @@ func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscripti
 	if response != nil {
 		switch response.Code {
 		case codecs.ControlResponseCode.ERROR:
-			return nil, fmt.Errorf("Response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
+			return nil, fmt.Errorf("response for correlationID %d (relevantId %d) failed %s", response.CorrelationId, response.RelevantId, response.ErrorMessage)
 
 		case codecs.ControlResponseCode.SUBSCRIPTION_UNKNOWN:
 			return archive.Control.Results.RecordingSubscriptionDescriptors, nil

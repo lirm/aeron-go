@@ -17,13 +17,7 @@ package archive
 import (
 	"flag"
 	"github.com/lirm/aeron-go/aeron"
-	"os/user"
 )
-
-func getuser() string {
-	user, _ := user.Current()
-	return user.Username
-}
 
 // TestConfig defaults
 var TestConfig = struct {
