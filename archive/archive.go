@@ -1014,9 +1014,6 @@ func (archive *Archive) KeepAlive() error {
 // require the replay from the source. This would require a multicast
 // live destination.
 //
-// Errors will be reported asynchronously and can be checked for with
-// PollForErrorResponse() Follow progress with the RecordingSignalAdapter
-//
 // srcRecordingID     recording id which must exist in the source archive.
 // dstRecordingID     recording to extend in the destination, otherwise {@link io.aeron.Aeron#NULL_VALUE}.
 // srcControlStreamID remote control stream id for the source archive to instruct the replay on.
@@ -1050,9 +1047,6 @@ func (archive *Archive) Replicate(srcRecordingID int64, dstRecordingID int64, sr
 // with the live stream and then follow it directly and no longer
 // require the replay from the source. This would require a multicast
 // live destination.
-//
-// Errors will be reported asynchronously and can be checked for with
-// PollForErrorResponse() Follow progress with the RecordingSignalAdapter
 //
 // srcRecordingID     recording id which must exist in the source archive.
 // dstRecordingID     recording to extend in the destination, otherwise {@link io.aeron.Aeron#NULL_VALUE}.
@@ -1090,9 +1084,6 @@ func (archive *Archive) Replicate2(srcRecordingID int64, dstRecordingID int64, s
 // the replay can merge with the live stream and then follow it
 // directly and no longer require the replay from the source. This
 // would require a multicast live destination.
-//
-// Errors will be reported asynchronously and can be checked for with
-// PollForErrorResponse() Follow progress with the RecordingSignalAdapter
 //
 // srcRecordingID     recording id which must exist in the source archive.
 // dstRecordingID     recording to extend in the destination, otherwise {@link io.aeron.Aeron#NULL_VALUE}.
