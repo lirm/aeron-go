@@ -7,7 +7,7 @@ protocol](http://github.com/real-logic/aeron/blob/master/aeron-archive/src/main/
 is specified in xml using the [Simple Binary Encoding (SBE)](https://github.com/real-logic/simple-binary-encoding)
 
 ## Current State
-The implementation is the first beta release. The API will be changed only if required for bugfixes.
+The implementation is the second beta release. The API may still be changed for bug fixes or significant issues.
 
 # Design
 
@@ -22,9 +22,9 @@ the archive library is a layering on top of that.
 
 Finally golang idioms are used where reasonable.
 
-The archive library does not lock and concurrent calls to archive
-library calls that invoke the aeron-archive protocol calls should be
-externally locked to ensure only one concurrent access.
+The archive library does not lock and concurrent calls on an archive
+client to invoke the aeron-archive protocol calls should be externally
+locked to ensure only one concurrent access.
 
 ### Naming and other choices
 
@@ -36,7 +36,7 @@ requirements, lack of polymorphism, etc.
 
 Function names used in encoders.go and proxy.go are based on the
 protocol specification. Where the protocol specifies a type that can
-ne naturally represented in golang, the golang type is used used where
+be naturally represented in golang, the golang type is used used where
 possible until encoding. Examples include the use of `bool` rather than
 `BooleanType` and `string` over `[]uint8`
 
@@ -97,3 +97,13 @@ The actual semantics of the security are dependent upon which authenticator supp
    available in go. As a result we use delays and 'hope' which isn't ideal.
  * It would be nice to silence the OnAvailableCounter noise
  * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.
+
+## Release Notes
+
+### 1.0b2
+ * Fix a race condition looking up correlationIDs
+ * Handle different archive clients using same channel/stream pairing
+ * Fix a return code error in StopRecordingById()
+ * Fix unused argumentin StopRecording()
+ * Cosmetic improvements for golint and staticcheck
+ * Improve the logging by downgrading in severity and message some warning only messages
