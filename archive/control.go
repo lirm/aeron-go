@@ -161,6 +161,12 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 			Listeners.RecordingSignalListener(recordingSignalEvent)
 		}
 
+	// These can happen when testing/reconnecting or if multiple clients are on the same channel/stream
+	case codecIds.recordingDescriptor:
+		logger.Debugf("controlFragmentHandler: ignoring RecordingDescriptor type %d\n", hdr.TemplateId)
+	case codecIds.recordingSubscriptionDescriptor:
+		logger.Debugf("controlFragmentHandler: ignoring RecordingSubscriptionDescriptor type %d\n", hdr.TemplateId)
+
 	default:
 		// This can happen when testing/adding new functionality
 		fmt.Printf("controlFragmentHandler: Unexpected message type %d\n", hdr.TemplateId)
@@ -203,11 +209,9 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		// Look it up
 		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
-			// Not much to be done here as we can't know what went wrong
-			err := fmt.Errorf("connectionControlFragmentHandler: ignoring uncorrelated correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err)
-			}
+			// Must have been for someone else which can happen if two or more clients have
+			// use the same channel/stream
+			logger.Debugf("connectionControlFragmentHandler/controlResponse: ignoring correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			return
 		}
 		control := c.(*Control)
@@ -275,6 +279,14 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		control.State.err = nil
 		control.archive.SessionId = challenge.ControlSessionId
 		control.archive.Proxy.ChallengeResponse(challenge.CorrelationId, control.archive.Options.AuthResponse)
+
+	// These can happen when testing/reconnecting or if multiple clients are on the same channel/stream
+	case codecIds.recordingDescriptor:
+		logger.Debugf("connectionControlFragmentHandler: ignoring RecordingDescriptor type %d\n", hdr.TemplateId)
+	case codecIds.recordingSubscriptionDescriptor:
+		logger.Debugf("connectionControlFragmentHandler: ignoring RecordingSubscriptionDescriptor type %d\n", hdr.TemplateId)
+	case codecIds.recordingSignalEvent:
+		logger.Debugf("connectionControlFragmentHandler: ignoring recordingSignalEvent type %d\n", hdr.TemplateId)
 
 	default:
 		fmt.Printf("ConnectionControlFragmentHandler: Insert decoder for type: %d\n", hdr.TemplateId)
@@ -431,11 +443,9 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// Look it up
 		c, ok := correlations.Load(recordingSubscriptionDescriptor.CorrelationId)
 		if !ok {
-			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("uncorrelated recordingSubscriptionDescriptor correlationID=%d\n%#v", recordingSubscriptionDescriptor.CorrelationId, recordingSubscriptionDescriptor)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err)
-			}
+			// Must have been for someone else which can happen if two or more clients have
+			// use the same channel/stream
+			logger.Debugf("descriptorFragmentHandler/recordingSubscriptionDescriptor: ignoring correlationID=%d [%s]\n%#v", recordingSubscriptionDescriptor.CorrelationId)
 			return
 		}
 		control := c.(*Control)
@@ -459,11 +469,9 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		// Look it up
 		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
-			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("DescriptorFragmentHandler: Uncorrelated control response correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err)
-			}
+			// Must have been for someone else which can happen if two or more clients have
+			// use the same channel/stream
+			logger.Debugf("descriptorFragmentHandler/controlResponse: ignoring correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			return
 		}
 		control := c.(*Control)
