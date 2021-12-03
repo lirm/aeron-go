@@ -108,7 +108,6 @@ func (sub *Subscription) PollWithContext(handler term.FragmentHandlerWithContext
 	img := sub.images.Get()
 	length := len(img)
 	var fragmentsRead int
-	logger.Debugf("Subscription.PollWithContext(handler, %d, %d) length is %d\n", context, fragmentLimit, length)
 
 	if length > 0 {
 		startingIndex := sub.roundRobinIndex
