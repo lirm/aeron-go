@@ -102,6 +102,34 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 	return fragmentsRead
 }
 
+// PollWithContext as for Poll() but provides an integer argument for passing contextual information
+func (sub *Subscription) PollWithContext(handler term.FragmentHandlerWithContext, context int64, fragmentLimit int) int {
+
+	img := sub.images.Get()
+	length := len(img)
+	var fragmentsRead int
+	logger.Debugf("Subscription.PollWithContext(handler, %d, %d) length is %d\n", context, fragmentLimit, length)
+
+	if length > 0 {
+		startingIndex := sub.roundRobinIndex
+		sub.roundRobinIndex++
+		if startingIndex >= length {
+			sub.roundRobinIndex = 0
+			startingIndex = 0
+		}
+
+		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
+			fragmentsRead += img[i].PollWithContext(handler, context, fragmentLimit-fragmentsRead)
+		}
+
+		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
+			fragmentsRead += img[i].PollWithContext(handler, context, fragmentLimit-fragmentsRead)
+		}
+	}
+
+	return fragmentsRead
+}
+
 func (sub *Subscription) hasImage(sessionID int32) bool {
 	img := sub.images.Get()
 	for _, image := range img {

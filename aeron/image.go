@@ -118,6 +118,25 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	return result
 }
 
+func (image *Image) PollWithContext(handler term.FragmentHandlerWithContext, context int64, fragmentLimit int) int {
+	if image.IsClosed() {
+		return 0
+	}
+
+	position := image.subscriberPosition.get()
+	termOffset := int32(position) & image.termLengthMask
+	index := indexByPosition(position, image.positionBitsToShift)
+	termBuffer := image.termBuffers[index]
+
+	offset, result := term.ReadWithContext(context, termBuffer, termOffset, handler, fragmentLimit, &image.header)
+
+	newPosition := position + int64(offset-termOffset)
+	if newPosition > position {
+		image.subscriberPosition.set(newPosition)
+	}
+	return result
+}
+
 // Position returns the position this Image has been consumed to by the subscriber.
 func (image *Image) Position() int64 {
 	if image.IsClosed() {

@@ -54,3 +54,35 @@ func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, 
 
 	return termOffset, fragmentsRead
 }
+
+// FragmentHandlerWithContext provides a FragmentHandler with context
+type FragmentHandlerWithContext func(context int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
+
+// ReadWithContext as for Read() but woth a contextual argument
+func ReadWithContext(context int64, termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandlerWithContext, fragmentsLimit int,
+	header *logbuffer.Header) (int32, int) {
+
+	capacity := termBuffer.Capacity()
+
+	var fragmentsRead int
+	for fragmentsRead < fragmentsLimit && termOffset < capacity {
+		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
+		if frameLength <= 0 {
+			break
+		}
+
+		fragmentOffset := termOffset
+		termOffset += util.AlignInt32(frameLength, logbuffer.FrameAlignment)
+
+		if !logbuffer.IsPaddingFrame(termBuffer, fragmentOffset) {
+			header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
+			header.SetOffset(fragmentOffset)
+			handler(context, termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
+				frameLength-logbuffer.DataFrameHeader.Length, header)
+
+			fragmentsRead++
+		}
+	}
+
+	return termOffset, fragmentsRead
+}
