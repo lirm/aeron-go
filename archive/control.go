@@ -100,11 +100,10 @@ func init() {
 	codecIds.recordingStopped = recordingStopped.SbeTemplateId()
 }
 
-// The current subscription handler doesn't provide a mechanism for passing a rock
+// The current subscription handler doesn't provide a mechanism for passing context
 // so we return data via the control's Results
-func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	logger.Debugf("controlFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
-
+func controlFragmentHandler(context int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	logger.Debugf("controlFragmentHandler: session:%d offset:%d length:%d header:%#v", context, offset, length, header)
 	var hdr codecs.SbeGoMessageHeader
 
 	buf := new(bytes.Buffer)
@@ -124,7 +123,7 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 	switch hdr.TemplateId {
 	case codecIds.controlResponse:
 		var controlResponse = new(codecs.ControlResponse)
-		logger.Debugf("Received controlResponse: length %d", buf.Len())
+		logger.Debugf("controlFragmentHandler/controlResponse: Received controlResponse: length %d", buf.Len())
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't see what's gone wrong
 			err2 := fmt.Errorf("controlFragmentHandler failed to decode control response:%w", err)
@@ -135,11 +134,11 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 			return
 		}
 
-		// Check this is for our session by looking it up
+		// Check this correlationID is for us
 		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
-			// Must have been for someone else which can happen if two or more clients have
-			// use the same channel/stream
+			// Must have been for someone else which might happen if two clients on the same channel/stream do
+			// overlapping I/O
 			logger.Debugf("controlFragmentHandler/controlResponse: ignoring correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			return
 		}
@@ -147,12 +146,14 @@ func controlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, h
 		control.Results.ControlResponse = controlResponse
 		control.Results.IsPollComplete = true
 
+		logger.Debugf("controlFragmentHandler/controlResponse matched correlationID=%d,isPollComplete=true, result=(%d, %s), [controlResponse is %#v]", controlResponse.CorrelationId, controlResponse.Code, string(controlResponse.ErrorMessage), controlResponse)
+
 	case codecIds.recordingSignalEvent:
 		var recordingSignalEvent = new(codecs.RecordingSignalEvent)
 
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't really tell what went wrong
-			err2 := fmt.Errorf("ControlFargamentHandler failed to decode recording signal: %w", err)
+			err2 := fmt.Errorf("ControlFragmentHandler failed to decode recording signal: %w", err)
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err2)
 			}
@@ -235,10 +236,10 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 			}
 		}
 
-		// Looking good, so update state and store the SessionId
+		// Looking good, so update state and store the SessionID
 		control.State.state = ControlStateConnected
 		control.State.err = nil
-		control.archive.SessionId = controlResponse.ControlSessionId
+		control.archive.SessionID = controlResponse.ControlSessionId
 
 	case codecIds.challenge:
 		var challenge = new(codecs.Challenge)
@@ -274,10 +275,10 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		}
 
 		// Send the response
-		// Looking good, so update state and store the SessionId
+		// Looking good, so update state and store the SessionID
 		control.State.state = ControlStateChallenged
 		control.State.err = nil
-		control.archive.SessionId = challenge.ControlSessionId
+		control.archive.SessionID = challenge.ControlSessionId
 		control.archive.Proxy.ChallengeResponse(challenge.CorrelationId, control.archive.Options.AuthResponse)
 
 	// These can happen when testing/reconnecting or if multiple clients are on the same channel/stream
@@ -306,84 +307,73 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 	return control.Subscription.Poll(handler, fragmentLimit)
 }
 
-// PollNextResponse for a matching ControlReponse
-func (control *Control) PollNextResponse(correlationID int64) error {
-	logger.Debugf("PollNextResponse(%d) start", correlationID)
+// PollWithContext provides a Poll with context via the context argument
+func (control *Control) PollWithContext(handler term.FragmentHandlerWithContext, context int64, fragmentLimit int) int {
 
-	start := time.Now()
+	// Update our globals in case they've changed so we use the current state in our callback
+	rangeChecking = control.archive.Options.RangeChecking
 
-	// Poll for events As we can get async events we receive a
-	// fairly arbitrary number of messages here Additionally if
-	// two clients use the same channel/stream for responses they
-	// will see each others messages.
-	// So we just continually poll until we get our response or
-	// timeout without having completed and treat that as an error
-	for {
-		control.Poll(controlFragmentHandler, 1)
+	control.Results.ControlResponse = nil  // Clear old results
+	control.Results.IsPollComplete = false // Clear completion flag
 
-		// Check result
-		if control.Results.IsPollComplete {
-			logger.Debugf("PollNextResponse(%d) complete", correlationID)
-			if control.Results.ControlResponse.Code != codecs.ControlResponseCode.OK {
-				err := fmt.Errorf("Control Response failure: %s", control.Results.ControlResponse.ErrorMessage)
-				logger.Debug(err)
-				return err
-			}
-			return nil
-		}
-
-		if control.Subscription.IsClosed() {
-			return fmt.Errorf("response channel from archive is not connected")
-		}
-
-		if time.Since(start) > control.archive.Options.Timeout {
-			return fmt.Errorf("timeout waiting for correlationID %d", correlationID)
-		}
-
-		// Idle as configured
-		control.archive.Options.IdleStrategy.Idle(0)
-	}
+	return control.Subscription.PollWithContext(handler, context, fragmentLimit)
 }
 
 // PollForResponse polls for a specific correlationID
 // Returns nil, relevantId on success, error, 0 failure
 // More complex responses are contained in Control.ControlResponse after the call
-func (control *Control) PollForResponse(correlationID int64) (int64, error) {
-	logger.Debugf("PollForResponse(%d)", correlationID)
+func (control *Control) PollForResponse(correlationID int64, sessionID int64) (int64, error) {
+	logger.Debugf("PollForResponse(%d:%d)", correlationID, sessionID)
+
+	// Poll for events.
+	//
+	// As we can get async events we receive a fairly arbitrary
+	// number of messages here.
+	//
+	// Additionally if two clients use the same channel/stream for
+	// responses they will see each others messages so we just
+	// continually poll until we get our response or timeout
+	// without having completed and treat that as an error
+	start := time.Now()
 
 	for {
-		// Check for error
-		if err := control.PollNextResponse(correlationID); err != nil {
-			return 0, err
-		}
+		ret := control.PollWithContext(controlFragmentHandler, sessionID, 1)
+		// logger.Debugf("PollWithContext(%d:%d) returned %d", correlationID, sessionID, ret)
 
-		// Check we're on the right session
-		if control.Results.ControlResponse.ControlSessionId != control.archive.SessionId {
-			err := fmt.Errorf("PollForResponse() expected SessionId %d, received %d", control.Results.ControlResponse.ControlSessionId, control.archive.SessionId)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err)
+		// Check result
+		if control.Results.IsPollComplete {
+			logger.Debugf("PollForResponse(%d:%d) complete, result is %d", correlationID, sessionID, control.Results.ControlResponse.Code)
+			if control.Results.ControlResponse.Code != codecs.ControlResponseCode.OK {
+				err := fmt.Errorf("Control Response failure: %s", control.Results.ControlResponse.ErrorMessage)
+				logger.Debug(err)
 			}
-			control.Results.IsPollComplete = true
-			return 0, err
-		}
-
-		// Sanity Check we've got the right correlationID which in theory can't happen
-		if control.Results.ControlResponse.CorrelationId != correlationID {
-			logger.Errorf("PollForResponse() unexpected CorrelationID expected:%d, received:%d", correlationID, control.Results.ControlResponse.CorrelationId)
-		} else {
-			control.Results.IsPollComplete = true
-			logger.Debugf("PollForResponse(%d) complete", correlationID)
+			// logger.Debugf("PollForResponse(%d:%d) success", correlationID, sessionID)
 			return control.Results.ControlResponse.RelevantId, nil
 		}
+
+		if control.Subscription.IsClosed() {
+			return 0, fmt.Errorf("response channel from archive is not connected")
+		}
+
+		if time.Since(start) > control.archive.Options.Timeout {
+			return 0, fmt.Errorf("timeout waiting for correlationID %d", correlationID)
+		}
+
+		// Idle as configured if there was nothing there
+		// logger.Debugf("PollForResponse(%d:%d) idle", correlationID, sessionID)
+		if ret == 0 {
+			control.archive.Options.IdleStrategy.Idle(0)
+		}
 	}
+
+	return 0, fmt.Errorf("PollForResponse out of loop") // can't happen
 }
 
 // DescriptorFragmentHandler is used to poll for descriptors (both recording and subscription)
-// The current subscription handler doesn't provide a mechanism for passing a rock
+// The current subscription handler doesn't provide a mechanism for passing a context
 // so we return data via the control's Results
-// FIXME:Bug Need to adjust fragment counts in case something async happens
-func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	// logger.Debugf("DescriptorFragmentHandler: offset:%d length: %d header: %#v\n", offset, length, header)
+func DescriptorFragmentHandler(context int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	// logger.Debugf("DescriptorFragmentHandler: context:%d offset:%d length: %d header: %#v\n", context, offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 
@@ -401,10 +391,12 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		return
 	}
 
+	// Look up out control via the context
+
 	switch hdr.TemplateId {
 	case codecIds.recordingDescriptor:
 		var recordingDescriptor = new(codecs.RecordingDescriptor)
-		// logger.Debugf("Received RecordingDescriptor: length %d", buf.Len())
+		logger.Debugf("Received RecordingDescriptor: length %d", buf.Len())
 		if err := recordingDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("failed to decode RecordingDescriptor: %w", err)
@@ -413,13 +405,15 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 			}
 			return
 		}
-		// logger.Debugf("RecordingDescriptor: %#v\n", recordingDescriptor)
+		logger.Debugf("RecordingDescriptor: %#v\n", recordingDescriptor)
 
 		// Look it up
-		c, ok := correlations.Load(recordingDescriptor.CorrelationId)
+		c, ok := sessions.Load(context)
 		if !ok {
-			// Not much to be done here as we can't correlate
-			logger.Debugf("DescriptorFragmentHandler ignoring correlationID=%d\n%#v", recordingDescriptor.CorrelationId)
+			// something has gone horribly wrong and we can't correlate
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(fmt.Errorf("failed to lookup sessionID %d", context))
+			}
 			return
 		}
 		control := c.(*Control)
@@ -429,7 +423,7 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		control.Results.FragmentsReceived++
 
 	case codecIds.recordingSubscriptionDescriptor:
-		// logger.Debugf("Received RecordingSubscriptionDescriptor: length %d", buf.Len())
+		logger.Debugf("Received RecordingSubscriptionDescriptor: length %d", buf.Len())
 		var recordingSubscriptionDescriptor = new(codecs.RecordingSubscriptionDescriptor)
 		if err := recordingSubscriptionDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
@@ -441,11 +435,12 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		}
 
 		// Look it up
-		c, ok := correlations.Load(recordingSubscriptionDescriptor.CorrelationId)
+		c, ok := sessions.Load(context)
 		if !ok {
-			// Must have been for someone else which can happen if two or more clients have
-			// use the same channel/stream
-			logger.Debugf("descriptorFragmentHandler/recordingSubscriptionDescriptor: ignoring correlationID=%d [%s]\n%#v", recordingSubscriptionDescriptor.CorrelationId)
+			// something has gone horribly wrong and we can't correlate
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(fmt.Errorf("failed to lookup sessionID %d", context))
+			}
 			return
 		}
 		control := c.(*Control)
@@ -467,16 +462,19 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 		}
 
 		// Look it up
-		c, ok := correlations.Load(controlResponse.CorrelationId)
+		c, ok := sessions.Load(context)
 		if !ok {
-			// Must have been for someone else which can happen if two or more clients have
-			// use the same channel/stream
-			logger.Debugf("descriptorFragmentHandler/controlResponse: ignoring correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
+			// something has gone horribly wrong and we can't correlate
+			if Listeners.ErrorListener != nil {
+				Listeners.ErrorListener(fmt.Errorf("failed to lookup sessionID %d", context))
+			}
 			return
 		}
 		control := c.(*Control)
 
 		// We're basically finished so prepare our OOB return values and log some info if we can
+		logger.Debugf("descriptorFragmentHandler/controlResponse: received controlResponse %#v", controlResponse)
+
 		control.Results.ControlResponse = controlResponse
 		control.Results.IsPollComplete = true
 
@@ -514,43 +512,8 @@ func DescriptorFragmentHandler(buffer *atomic.Buffer, offset int32, length int32
 	}
 }
 
-// PollNextDescriptor to poll for a fragmentLimit of Descriptors
-func (control *Control) PollNextDescriptor(correlationID int64, fragmentsWanted int) error {
-	logger.Debugf("PollNextDescriptor(%d) start", correlationID)
-	start := time.Now()
-
-	// Poll for descriptors
-	// We should end up with a maximum of fragmentsWanted or finish with a ControlResults
-	for !control.Results.IsPollComplete {
-		control.Poll(DescriptorFragmentHandler, fragmentsWanted-control.Results.FragmentsReceived)
-
-		if fragmentsWanted <= control.Results.FragmentsReceived {
-			logger.Debugf("PollNextDescriptor(%d) all fragments received", fragmentsWanted)
-			control.Results.IsPollComplete = true
-		}
-
-		if control.Subscription.IsClosed() {
-			return fmt.Errorf("response channel from archive is not connected")
-		}
-
-		if control.Results.IsPollComplete {
-			logger.Debugf("PollNextDescriptor(%d) complete", correlationID)
-			return nil
-		}
-
-		if time.Since(start) > control.archive.Options.Timeout {
-			return fmt.Errorf("PollNextDescriptor timeout waiting for correlationID %d", correlationID)
-		}
-
-		control.archive.Options.IdleStrategy.Idle(0)
-	}
-
-	return nil
-}
-
 // PollForDescriptors to poll for recording descriptors, adding them to the set in the control
-func (control *Control) PollForDescriptors(correlationID int64, fragmentsWanted int32) error {
-	logger.Debugf("PollForDescriptors(%d)", correlationID)
+func (control *Control) PollForDescriptors(correlationID int64, sessionID int64, fragmentsWanted int32) error {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = control.archive.Options.RangeChecking
@@ -559,18 +522,49 @@ func (control *Control) PollForDescriptors(correlationID int64, fragmentsWanted 
 	control.Results.IsPollComplete = false                 // Clear completion flag
 	control.Results.RecordingDescriptors = nil             // Clear previous results
 	control.Results.RecordingSubscriptionDescriptors = nil // Clear previous results
-	control.Results.FragmentsReceived = 0                  // Reset our results count
+	control.Results.FragmentsReceived = 0                  // Reset our loop results count
 
-	for {
-		// Check for error
-		if err := control.PollNextDescriptor(correlationID, int(fragmentsWanted)); err != nil {
-			control.Results.IsPollComplete = true
-			return err
-		}
+	start := time.Now()
+	descriptorCount := 0
 
-		if control.Results.IsPollComplete {
-			logger.Debugf("PollForDescriptors(%d) complete", correlationID)
+	for !control.Results.IsPollComplete {
+		logger.Debugf("PollForDescriptors(%d:%d, %d)", correlationID, sessionID, int(fragmentsWanted)-descriptorCount)
+		fragments := control.PollWithContext(DescriptorFragmentHandler, sessionID, int(fragmentsWanted)-descriptorCount)
+		logger.Debugf("PollWithContext(%d:%d) returned %d fragments", correlationID, sessionID, fragments)
+		descriptorCount = len(control.Results.RecordingDescriptors) + len(control.Results.RecordingSubscriptionDescriptors)
+
+		// A control response may have told us we're complete or we may have all we asked for
+		if control.Results.IsPollComplete || descriptorCount >= int(fragmentsWanted) {
+			logger.Debugf("PollNextDescriptor(%d:%d) complete", correlationID, sessionID)
 			return nil
 		}
+
+		// Check wer're live
+		if control.Subscription.IsClosed() {
+			return fmt.Errorf("response channel from archive is not connected")
+		}
+
+		// Check timeout
+		if time.Since(start) > control.archive.Options.Timeout {
+			return fmt.Errorf("PollNextDescriptor timeout waiting for correlationID %d", correlationID)
+		}
+
+		// If we received something then loop straight away
+		if fragments > 0 {
+			logger.Debugf("PollForDescriptors(%d:%d) looping with %d of %d", correlationID, sessionID, control.Results.FragmentsReceived, fragmentsWanted)
+			continue
+		}
+
+		// If we are yet to receive anything then idle
+		if descriptorCount == 0 {
+			logger.Debugf("PollForDescriptors(%d:%d) idling with %d of %d", correlationID, sessionID, control.Results.FragmentsReceived, fragmentsWanted)
+			control.archive.Options.IdleStrategy.Idle(0)
+		} else {
+			// Otherwise we have received everything and we're done
+			logger.Debugf("PollForDescriptors(%d/%d) complete at %d of %d (fragments:%d)", correlationID, sessionID, control.Results.FragmentsReceived, fragmentsWanted, fragments)
+			return nil
+		}
+
 	}
+	return nil
 }

@@ -31,7 +31,7 @@ type Archive struct {
 	aeron        *aeron.Aeron            // Embedded aeron
 	aeronContext *aeron.Context          // Embedded aeron context, see context.go for available wrapper functions
 	Options      *Options                // Configuration options
-	SessionId    int64                   // Allocated by the archiving media driver
+	SessionID    int64                   // Allocated by the archiving media driver
 	Proxy        *Proxy                  // For outgoing protocol messages (publish/request)
 	Control      *Control                // For incoming protocol messages (subscribe/reponse)
 	Events       *RecordingEventsAdapter // For async recording events (must be enabled)
@@ -143,21 +143,20 @@ var rangeChecking bool
 // Logging handler
 var logger = logging.MustGetLogger("archive")
 
-// The archive protocol uses correlation Ids to allow us to match
-// request/response pairs. It additionally uses these in recording
-// events. Unfortunately, the aeron structure doesn't allow us any
-// user data/rock/context in the fragment assembler and so we need to
-// track these. Worse we need to track them globally for the recording
-// events.
-//
-// For getting new unique correlation IDs we can In() this.
-var _correlationID atomic.Long
-
 // Map correlation IDs to Control structures for the fragment
 // assemblers.  A common usage case would be a goroutine per archive
 // instance and for this case a sync.Map should be a little more
 // efficient.
 var correlations sync.Map // [int64]*Control
+
+// Map of SessionID to Control structures When dealing with two
+// archive clients having the same channel/stream we need to
+// disambiguate in the Fragmenthandlers. We can use this map at the
+// inner loop to lookup the sessionID to find the correct control
+var sessions sync.Map // [int64]*Control
+
+// For creating unique correlationIDs via nextCorrelationID()
+var _correlationID atomic.Long
 
 // Inititialization
 func init() {
@@ -169,7 +168,7 @@ func nextCorrelationID() int64 {
 	return _correlationID.Inc()
 }
 
-// ReplaySessionIdToStreamId utility function to convert a ReplaySessionId into a streamID
+// ReplaySessionIdToStreamId utility function to convert a ReplaySessionID into a streamID
 func ReplaySessionIdToStreamId(replaySessionID int64) int32 {
 	// It's actually just the least significant 32 bits
 	return int32(replaySessionID)
@@ -311,8 +310,11 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	} else if archive.Control.State.state != ControlStateConnected {
 		logger.Error("Connect failed\n")
 	} else {
-		logger.Infof("Archive connection established for sessionId:%d\n", archive.SessionId)
+		logger.Infof("Archive connection established for sessionId:%d\n", archive.SessionID)
 	}
+
+	// Add a reference by SessionID so we can lookup the Control session for it
+	sessions.Store(archive.SessionID, archive.Control)
 
 	return archive, archive.Control.State.err
 }
@@ -322,6 +324,7 @@ func (archive *Archive) Close() error {
 	archive.Proxy.CloseSessionRequest()
 	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
+	sessions.Delete(archive.SessionID)
 	return archive.aeron.Close()
 }
 
@@ -433,7 +436,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, isLocal boo
 	if err := archive.Proxy.StartRecordingRequest(correlationID, stream, isLocal, autoStop, channel); err != nil {
 		return 0, err
 	}
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // StopRecording can be performed by RecordingID, by SubscriptionId,
@@ -453,7 +456,7 @@ func (archive *Archive) StopRecording(channel string, stream int32) error {
 	if err := archive.Proxy.StopRecordingRequest(correlationID, stream, channel); err != nil {
 		return err
 	}
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }
 
@@ -470,7 +473,7 @@ func (archive *Archive) StopRecordingByIdentity(recordingID int64) (bool, error)
 	if err := archive.Proxy.StopRecordingByIdentityRequest(correlationID, recordingID); err != nil {
 		return false, err
 	}
-	res, err := archive.Control.PollForResponse(correlationID)
+	res, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	if res < 0 {
 		logger.Debugf("StopRecordingByIdentity result was %d\n", res)
 	}
@@ -495,7 +498,7 @@ func (archive *Archive) StopRecordingBySubscriptionId(subscriptionID int64) erro
 	if err := archive.Proxy.StopRecordingSubscriptionRequest(correlationID, subscriptionID); err != nil {
 		return err
 	}
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }
 
@@ -541,7 +544,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 		return nil, err
 	}
 
-	if _, err := archive.Control.PollForResponse(correlationID); err != nil {
+	if _, err := archive.Control.PollForResponse(correlationID, archive.SessionID); err != nil {
 		publication.Close()
 		return nil, err
 	}
@@ -560,7 +563,7 @@ func (archive *Archive) ListRecordings(fromRecordingID int64, recordCount int32)
 	if err := archive.Proxy.ListRecordingsRequest(correlationID, fromRecordingID, recordCount); err != nil {
 		return nil, err
 	}
-	if err := archive.Control.PollForDescriptors(correlationID, recordCount); err != nil {
+	if err := archive.Control.PollForDescriptors(correlationID, archive.SessionID, recordCount); err != nil {
 		return nil, err
 	}
 
@@ -595,7 +598,7 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingID int64, recordCount 
 		return nil, err
 	}
 
-	if err := archive.Control.PollForDescriptors(correlationID, recordCount); err != nil {
+	if err := archive.Control.PollForDescriptors(correlationID, archive.SessionID, recordCount); err != nil {
 		return nil, err
 	}
 
@@ -627,7 +630,7 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 	if err := archive.Proxy.ListRecordingRequest(correlationID, recordingID); err != nil {
 		return nil, err
 	}
-	if err := archive.Control.PollForDescriptors(correlationID, 1); err != nil {
+	if err := archive.Control.PollForDescriptors(correlationID, archive.SessionID, 1); err != nil {
 		return nil, err
 	}
 
@@ -658,7 +661,7 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 // If the length is RecordingLengthNull (-1) the replay will
 // replay the whole stream of unknown length.
 //
-// The lower 32-bits of the returned value contains the ImageSessionId() of the received replay. All
+// The lower 32-bits of the returned value contains the ImageSessionID() of the received replay. All
 // 64-bits are required to uniquely identify the replay when calling StopReplay(). The lower 32-bits
 // can be obtained by casting the int64 value to an int32. See ReplaySessionIdToStreamId() helper.
 //
@@ -667,7 +670,7 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 func (archive *Archive) StartReplay(recordingID int64, position int64, length int64, replayChannel string, replayStream int32) (int64, error) {
 
 	correlationID := nextCorrelationID()
-	logger.Debugf("StartReplay(%d, %d, %d, %d, %s, %d), correlationID:%d\n", recordingID, position, length, replayChannel, replayStream, correlationID)
+	// logger.Debugf("StartReplay(%d, %d, %d, %s, %d), correlationID:%d\n", recordingID, position, length, replayChannel, replayStream, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -675,7 +678,7 @@ func (archive *Archive) StartReplay(recordingID int64, position int64, length in
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // BoundedReplay to start a replay for a length in bytes of a
@@ -706,7 +709,7 @@ func (archive *Archive) BoundedReplay(recordingID int64, position int64, length 
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // StopReplay for a  session.
@@ -722,7 +725,7 @@ func (archive *Archive) StopReplay(replaySessionID int64) error {
 		return err
 	}
 
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }
 
@@ -739,7 +742,7 @@ func (archive *Archive) StopAllReplays(recordingID int64) error {
 		return err
 	}
 
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }
 
@@ -758,7 +761,7 @@ func (archive *Archive) ExtendRecording(recordingID int64, stream int32, sourceL
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // GetRecordingPosition of the position recorded for an active recording.
@@ -775,7 +778,7 @@ func (archive *Archive) GetRecordingPosition(recordingID int64) (int64, error) {
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // TruncateRecording of a stopped recording to a given position that
@@ -798,7 +801,7 @@ func (archive *Archive) TruncateRecording(recordingID int64, position int64) err
 		return err
 	}
 
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }
 
@@ -815,7 +818,7 @@ func (archive *Archive) GetStartPosition(recordingID int64) (int64, error) {
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // GetStopPosition for a recording.
@@ -831,7 +834,7 @@ func (archive *Archive) GetStopPosition(recordingID int64) (int64, error) {
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // FindLastMatchingRecording that matches the given criteria.
@@ -847,7 +850,7 @@ func (archive *Archive) FindLastMatchingRecording(minRecordingID int64, sessionI
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // ListRecordingSubscriptions to list the active recording
@@ -865,7 +868,7 @@ func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscripti
 		return nil, err
 	}
 
-	if err := archive.Control.PollForDescriptors(correlationID, subscriptionCount); err != nil {
+	if err := archive.Control.PollForDescriptors(correlationID, archive.SessionID, subscriptionCount); err != nil {
 		return nil, err
 	}
 
@@ -903,7 +906,7 @@ func (archive *Archive) DetachSegments(recordingID int64, newStartPosition int64
 		return err
 	}
 
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }
 
@@ -920,7 +923,7 @@ func (archive *Archive) DeleteDetachedSegments(recordingID int64) (int64, error)
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // PurgeSegments (detach and delete) to segments from the beginning of
@@ -940,7 +943,7 @@ func (archive *Archive) PurgeSegments(recordingID int64, newStartPosition int64)
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // AttachSegments to the beginning of a recording to restore history
@@ -959,7 +962,7 @@ func (archive *Archive) AttachSegments(recordingID int64) (int64, error) {
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // MigrateSegments from a source recording and attach them to the
@@ -985,7 +988,7 @@ func (archive *Archive) MigrateSegments(recordingID int64, position int64) (int6
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // KeepAlive will perform a simple packet exchange with the media-driver
@@ -1031,7 +1034,7 @@ func (archive *Archive) Replicate(srcRecordingID int64, dstRecordingID int64, sr
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // Replicate2 will replicate a recording from a source archive to a
@@ -1067,7 +1070,7 @@ func (archive *Archive) Replicate2(srcRecordingID int64, dstRecordingID int64, s
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // TaggedReplicate to replicate a recording from a source archive to a
@@ -1104,7 +1107,7 @@ func (archive *Archive) TaggedReplicate(srcRecordingID int64, dstRecordingID int
 		return 0, err
 	}
 
-	return archive.Control.PollForResponse(correlationID)
+	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
 // StopReplication of a replication request
@@ -1120,7 +1123,7 @@ func (archive *Archive) StopReplication(replicationID int64) error {
 		return err
 	}
 
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }
 
@@ -1139,6 +1142,6 @@ func (archive *Archive) PurgeRecording(recordingID int64) error {
 		return err
 	}
 
-	_, err := archive.Control.PollForResponse(correlationID)
+	_, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	return err
 }

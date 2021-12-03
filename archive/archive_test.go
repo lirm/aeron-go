@@ -245,6 +245,11 @@ func TestListRecordings(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
+	if len(recordings) == 0 {
+		t.Log("No Recordings!")
+		t.FailNow()
+	}
+
 	//  Grab the recordingID
 	recordingID := recordings[len(recordings)-1].RecordingId
 	t.Logf("Working count is %d, recordingID is %d", len(recordings), recordingID)
@@ -301,7 +306,6 @@ func TestStartStopReplay(t *testing.T) {
 	if len(recordings) == 0 {
 		t.Log("No recordings!")
 		t.FailNow()
-
 	}
 
 	// That should give us a recordingID
@@ -328,6 +332,10 @@ func TestStartStopReplay(t *testing.T) {
 	recordings, err = archive.ListRecordings(0, 10)
 	if err != nil {
 		t.Log(err)
+		t.FailNow()
+	}
+	if len(recordings) == 0 {
+		t.Log("No recordings!")
 		t.FailNow()
 	}
 	recordingID = recordings[len(recordings)-1].RecordingId

@@ -77,7 +77,7 @@ func BenchmarkDescriptorFragmentHandler(b *testing.B) {
 	correlations.Store(rd.CorrelationId, new(Control))
 
 	for n := 0; n < b.N; n++ {
-		DescriptorFragmentHandler(atomicbuffer, 0, length, nil)
+		DescriptorFragmentHandler(archive.SessionID, atomicbuffer, 0, length, nil)
 	}
 
 }

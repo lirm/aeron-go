@@ -75,6 +75,7 @@ func reFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 				Listeners.ErrorListener(err2)
 			}
 		} else {
+			// logger.Debugf("RecordingStarted: %#v\n", recordingStarted)
 			// Call the Listener
 			if Listeners.RecordingEventStartedListener != nil {
 				Listeners.RecordingEventStartedListener(recordingStarted)
