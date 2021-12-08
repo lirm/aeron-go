@@ -149,12 +149,6 @@ var logger = logging.MustGetLogger("archive")
 // efficient.
 var correlations sync.Map // [int64]*Control
 
-// Map of SessionID to Control structures When dealing with two
-// archive clients having the same channel/stream we need to
-// disambiguate in the Fragmenthandlers. We can use this map at the
-// inner loop to lookup the sessionID to find the correct control
-var sessions sync.Map // [int64]*Control
-
 // For creating unique correlationIDs via nextCorrelationID()
 var _correlationID atomic.Long
 
@@ -313,9 +307,6 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 		logger.Infof("Archive connection established for sessionId:%d\n", archive.SessionID)
 	}
 
-	// Add a reference by SessionID so we can lookup the Control session for it
-	sessions.Store(archive.SessionID, archive.Control)
-
 	return archive, archive.Control.State.err
 }
 
@@ -324,7 +315,6 @@ func (archive *Archive) Close() error {
 	archive.Proxy.CloseSessionRequest()
 	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
-	sessions.Delete(archive.SessionID)
 	return archive.aeron.Close()
 }
 
