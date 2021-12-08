@@ -284,7 +284,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 
 	start := time.Now()
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
-		fragments := archive.Control.Poll(ConnectionControlFragmentHandler, 1)
+		fragments := archive.Control.PollWithContext(ConnectionControlFragmentHandler, correlationID, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragment(s)\n", fragments)
 		}

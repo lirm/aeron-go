@@ -102,8 +102,8 @@ func init() {
 
 // The current subscription handler doesn't provide a mechanism for passing context
 // so we return data via the control's Results
-func controlFragmentHandler(context int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	logger.Debugf("controlFragmentHandler: correlationID:%d offset:%d length:%d header:%#v", context, offset, length, header)
+func controlFragmentHandler(correlationID int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	logger.Debugf("controlFragmentHandler: correlationID:%d offset:%d length:%d header:%#v", correlationID, offset, length, header)
 	var hdr codecs.SbeGoMessageHeader
 
 	buf := new(bytes.Buffer)
@@ -120,14 +120,14 @@ func controlFragmentHandler(context int64, buffer *atomic.Buffer, offset int32, 
 		return
 	}
 
-	// Look up our control via the context
-	c, ok := correlations.Load(context)
+	// Look up our control
+	c, ok := correlations.Load(correlationID)
 	if !ok {
 		// something has gone horribly wrong and we can't correlate
 		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", context))
+			Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", correlationID))
 		}
-		logger.Debugf("failed to locate control via correlationID %d", context)
+		logger.Debugf("failed to locate control via correlationID %d", correlationID)
 		return
 	}
 	control := c.(*Control)
@@ -147,7 +147,7 @@ func controlFragmentHandler(context int64, buffer *atomic.Buffer, offset int32, 
 		}
 
 		// Check this was for us
-		if controlResponse.ControlSessionId == control.archive.SessionID && controlResponse.CorrelationId == context {
+		if controlResponse.ControlSessionId == control.archive.SessionID && controlResponse.CorrelationId == correlationID {
 			// Set our state to let the caller of Poll() which triggered this know they have something
 			// We're basically finished so prepare our OOB return values and log some info if we can
 			logger.Debugf("controlFragmentHandler/controlResponse: received for sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
@@ -185,8 +185,8 @@ func controlFragmentHandler(context int64, buffer *atomic.Buffer, offset int32, 
 
 // ConnectionControlFragmentHandler is the connection handling specific fragment handler.
 // This mechanism only alows us to pass results back via global state which we do in control.State
-func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	logger.Debugf("ControlSubscriptionHandler: offset:%d length: %d header: %#v", offset, length, header)
+func ConnectionControlFragmentHandler(correlationID int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	logger.Debugf("ConnectionControlFragmentHandler: correlationID:%d offset:%d length: %d header: %#v", correlationID, offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 
@@ -213,42 +213,48 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 			if Listeners.ErrorListener != nil {
 				Listeners.ErrorListener(err2)
 			}
+			logger.Debugf("ConnectionControlFragmentHandler failed to decode control response: %w", err)
 			return
 		}
 
 		// Look it up
 		c, ok := correlations.Load(controlResponse.CorrelationId)
 		if !ok {
-			// Must have been for someone else which can happen if two or more clients have
-			// use the same channel/stream
 			logger.Debugf("connectionControlFragmentHandler/controlResponse: ignoring correlationID=%d [%s]\n%#v", controlResponse.CorrelationId, string(controlResponse.ErrorMessage), controlResponse)
 			return
 		}
 		control := c.(*Control)
 
-		// Check result
-		if controlResponse.Code != codecs.ControlResponseCode.OK {
-			control.State.state = ControlStateError
-			control.State.err = fmt.Errorf("Control Response failure: %s", controlResponse.ErrorMessage)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(control.State.err)
+		// Check this was for us
+		if controlResponse.CorrelationId == correlationID {
+			// Check result
+			if controlResponse.Code != codecs.ControlResponseCode.OK {
+				control.State.state = ControlStateError
+				control.State.err = fmt.Errorf("Control Response failure: %s", controlResponse.ErrorMessage)
+				if Listeners.ErrorListener != nil {
+					Listeners.ErrorListener(control.State.err)
+				}
+				return
 			}
-			return
-		}
 
-		// assert state change
-		if control.State.state != ControlStateConnectRequestSent {
-			control.State.state = ControlStateError
-			control.State.err = fmt.Errorf("Control Response not expecting response")
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(control.State.err)
+			// assert state change
+			if control.State.state != ControlStateConnectRequestSent {
+				control.State.state = ControlStateError
+				control.State.err = fmt.Errorf("Control Response not expecting response")
+				if Listeners.ErrorListener != nil {
+					Listeners.ErrorListener(control.State.err)
+				}
 			}
-		}
 
-		// Looking good, so update state and store the SessionID
-		control.State.state = ControlStateConnected
-		control.State.err = nil
-		control.archive.SessionID = controlResponse.ControlSessionId
+			// Looking good, so update state and store the SessionID
+			control.State.state = ControlStateConnected
+			control.State.err = nil
+			control.archive.SessionID = controlResponse.ControlSessionId
+		} else {
+			// It's conceivable if the same application is making concurrent connection attempts using
+			// the same channel/stream that we can reach here which is our parent's problem
+			logger.Debugf("connectionControlFragmentHandler/controlResponse: ignoring correlationID=%d", controlResponse.CorrelationId)
+		}
 
 	case codecIds.challenge:
 		var challenge = new(codecs.Challenge)
@@ -266,29 +272,33 @@ func ConnectionControlFragmentHandler(buffer *atomic.Buffer, offset int32, lengt
 		// Look it up
 		c, ok := correlations.Load(challenge.CorrelationId)
 		if !ok {
-			// Not much to be done here as we can't correlate
-			err := fmt.Errorf("connectionControlFragmentHandler: ignoring uncorrelated correlationID=%d", challenge.CorrelationId)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err)
-			}
+			logger.Debugf("connectionControlFragmentHandler/controlResponse: ignoring correlationID=%d", challenge.CorrelationId)
 			return
 		}
 		control := c.(*Control)
 
-		// Check the challenge is expected iff our option for this is not nil
-		if control.archive.Options.AuthChallenge != nil {
-			if !bytes.Equal(control.archive.Options.AuthChallenge, challenge.EncodedChallenge) {
-				control.State.err = fmt.Errorf("ChallengeResponse Unexpected: expected:%v received:%v", control.archive.Options.AuthChallenge, challenge.EncodedChallenge)
-				return
-			}
-		}
+		// Check this was for us
+		if challenge.CorrelationId == correlationID {
 
-		// Send the response
-		// Looking good, so update state and store the SessionID
-		control.State.state = ControlStateChallenged
-		control.State.err = nil
-		control.archive.SessionID = challenge.ControlSessionId
-		control.archive.Proxy.ChallengeResponse(challenge.CorrelationId, control.archive.Options.AuthResponse)
+			// Check the challenge is expected iff our option for this is not nil
+			if control.archive.Options.AuthChallenge != nil {
+				if !bytes.Equal(control.archive.Options.AuthChallenge, challenge.EncodedChallenge) {
+					control.State.err = fmt.Errorf("ChallengeResponse Unexpected: expected:%v received:%v", control.archive.Options.AuthChallenge, challenge.EncodedChallenge)
+					return
+				}
+			}
+
+			// Send the response
+			// Looking good, so update state and store the SessionID
+			control.State.state = ControlStateChallenged
+			control.State.err = nil
+			control.archive.SessionID = challenge.ControlSessionId
+			control.archive.Proxy.ChallengeResponse(challenge.CorrelationId, control.archive.Options.AuthResponse)
+		} else {
+			// It's conceivable if the same application is making concurrent connection attempts using
+			// the same channel/stream that we can reach here which is our parent's problem
+			logger.Debugf("connectionControlFragmentHandler/challengr: ignoring correlationID=%d", challenge.CorrelationId)
+		}
 
 	// These can happen when testing/reconnecting or if multiple clients are on the same channel/stream
 	case codecIds.recordingDescriptor:
@@ -316,7 +326,7 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 	return control.Subscription.Poll(handler, fragmentLimit)
 }
 
-// PollWithContext provides a Poll with context via the context argument
+// PollWithContext provides a Poll() with a context argument
 func (control *Control) PollWithContext(handler term.FragmentHandlerWithContext, context int64, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
@@ -380,8 +390,8 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 // DescriptorFragmentHandler is used to poll for descriptors (both recording and subscription)
 // The current subscription handler doesn't provide a mechanism for passing a context
 // so we return data via the control's Results
-func DescriptorFragmentHandler(context int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	// logger.Debugf("DescriptorFragmentHandler: context:%d offset:%d length: %d header: %#v\n", context, offset, length, header)
+func DescriptorFragmentHandler(correlationID int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	// logger.Debugf("DescriptorFragmentHandler: correlationID:%d offset:%d length: %d header: %#v\n", correlationID, offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 
@@ -399,14 +409,14 @@ func DescriptorFragmentHandler(context int64, buffer *atomic.Buffer, offset int3
 		return
 	}
 
-	// Look up our control via the context
-	c, ok := correlations.Load(context)
+	// Look up our control
+	c, ok := correlations.Load(correlationID)
 	if !ok {
 		// something has gone horribly wrong and we can't correlate
 		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", context))
+			Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", correlationID))
 		}
-		logger.Debugf("failed to locate control via correlationID %d", context)
+		logger.Debugf("failed to locate control via correlationID %d", correlationID)
 		return
 	}
 	control := c.(*Control)
@@ -426,7 +436,7 @@ func DescriptorFragmentHandler(context int64, buffer *atomic.Buffer, offset int3
 		logger.Debugf("RecordingDescriptor: %#v", recordingDescriptor)
 
 		// Check this was for us
-		if recordingDescriptor.ControlSessionId == control.archive.SessionID && recordingDescriptor.CorrelationId == context {
+		if recordingDescriptor.ControlSessionId == control.archive.SessionID && recordingDescriptor.CorrelationId == correlationID {
 			// Set our state to let the caller of Poll() which triggered this know they have something
 			control.Results.RecordingDescriptors = append(control.Results.RecordingDescriptors, recordingDescriptor)
 			control.Results.FragmentsReceived++
@@ -447,7 +457,7 @@ func DescriptorFragmentHandler(context int64, buffer *atomic.Buffer, offset int3
 		}
 
 		// Check this was for us
-		if recordingSubscriptionDescriptor.ControlSessionId == control.archive.SessionID && recordingSubscriptionDescriptor.CorrelationId == context {
+		if recordingSubscriptionDescriptor.ControlSessionId == control.archive.SessionID && recordingSubscriptionDescriptor.CorrelationId == correlationID {
 			// Set our state to let the caller of Poll() which triggered this know they have something
 			control.Results.RecordingSubscriptionDescriptors = append(control.Results.RecordingSubscriptionDescriptors, recordingSubscriptionDescriptor)
 			control.Results.FragmentsReceived++
@@ -468,7 +478,7 @@ func DescriptorFragmentHandler(context int64, buffer *atomic.Buffer, offset int3
 		}
 
 		// Check this was for us
-		if controlResponse.ControlSessionId == control.archive.SessionID && controlResponse.CorrelationId == context {
+		if controlResponse.ControlSessionId == control.archive.SessionID && controlResponse.CorrelationId == correlationID {
 			// Set our state to let the caller of Poll() which triggered this know they have something
 			// We're basically finished so prepare our OOB return values and log some info if we can
 			logger.Debugf("descriptorFragmentHandler/controlResponse: received for sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
