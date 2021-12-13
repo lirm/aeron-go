@@ -19,7 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/codahale/hdrhistogram"
+	"github.com/HdrHistogram/hdrhistogram-go"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
