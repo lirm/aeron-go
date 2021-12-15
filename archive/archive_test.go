@@ -18,7 +18,7 @@ import (
 	"flag"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	logging "github.com/op/go-logging"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"log"
 	"math/rand"
 	"os"

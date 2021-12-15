@@ -30,7 +30,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	logging "github.com/op/go-logging"
+	"github.com/lirm/aeron-go/aeron/logging"
 )
 
 var RegistrationStatus = struct {

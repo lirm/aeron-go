@@ -22,8 +22,8 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/aeron/util"
-	logging "github.com/op/go-logging"
 )
 
 const (

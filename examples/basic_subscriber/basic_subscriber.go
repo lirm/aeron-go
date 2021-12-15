@@ -27,8 +27,8 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/examples"
-	logging "github.com/op/go-logging"
 )
 
 var logger = logging.MustGetLogger("basic_subscriber")

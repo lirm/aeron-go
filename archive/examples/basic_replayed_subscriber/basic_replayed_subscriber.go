@@ -22,9 +22,9 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/archive"
 	"github.com/lirm/aeron-go/archive/examples"
-	logging "github.com/op/go-logging"
 	"math"
 	"time"
 )

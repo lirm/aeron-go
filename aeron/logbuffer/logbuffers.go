@@ -18,8 +18,8 @@ package logbuffer
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"github.com/op/go-logging"
 	"unsafe"
 )
 

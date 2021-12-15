@@ -20,9 +20,9 @@ import (
 	"github.com/lirm/aeron-go/aeron/broadcast"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
+	"github.com/lirm/aeron-go/aeron/logging"
 	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	logging "github.com/op/go-logging"
 )
 
 // NewPublicationHandler is the handler type for new publication notification from the media driver

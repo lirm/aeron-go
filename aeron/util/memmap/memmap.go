@@ -24,7 +24,7 @@ import (
 	"unsafe"
 
 	mapper "github.com/edsrzf/mmap-go"
-	"github.com/op/go-logging"
+	"github.com/lirm/aeron-go/aeron/logging"
 )
 
 // File is the wrapper around memory mapped file
