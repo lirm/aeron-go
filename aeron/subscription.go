@@ -103,7 +103,7 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 }
 
 // PollWithContext as for Poll() but provides an integer argument for passing contextual information
-func (sub *Subscription) PollWithContext(handler term.FragmentHandlerWithContext, context int64, fragmentLimit int) int {
+func (sub *Subscription) PollWithContext(handler term.FragmentHandlerWithContext, context interface{}, fragmentLimit int) int {
 
 	img := sub.images.Get()
 	length := len(img)

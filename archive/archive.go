@@ -283,8 +283,10 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	}
 
 	start := time.Now()
+	pollContext := PollContext{archive.Control, correlationID}
+
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
-		fragments := archive.Control.PollWithContext(ConnectionControlFragmentHandler, correlationID, 1)
+		fragments := archive.Control.PollWithContext(ConnectionControlFragmentHandler, &pollContext, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragment(s)\n", fragments)
 		}

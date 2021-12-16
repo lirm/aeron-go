@@ -118,7 +118,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	return result
 }
 
-func (image *Image) PollWithContext(handler term.FragmentHandlerWithContext, context int64, fragmentLimit int) int {
+func (image *Image) PollWithContext(handler term.FragmentHandlerWithContext, context interface{}, fragmentLimit int) int {
 	if image.IsClosed() {
 		return 0
 	}

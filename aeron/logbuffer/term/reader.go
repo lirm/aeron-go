@@ -56,10 +56,10 @@ func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, 
 }
 
 // FragmentHandlerWithContext provides a FragmentHandler with context
-type FragmentHandlerWithContext func(context int64, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
+type FragmentHandlerWithContext func(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
 
 // ReadWithContext as for Read() but woth a contextual argument
-func ReadWithContext(context int64, termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandlerWithContext, fragmentsLimit int,
+func ReadWithContext(context interface{}, termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandlerWithContext, fragmentsLimit int,
 	header *logbuffer.Header) (int32, int) {
 
 	capacity := termBuffer.Capacity()
