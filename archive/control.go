@@ -128,8 +128,8 @@ func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset i
 		// Not much to be done here as we can't really tell what went wrong
 		err2 := fmt.Errorf("controlFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
-		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(err2)
+		if pollContext.control.archive.Listeners.ErrorListener != nil {
+			pollContext.control.archive.Listeners.ErrorListener(err2)
 		}
 		return
 	}
@@ -138,8 +138,8 @@ func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset i
 	c, ok := correlations.Load(pollContext.correlationID)
 	if !ok {
 		// something has gone horribly wrong and we can't correlate
-		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", pollContext.correlationID))
+		if pollContext.control.archive.Listeners.ErrorListener != nil {
+			pollContext.control.archive.Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", pollContext.correlationID))
 		}
 		logger.Debugf("failed to locate control via correlationID %d", pollContext.correlationID)
 		return
@@ -154,8 +154,8 @@ func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset i
 			// Not much to be done here as we can't see what's gone wrong
 			err2 := fmt.Errorf("controlFragmentHandler failed to decode control response:%w", err)
 			// Call the global error handler, ugly but it's all we've got
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 			return
 		}
@@ -177,12 +177,12 @@ func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset i
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't really tell what went wrong
 			err2 := fmt.Errorf("ControlFragmentHandler failed to decode recording signal: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 		}
-		if Listeners.RecordingSignalListener != nil {
-			Listeners.RecordingSignalListener(recordingSignalEvent)
+		if pollContext.control.archive.Listeners.RecordingSignalListener != nil {
+			pollContext.control.archive.Listeners.RecordingSignalListener(recordingSignalEvent)
 		}
 
 	// These can happen when testing/reconnecting or if multiple clients are on the same channel/stream
@@ -217,8 +217,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		// Not much to be done here as we can't correlate
 		err2 := fmt.Errorf("ConnectionControlFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
-		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(err2)
+		if pollContext.control.archive.Listeners.ErrorListener != nil {
+			pollContext.control.archive.Listeners.ErrorListener(err2)
 		}
 	}
 
@@ -229,8 +229,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("ConnectionControlFragmentHandler failed to decode control response: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 			logger.Debugf("ConnectionControlFragmentHandler failed to decode control response: %w", err)
 			return
@@ -250,8 +250,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 			if controlResponse.Code != codecs.ControlResponseCode.OK {
 				control.State.state = ControlStateError
 				control.State.err = fmt.Errorf("Control Response failure: %s", controlResponse.ErrorMessage)
-				if Listeners.ErrorListener != nil {
-					Listeners.ErrorListener(control.State.err)
+				if pollContext.control.archive.Listeners.ErrorListener != nil {
+					pollContext.control.archive.Listeners.ErrorListener(control.State.err)
 				}
 				return
 			}
@@ -260,8 +260,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 			if control.State.state != ControlStateConnectRequestSent {
 				control.State.state = ControlStateError
 				control.State.err = fmt.Errorf("Control Response not expecting response")
-				if Listeners.ErrorListener != nil {
-					Listeners.ErrorListener(control.State.err)
+				if pollContext.control.archive.Listeners.ErrorListener != nil {
+					pollContext.control.archive.Listeners.ErrorListener(control.State.err)
 				}
 			}
 
@@ -281,8 +281,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		if err := challenge.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("ControlFragmentHandler failed to decode challenge: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 		}
 
@@ -429,8 +429,8 @@ func DescriptorFragmentHandler(context interface{}, buffer *atomic.Buffer, offse
 		// Not much to be done here as we can't correlate
 		err2 := fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
-		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(err2)
+		if pollContext.control.archive.Listeners.ErrorListener != nil {
+			pollContext.control.archive.Listeners.ErrorListener(err2)
 		}
 		return
 	}
@@ -439,8 +439,8 @@ func DescriptorFragmentHandler(context interface{}, buffer *atomic.Buffer, offse
 	c, ok := correlations.Load(pollContext.correlationID)
 	if !ok {
 		// something has gone horribly wrong and we can't correlate
-		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", pollContext.correlationID))
+		if pollContext.control.archive.Listeners.ErrorListener != nil {
+			pollContext.control.archive.Listeners.ErrorListener(fmt.Errorf("failed to locate control via correlationID %d", pollContext.correlationID))
 		}
 		logger.Debugf("failed to locate control via correlationID %d", pollContext.correlationID)
 		return
@@ -454,8 +454,8 @@ func DescriptorFragmentHandler(context interface{}, buffer *atomic.Buffer, offse
 		if err := recordingDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("failed to decode RecordingDescriptor: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 			return
 		}
@@ -476,8 +476,8 @@ func DescriptorFragmentHandler(context interface{}, buffer *atomic.Buffer, offse
 		if err := recordingSubscriptionDescriptor.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("failed to decode RecordingSubscriptioDescriptor: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 			return
 		}
@@ -497,8 +497,8 @@ func DescriptorFragmentHandler(context interface{}, buffer *atomic.Buffer, offse
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("failed to decode control response: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 			return
 		}
@@ -531,14 +531,14 @@ func DescriptorFragmentHandler(context interface{}, buffer *atomic.Buffer, offse
 		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("failed to decode recording signal: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
 			}
 			return
 
 		}
-		if Listeners.RecordingSignalListener != nil {
-			Listeners.RecordingSignalListener(recordingSignalEvent)
+		if pollContext.control.archive.Listeners.RecordingSignalListener != nil {
+			pollContext.control.archive.Listeners.RecordingSignalListener(recordingSignalEvent)
 		}
 
 	default:

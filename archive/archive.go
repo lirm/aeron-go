@@ -35,6 +35,7 @@ type Archive struct {
 	Proxy        *Proxy                  // For outgoing protocol messages (publish/request)
 	Control      *Control                // For incoming protocol messages (subscribe/reponse)
 	Events       *RecordingEventsAdapter // For async recording events (must be enabled)
+	Listeners    *ArchiveListeners       // Per client event listeners for async callbacks
 }
 
 // Constant values used to control behaviour of StartReplay
@@ -54,7 +55,6 @@ const (
 // within the the FragmentAssemblers without any user data (or other
 // context). Listeners.ErrorListener() if set will be called if for
 // example protocol unmarshalling goes wrong.
-var Listeners *ArchiveListeners
 
 // ArchiveListeners contains all the callbacks
 // By default only the ErrorListener is set to a logging listener.  If
@@ -223,8 +223,8 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.Events.archive = archive
 
 	// Create the listeners and populate
-	Listeners = new(ArchiveListeners)
-	Listeners.ErrorListener = LoggingErrorListener
+	archive.Listeners = new(ArchiveListeners)
+	archive.Listeners.ErrorListener = LoggingErrorListener
 	archive.SetAeronErrorHandler(LoggingErrorListener)
 
 	// In Debug mode initialize our listeners with simple loggers
@@ -232,20 +232,20 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	if logging.GetLevel("archive") >= logging.DEBUG {
 		logger.Debugf("Setting logging listeners")
 
-		Listeners.RecordingEventStartedListener = LoggingRecordingEventStartedListener
-		Listeners.RecordingEventProgressListener = LoggingRecordingEventProgressListener
-		Listeners.RecordingEventStoppedListener = LoggingRecordingEventStoppedListener
+		archive.Listeners.RecordingEventStartedListener = LoggingRecordingEventStartedListener
+		archive.Listeners.RecordingEventProgressListener = LoggingRecordingEventProgressListener
+		archive.Listeners.RecordingEventStoppedListener = LoggingRecordingEventStoppedListener
 
-		Listeners.RecordingSignalListener = LoggingRecordingSignalListener
+		archive.Listeners.RecordingSignalListener = LoggingRecordingSignalListener
 
-		Listeners.AvailableImageListener = LoggingAvailableImageListener
-		Listeners.UnavailableImageListener = LoggingUnavailableImageListener
+		archive.Listeners.AvailableImageListener = LoggingAvailableImageListener
+		archive.Listeners.UnavailableImageListener = LoggingUnavailableImageListener
 
-		Listeners.NewSubscriptionListener = LoggingNewSubscriptionListener
-		Listeners.NewPublicationListener = LoggingNewPublicationListener
+		archive.Listeners.NewSubscriptionListener = LoggingNewSubscriptionListener
+		archive.Listeners.NewPublicationListener = LoggingNewPublicationListener
 
-		archive.aeronContext.NewSubscriptionHandler(Listeners.NewSubscriptionListener)
-		archive.aeronContext.NewPublicationHandler(Listeners.NewPublicationListener)
+		archive.aeronContext.NewSubscriptionHandler(archive.Listeners.NewSubscriptionListener)
+		archive.aeronContext.NewPublicationHandler(archive.Listeners.NewPublicationListener)
 	}
 
 	// Connect the underlying aeron
@@ -373,7 +373,7 @@ func (archive *Archive) DisableRecordingEvents() {
 
 // RecordingEventsPoll is used to poll for recording events
 func (archive *Archive) RecordingEventsPoll() int {
-	return archive.Events.Poll(nil, 1)
+	return archive.Events.PollWithContext(nil, 1)
 }
 
 // AddSubscription will add a new subscription to the driver.

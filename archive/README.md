@@ -107,3 +107,4 @@ The actual semantics of the security are dependent upon which authenticator supp
  * Fix unused argumentin StopRecording()
  * Cosmetic improvements for golint and staticcheck
  * Improve the logging by downgrading in severity and message some warning only messages
+ * Make the Listeners used for async events be per archive client instead of global

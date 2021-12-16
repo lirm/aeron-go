@@ -31,10 +31,10 @@ type RecordingEventsAdapter struct {
 	archive      *Archive // link to parent
 }
 
-// Poll the aeron subscription handler.
+// PollWithContext the aeron subscription handler.
 // If you pass it a nil handler it will use the builtin and call the Listeners
 // If you ask for 0 fragments it will only return one fragment (if available)
-func (rea *RecordingEventsAdapter) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (rea *RecordingEventsAdapter) PollWithContext(handler term.FragmentHandlerWithContext, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = rea.archive.Options.RangeChecking
@@ -45,10 +45,16 @@ func (rea *RecordingEventsAdapter) Poll(handler term.FragmentHandler, fragmentLi
 	if fragmentLimit == 0 {
 		fragmentLimit = 1
 	}
-	return rea.Subscription.Poll(handler, fragmentLimit)
+	return rea.Subscription.PollWithContext(handler, rea.archive.Listeners, fragmentLimit)
 }
 
-func reFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func reFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	listeners, ok := context.(*ArchiveListeners)
+	if !ok {
+		logger.Errorf("context conversion failed")
+		return
+	}
+
 	var hdr codecs.SbeGoMessageHeader
 
 	buf := new(bytes.Buffer)
@@ -60,8 +66,8 @@ func reFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 		// Not much to be done here as we can't correlate
 		err2 := fmt.Errorf("reFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
-		if Listeners.ErrorListener != nil {
-			Listeners.ErrorListener(err2)
+		if listeners.ErrorListener != nil {
+			listeners.ErrorListener(err2)
 		}
 	}
 
@@ -71,14 +77,14 @@ func reFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 		logger.Debugf("Received RecordingStarted: length %d", buf.Len())
 		if err := recordingStarted.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			err2 := fmt.Errorf("Decode() of RecordingStarted failed: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if listeners.ErrorListener != nil {
+				listeners.ErrorListener(err2)
 			}
 		} else {
 			// logger.Debugf("RecordingStarted: %#v\n", recordingStarted)
 			// Call the Listener
-			if Listeners.RecordingEventStartedListener != nil {
-				Listeners.RecordingEventStartedListener(recordingStarted)
+			if listeners.RecordingEventStartedListener != nil {
+				listeners.RecordingEventStartedListener(recordingStarted)
 			}
 		}
 
@@ -87,14 +93,14 @@ func reFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 		logger.Debugf("Received RecordingProgress: length %d", buf.Len())
 		if err := recordingProgress.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			err2 := fmt.Errorf("Decode() of RecordingProgress failed: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if listeners.ErrorListener != nil {
+				listeners.ErrorListener(err2)
 			}
 		} else {
 			logger.Debugf("RecordingProgress: %#v\n", recordingProgress)
 			// Call the Listener
-			if Listeners.RecordingEventProgressListener != nil {
-				Listeners.RecordingEventProgressListener(recordingProgress)
+			if listeners.RecordingEventProgressListener != nil {
+				listeners.RecordingEventProgressListener(recordingProgress)
 			}
 		}
 
@@ -103,14 +109,14 @@ func reFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header
 		logger.Debugf("Received RecordingStopped: length %d", buf.Len())
 		if err := recordingStopped.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			err2 := fmt.Errorf("Decode() of RecordingStopped failed: %w", err)
-			if Listeners.ErrorListener != nil {
-				Listeners.ErrorListener(err2)
+			if listeners.ErrorListener != nil {
+				listeners.ErrorListener(err2)
 			}
 		} else {
 			logger.Debugf("RecordingStopped: %#v\n", recordingStopped)
 			// Call the Listener
-			if Listeners.RecordingEventStoppedListener != nil {
-				Listeners.RecordingEventStoppedListener(recordingStopped)
+			if listeners.RecordingEventStoppedListener != nil {
+				listeners.RecordingEventStoppedListener(recordingStopped)
 			}
 		}
 
