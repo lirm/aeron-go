@@ -18,6 +18,7 @@ import (
 	"flag"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
 	"log"
 	"math/rand"
@@ -44,6 +45,32 @@ type TestCases struct {
 
 var testCases = []TestCases{
 	{int32(*TestConfig.SampleStream), *TestConfig.SampleChannel, int32(*TestConfig.ReplayStream), *TestConfig.ReplayChannel},
+}
+
+// For testing async events
+type Counters struct {
+	recordingSignalCount        int
+	recordingEventStartedCount  int
+	recordingEventProgressCount int
+	recordingEventStoppedCount  int
+}
+
+var counters Counters
+
+func RecordingSignalListener(rse *codecs.RecordingSignalEvent) {
+	counters.recordingSignalCount++
+}
+
+func RecordingEventStartedListener(rs *codecs.RecordingStarted) {
+	counters.recordingEventStartedCount++
+}
+
+func RecordingEventProgressListener(rp *codecs.RecordingProgress) {
+	counters.recordingEventProgressCount++
+}
+
+func RecordingEventStoppedListener(rs *codecs.RecordingStopped) {
+	counters.recordingEventStoppedCount++
 }
 
 func TestMain(m *testing.M) {
@@ -135,6 +162,103 @@ func TestKeepAlive(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
+}
+
+// Helper to check values of counters
+func CounterValuesMatch(c Counters, signals int, started int, progress int, stopped int, t *testing.T) bool {
+	if counters.recordingSignalCount != signals {
+		t.Logf("counters.recordingSignalCount[%d] != signals[%d]", counters.recordingSignalCount, signals)
+		return false
+	}
+	if counters.recordingEventStartedCount != started {
+		t.Logf("counters.recordingEventStartedCount[%d] != started[%d]", counters.recordingEventStartedCount, started)
+		return false
+	}
+	if counters.recordingEventProgressCount != progress {
+		t.Logf("counters.recordingEventProgressCount[%d] != progress[%d]", counters.recordingEventProgressCount, progress)
+		return false
+	}
+	if counters.recordingEventStoppedCount != stopped {
+		t.Logf("counters.recordingEventStoppedCount[%d] != stopped[%d]", counters.recordingEventStoppedCount, stopped)
+		return false
+	}
+	return true
+}
+
+// Test the recording event signals appear
+func TestAsyncEvents(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	archive.Listeners.RecordingSignalListener = RecordingSignalListener
+	archive.Listeners.RecordingEventStartedListener = RecordingEventStartedListener
+	archive.Listeners.RecordingEventProgressListener = RecordingEventProgressListener
+	archive.Listeners.RecordingEventStoppedListener = RecordingEventStoppedListener
+
+	counters = Counters{0, 0, 0, 0}
+	if !CounterValuesMatch(counters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	archive.EnableRecordingEvents()
+	archive.RecordingEventsPoll()
+
+	if !CounterValuesMatch(counters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	publication, err := archive.AddRecordedPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	archive.RecordingEventsPoll()
+	if !CounterValuesMatch(counters, 1, 1, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	// Delay a little to get the publication is established
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+	idler.Idle(0)
+
+	if err := archive.StopRecordingByPublication(*publication); err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	if !CounterValuesMatch(counters, 2, 1, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	archive.RecordingEventsPoll()
+	if !CounterValuesMatch(counters, 2, 1, 0, 1, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	// Cleanup
+	archive.DisableRecordingEvents()
+	archive.Listeners.RecordingSignalListener = nil
+	archive.Listeners.RecordingEventStartedListener = nil
+	archive.Listeners.RecordingEventProgressListener = nil
+	archive.Listeners.RecordingEventStoppedListener = nil
+	counters = Counters{0, 0, 0, 0}
+	if !CounterValuesMatch(counters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	publication.Close()
 }
 
 // Test adding a recording and then removing it - by Publication (session specific)

@@ -376,7 +376,7 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 	context := PollContext{control, correlationID}
 
 	for {
-		ret := control.PollWithContext(controlFragmentHandler, &context, 1)
+		ret := control.PollWithContext(controlFragmentHandler, &context, 10)
 
 		// Check result
 		if control.Results.IsPollComplete {
