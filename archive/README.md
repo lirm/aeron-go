@@ -101,7 +101,7 @@ The actual semantics of the security are dependent upon which authenticator supp
 ## Release Notes
 
 ### 1.0b2
- * Fix a race condition looking up correlationIDs
+ * Fix a race condition looking up correlationIDs on ControlResponse
  * Handle different archive clients using same channel/stream pairing
  * Fix a return code error in StopRecordingById()
  * Fix unused argumentin StopRecording()
