@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/archive/codecs"
 	logging "github.com/op/go-logging"
 	"sync"
@@ -286,7 +287,10 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	pollContext := PollContext{archive.Control, correlationID}
 
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
-		fragments := archive.Control.PollWithContext(ConnectionControlFragmentHandler, &pollContext, 1)
+		fragments := archive.Control.PollWithContext(
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+				ConnectionControlFragmentHandler(&pollContext, buf, offset, length, header)
+			}, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragment(s)\n", fragments)
 		}

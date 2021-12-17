@@ -20,7 +20,6 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/archive/codecs"
 )
 
@@ -31,10 +30,13 @@ type RecordingEventsAdapter struct {
 	archive      *Archive // link to parent
 }
 
+// FragmentHandlerWithListeners provides a FragmentHandler with ArchiveListeners
+type FragmentHandlerWithListeners func(listeners *ArchiveListeners, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
+
 // PollWithContext the aeron subscription handler.
 // If you pass it a nil handler it will use the builtin and call the Listeners
 // If you ask for 0 fragments it will only return one fragment (if available)
-func (rea *RecordingEventsAdapter) PollWithContext(handler term.FragmentHandlerWithContext, fragmentLimit int) int {
+func (rea *RecordingEventsAdapter) PollWithContext(handler FragmentHandlerWithListeners, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = rea.archive.Options.RangeChecking
@@ -45,16 +47,13 @@ func (rea *RecordingEventsAdapter) PollWithContext(handler term.FragmentHandlerW
 	if fragmentLimit == 0 {
 		fragmentLimit = 1
 	}
-	return rea.Subscription.PollWithContext(handler, rea.archive.Listeners, fragmentLimit)
+	return rea.Subscription.PollWithContext(
+		func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			handler(rea.archive.Listeners, buf, offset, length, header)
+		}, fragmentLimit)
 }
 
-func reFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	listeners, ok := context.(*ArchiveListeners)
-	if !ok {
-		logger.Errorf("context conversion failed")
-		return
-	}
-
+func reFragmentHandler(listeners *ArchiveListeners, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	var hdr codecs.SbeGoMessageHeader
 
 	buf := new(bytes.Buffer)

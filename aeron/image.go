@@ -118,7 +118,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	return result
 }
 
-func (image *Image) PollWithContext(handler term.FragmentHandlerWithContext, context interface{}, fragmentLimit int) int {
+func (image *Image) PollWithContext(handler term.FragmentHandler, fragmentLimit int) int {
 	if image.IsClosed() {
 		return 0
 	}
@@ -128,7 +128,7 @@ func (image *Image) PollWithContext(handler term.FragmentHandlerWithContext, con
 	index := indexByPosition(position, image.positionBitsToShift)
 	termBuffer := image.termBuffers[index]
 
-	offset, result := term.ReadWithContext(context, termBuffer, termOffset, handler, fragmentLimit, &image.header)
+	offset, result := term.ReadWithContext(termBuffer, termOffset, handler, fragmentLimit, &image.header)
 
 	newPosition := position + int64(offset-termOffset)
 	if newPosition > position {

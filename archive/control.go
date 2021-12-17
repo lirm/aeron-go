@@ -199,13 +199,8 @@ func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset i
 
 // ConnectionControlFragmentHandler is the connection handling specific fragment handler.
 // This mechanism only alows us to pass results back via global state which we do in control.State
-func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-	pollContext, ok := context.(*PollContext)
-	if !ok {
-		logger.Errorf("Context conversion failed")
-		return
-	}
-	logger.Debugf("ConnectionControlFragmentHandler: correlationID:%d offset:%d length: %d header: %#v", pollContext.correlationID, offset, length, header)
+func ConnectionControlFragmentHandler(context *PollContext, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	logger.Debugf("ConnectionControlFragmentHandler: correlationID:%d offset:%d length: %d header: %#v", context.correlationID, offset, length, header)
 
 	var hdr codecs.SbeGoMessageHeader
 
@@ -217,8 +212,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		// Not much to be done here as we can't correlate
 		err2 := fmt.Errorf("ConnectionControlFragmentHandler() failed to decode control message header: %w", err)
 		// Call the global error handler, ugly but it's all we've got
-		if pollContext.control.archive.Listeners.ErrorListener != nil {
-			pollContext.control.archive.Listeners.ErrorListener(err2)
+		if context.control.archive.Listeners.ErrorListener != nil {
+			context.control.archive.Listeners.ErrorListener(err2)
 		}
 	}
 
@@ -229,8 +224,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("ConnectionControlFragmentHandler failed to decode control response: %w", err)
-			if pollContext.control.archive.Listeners.ErrorListener != nil {
-				pollContext.control.archive.Listeners.ErrorListener(err2)
+			if context.control.archive.Listeners.ErrorListener != nil {
+				context.control.archive.Listeners.ErrorListener(err2)
 			}
 			logger.Debugf("ConnectionControlFragmentHandler failed to decode control response: %w", err)
 			return
@@ -245,13 +240,13 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		control := c.(*Control)
 
 		// Check this was for us
-		if controlResponse.CorrelationId == pollContext.correlationID {
+		if controlResponse.CorrelationId == context.correlationID {
 			// Check result
 			if controlResponse.Code != codecs.ControlResponseCode.OK {
 				control.State.state = ControlStateError
 				control.State.err = fmt.Errorf("Control Response failure: %s", controlResponse.ErrorMessage)
-				if pollContext.control.archive.Listeners.ErrorListener != nil {
-					pollContext.control.archive.Listeners.ErrorListener(control.State.err)
+				if context.control.archive.Listeners.ErrorListener != nil {
+					context.control.archive.Listeners.ErrorListener(control.State.err)
 				}
 				return
 			}
@@ -260,8 +255,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 			if control.State.state != ControlStateConnectRequestSent {
 				control.State.state = ControlStateError
 				control.State.err = fmt.Errorf("Control Response not expecting response")
-				if pollContext.control.archive.Listeners.ErrorListener != nil {
-					pollContext.control.archive.Listeners.ErrorListener(control.State.err)
+				if context.control.archive.Listeners.ErrorListener != nil {
+					context.control.archive.Listeners.ErrorListener(control.State.err)
 				}
 			}
 
@@ -281,8 +276,8 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		if err := challenge.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't correlate
 			err2 := fmt.Errorf("ControlFragmentHandler failed to decode challenge: %w", err)
-			if pollContext.control.archive.Listeners.ErrorListener != nil {
-				pollContext.control.archive.Listeners.ErrorListener(err2)
+			if context.control.archive.Listeners.ErrorListener != nil {
+				context.control.archive.Listeners.ErrorListener(err2)
 			}
 		}
 
@@ -297,7 +292,7 @@ func ConnectionControlFragmentHandler(context interface{}, buffer *atomic.Buffer
 		control := c.(*Control)
 
 		// Check this was for us
-		if challenge.CorrelationId == pollContext.correlationID {
+		if challenge.CorrelationId == context.correlationID {
 
 			// Check the challenge is expected iff our option for this is not nil
 			if control.archive.Options.AuthChallenge != nil {
@@ -346,7 +341,7 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 }
 
 // PollWithContext provides a Poll() with a context argument
-func (control *Control) PollWithContext(handler term.FragmentHandlerWithContext, context *PollContext, fragmentLimit int) int {
+func (control *Control) PollWithContext(handler term.FragmentHandler, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = control.archive.Options.RangeChecking
@@ -354,7 +349,7 @@ func (control *Control) PollWithContext(handler term.FragmentHandlerWithContext,
 	control.Results.ControlResponse = nil  // Clear old results
 	control.Results.IsPollComplete = false // Clear completion flag
 
-	return control.Subscription.PollWithContext(handler, context, fragmentLimit)
+	return control.Subscription.PollWithContext(handler, fragmentLimit)
 }
 
 // PollForResponse polls for a specific correlationID
@@ -376,7 +371,10 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 	context := PollContext{control, correlationID}
 
 	for {
-		ret := control.PollWithContext(controlFragmentHandler, &context, 10)
+		ret := control.PollWithContext(
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+				controlFragmentHandler(&context, buf, offset, length, header)
+			}, 10)
 
 		// Check result
 		if control.Results.IsPollComplete {
@@ -565,7 +563,10 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 
 	for !control.Results.IsPollComplete {
 		logger.Debugf("PollForDescriptors(%d:%d, %d)", correlationID, sessionID, int(fragmentsWanted)-descriptorCount)
-		fragments := control.PollWithContext(DescriptorFragmentHandler, &pollContext, int(fragmentsWanted)-descriptorCount)
+		fragments := control.PollWithContext(
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+				DescriptorFragmentHandler(&pollContext, buf, offset, length, header)
+			}, int(fragmentsWanted)-descriptorCount)
 		logger.Debugf("PollWithContext(%d:%d) returned %d fragments", correlationID, sessionID, fragments)
 		descriptorCount = len(control.Results.RecordingDescriptors) + len(control.Results.RecordingSubscriptionDescriptors)
 
