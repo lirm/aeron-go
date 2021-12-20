@@ -358,7 +358,7 @@ func (control *Control) PollWithContext(handler term.FragmentHandlerWithContext,
 }
 
 // PollForResponse polls for a specific correlationID
-// Returns nil, relevantId on success, error, 0 failure
+// Returns (relevantId, nil) on success, (0 or relevantId, error) on failure
 // More complex responses are contained in Control.ControlResponse after the call
 func (control *Control) PollForResponse(correlationID int64, sessionID int64) (int64, error) {
 	logger.Debugf("PollForResponse(%d:%d)", correlationID, sessionID)
@@ -383,7 +383,8 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 			logger.Debugf("PollForResponse(%d:%d) complete, result is %d", correlationID, sessionID, control.Results.ControlResponse.Code)
 			if control.Results.ControlResponse.Code != codecs.ControlResponseCode.OK {
 				err := fmt.Errorf("Control Response failure: %s", control.Results.ControlResponse.ErrorMessage)
-				logger.Debug(err)
+				logger.Debug(err) // log it in debug mode as an aid to diagnosis
+				return control.Results.ControlResponse.RelevantId, err
 			}
 			// logger.Debugf("PollForResponse(%d:%d) success", correlationID, sessionID)
 			return control.Results.ControlResponse.RelevantId, nil
