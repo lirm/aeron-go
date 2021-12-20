@@ -171,6 +171,16 @@ func (sub *Subscription) RegistrationID() int64 {
 	return sub.registrationID
 }
 
+// IsConnected returns if this subscription is connected by having at least one open publication Image.
+func (sub *Subscription) IsConnected() bool {
+	for _, image := range sub.images.Get() {
+		if !image.IsClosed() {
+			return true
+		}
+	}
+	return false
+}
+
 // HasImages is a helper method checking whether this subscription has any images associated with it.
 func (sub *Subscription) HasImages() bool {
 	images := sub.images.Get()

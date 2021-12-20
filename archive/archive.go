@@ -17,6 +17,7 @@
 package archive
 
 import (
+	"errors"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
@@ -366,6 +367,15 @@ func (archive *Archive) EnableRecordingEvents() {
 	archive.Events.Subscription = <-archive.aeron.AddSubscription(archive.Options.RecordingEventsChannel, archive.Options.RecordingEventsStream)
 	archive.Events.Enabled = true
 	logger.Debugf("RecordingEvents subscription: %#v", archive.Events.Subscription)
+}
+
+// IsRecordingEventsConnected returns true if the recording events subscription
+// is connected.
+func (archive *Archive) IsRecordingEventsConnected() (bool, error) {
+	if !archive.Events.Enabled {
+		return false, errors.New("recording events not enabled")
+	}
+	return archive.Events.Subscription.IsConnected(), nil
 }
 
 // DisableRecordingEvents stops recording events flowing
