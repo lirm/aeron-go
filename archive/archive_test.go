@@ -185,6 +185,25 @@ func CounterValuesMatch(c Counters, signals int, started int, progress int, stop
 	return true
 }
 
+// Test that Archive RPCs will fail correctly
+func TestRPCFailure(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	// Ask to stop a bogus recording
+	res, err := archive.StopRecordingByIdentity(0xdeadbeef)
+	if err == nil || res {
+		t.Logf("RPC succeeded and should have failed")
+		t.FailNow()
+	}
+
+}
+
 // Test the recording event signals appear
 func TestAsyncEvents(t *testing.T) {
 	if !haveArchive {

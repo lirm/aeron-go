@@ -470,6 +470,9 @@ func (archive *Archive) StopRecordingByIdentity(recordingID int64) (bool, error)
 		logger.Debugf("StopRecordingByIdentity result was %d\n", res)
 	}
 
+	if err != nil {
+		return false, err
+	}
 	return res >= 0, err
 }
 
