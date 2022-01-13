@@ -47,7 +47,7 @@ const (
 	RecordingLengthMax    = int64(2<<31 - 1) // Replay the whole stream
 )
 
-// replication flag used fir duplication instead of extension, see Replicate and variants
+// replication flag used for duplication instead of extension, see Replicate and variants
 const (
 	RecordingIdNullValue = int32(-1)
 )
