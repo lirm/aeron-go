@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright (C) 2020-2021 Talos, Inc.
+# Copyright (C) 2020-2022 Talos, Inc.
 
 # This isn't that useful without modification or an identical layout to the
 # defaults below so you might consider it more documentation than working

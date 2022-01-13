@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2021-2022 Talos, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,29 +48,29 @@ var testCases = []TestCases{
 }
 
 // For testing async events
-type Counters struct {
+type TestCounters struct {
 	recordingSignalCount        int
 	recordingEventStartedCount  int
 	recordingEventProgressCount int
 	recordingEventStoppedCount  int
 }
 
-var counters Counters
+var testCounters TestCounters
 
 func RecordingSignalListener(rse *codecs.RecordingSignalEvent) {
-	counters.recordingSignalCount++
+	testCounters.recordingSignalCount++
 }
 
 func RecordingEventStartedListener(rs *codecs.RecordingStarted) {
-	counters.recordingEventStartedCount++
+	testCounters.recordingEventStartedCount++
 }
 
 func RecordingEventProgressListener(rp *codecs.RecordingProgress) {
-	counters.recordingEventProgressCount++
+	testCounters.recordingEventProgressCount++
 }
 
 func RecordingEventStoppedListener(rs *codecs.RecordingStopped) {
-	counters.recordingEventStoppedCount++
+	testCounters.recordingEventStoppedCount++
 }
 
 func TestMain(m *testing.M) {
@@ -165,21 +165,21 @@ func TestKeepAlive(t *testing.T) {
 }
 
 // Helper to check values of counters
-func CounterValuesMatch(c Counters, signals int, started int, progress int, stopped int, t *testing.T) bool {
-	if counters.recordingSignalCount != signals {
-		t.Logf("counters.recordingSignalCount[%d] != signals[%d]", counters.recordingSignalCount, signals)
+func CounterValuesMatch(c TestCounters, signals int, started int, progress int, stopped int, t *testing.T) bool {
+	if testCounters.recordingSignalCount != signals {
+		t.Logf("testCounters.recordingSignalCount[%d] != signals[%d]", testCounters.recordingSignalCount, signals)
 		return false
 	}
-	if counters.recordingEventStartedCount != started {
-		t.Logf("counters.recordingEventStartedCount[%d] != started[%d]", counters.recordingEventStartedCount, started)
+	if testCounters.recordingEventStartedCount != started {
+		t.Logf("testCounters.recordingEventStartedCount[%d] != started[%d]", testCounters.recordingEventStartedCount, started)
 		return false
 	}
-	if counters.recordingEventProgressCount != progress {
-		t.Logf("counters.recordingEventProgressCount[%d] != progress[%d]", counters.recordingEventProgressCount, progress)
+	if testCounters.recordingEventProgressCount != progress {
+		t.Logf("testCounters.recordingEventProgressCount[%d] != progress[%d]", testCounters.recordingEventProgressCount, progress)
 		return false
 	}
-	if counters.recordingEventStoppedCount != stopped {
-		t.Logf("counters.recordingEventStoppedCount[%d] != stopped[%d]", counters.recordingEventStoppedCount, stopped)
+	if testCounters.recordingEventStoppedCount != stopped {
+		t.Logf("testCounters.recordingEventStoppedCount[%d] != stopped[%d]", testCounters.recordingEventStoppedCount, stopped)
 		return false
 	}
 	return true
@@ -219,8 +219,8 @@ func TestAsyncEvents(t *testing.T) {
 	archive.Listeners.RecordingEventProgressListener = RecordingEventProgressListener
 	archive.Listeners.RecordingEventStoppedListener = RecordingEventStoppedListener
 
-	counters = Counters{0, 0, 0, 0}
-	if !CounterValuesMatch(counters, 0, 0, 0, 0, t) {
+	testCounters = TestCounters{0, 0, 0, 0}
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
@@ -228,7 +228,7 @@ func TestAsyncEvents(t *testing.T) {
 	archive.EnableRecordingEvents()
 	archive.RecordingEventsPoll()
 
-	if !CounterValuesMatch(counters, 0, 0, 0, 0, t) {
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
@@ -240,7 +240,7 @@ func TestAsyncEvents(t *testing.T) {
 	}
 
 	archive.RecordingEventsPoll()
-	if !CounterValuesMatch(counters, 1, 1, 0, 0, t) {
+	if !CounterValuesMatch(testCounters, 1, 1, 0, 0, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
@@ -254,13 +254,13 @@ func TestAsyncEvents(t *testing.T) {
 		t.FailNow()
 	}
 
-	if !CounterValuesMatch(counters, 2, 1, 0, 0, t) {
+	if !CounterValuesMatch(testCounters, 2, 1, 0, 0, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
 
 	archive.RecordingEventsPoll()
-	if !CounterValuesMatch(counters, 2, 1, 0, 1, t) {
+	if !CounterValuesMatch(testCounters, 2, 1, 0, 1, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
@@ -271,8 +271,8 @@ func TestAsyncEvents(t *testing.T) {
 	archive.Listeners.RecordingEventStartedListener = nil
 	archive.Listeners.RecordingEventProgressListener = nil
 	archive.Listeners.RecordingEventStoppedListener = nil
-	counters = Counters{0, 0, 0, 0}
-	if !CounterValuesMatch(counters, 0, 0, 0, 0, t) {
+	testCounters = TestCounters{0, 0, 0, 0}
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
@@ -500,9 +500,9 @@ func TestStartStopReplay(t *testing.T) {
 	}
 	t.Logf("ListRecording(%d) returned %#v", recordingID, *recording)
 
-	// ListRecording should not find one with a bad Id
-	badId := int64(-127)
-	recording, err = archive.ListRecording(badId)
+	// ListRecording should not find one with a bad ID
+	badID := int64(-127)
+	recording, err = archive.ListRecording(badID)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -511,7 +511,7 @@ func TestStartStopReplay(t *testing.T) {
 		t.Log("ListRecording returned a record descriptor and should not have")
 		t.FailNow()
 	}
-	t.Logf("ListRecording(%d) correctly returned nil", badId)
+	t.Logf("ListRecording(%d) correctly returned nil", badID)
 
 	// While we're here, check ListRecordingSubscription is working
 	descriptors, err := archive.ListRecordingSubscriptions(0, 10, false, 0, "aeron")
