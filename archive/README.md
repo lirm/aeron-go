@@ -85,8 +85,6 @@ The actual semantics of the security are dependent upon which authenticator supp
  * more testing
   * archive-media-driver mocking/execution
   * test cleanup in the media driver can be problematic
- * The archive state is largely unused. 
-   * Add? and use? IsOpen()
  * Auth should provide some callout mechanism
  * various FIXMEs
 
@@ -101,10 +99,13 @@ The actual semantics of the security are dependent upon which authenticator supp
 ## Release Notes
 
 ### 1.0b2
- * Fix a race condition looking up correlationIDs on ControlResponse
  * Handle different archive clients using same channel/stream pairing
+ * Provide Subscription.IsConnected() and IsRecordingEventsConnected()
+ * Replace go-logging with zap to avoid reentrancy crashes in logging library
+ * Improve the logging by downgrading in severity and message tone some warning level messages
+ * Fix a race condition looking up correlationIDs on ControlResponse
  * Fix a return code error in StopRecordingById()
  * Fix unused argumentin StopRecording()
  * Cosmetic improvements for golint and staticcheck
- * Improve the logging by downgrading in severity and message some warning only messages
  * Make the Listeners used for async events be per archive client instead of global
+ 
