@@ -30,6 +30,7 @@ type LogBuffers struct {
 	mmapFiles []*memmap.File
 	buffers   [PartitionCount + 1]atomic.Buffer
 	meta      LogBufferMetaData
+	refCount  int
 }
 
 // Wrap is the factory method wrapping the LogBuffers structure around memory mapped file
@@ -120,4 +121,16 @@ func (logBuffers *LogBuffers) Close() error {
 	}
 	logBuffers.mmapFiles = nil
 	return err
+}
+
+// IncRef increments the reference count. Returns the current reference count after increment.
+func (logBuffers *LogBuffers) IncRef() int {
+	logBuffers.refCount++
+	return logBuffers.refCount
+}
+
+// DecRef decrements the reference count. Returns the current reference counter after decrement.
+func (logBuffers *LogBuffers) DecRef() int {
+	logBuffers.refCount--
+	return logBuffers.refCount
 }

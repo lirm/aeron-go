@@ -94,6 +94,11 @@ func (hdr *Header) SetReservedValue(reservedValue int64) *Header {
 	return hdr
 }
 
+func (hdr *Header) SetSessionId(value int32) *Header {
+	hdr.buffer.PutInt32(sessionIdOffset(hdr.offset), value)
+	return hdr
+}
+
 // computePosition computes the current position in absolute number of bytes.
 func computePosition(activeTermId int32, termOffset int32, positionBitsToShift int32, initialTermId int32) int64 {
 	termCount := activeTermId - initialTermId // copes with negative activeTermId on rollover
