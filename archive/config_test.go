@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2021-2022 Talos, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,14 +17,9 @@ package archive
 import (
 	"flag"
 	"github.com/lirm/aeron-go/aeron"
-	"os/user"
 )
 
-func getuser() string {
-	user, _ := user.Current()
-	return user.Username
-}
-
+// TestConfig defaults
 var TestConfig = struct {
 	AuthEnabled     *bool
 	AuthCredentials *string

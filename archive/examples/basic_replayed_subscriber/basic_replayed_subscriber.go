@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2021-2022 Talos, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,8 +29,8 @@ import (
 	"time"
 )
 
-var logId string = "basic_recording_subscriber"
-var logger = logging.MustGetLogger(logId)
+var logID = "basic_recording_subscriber"
+var logger = logging.MustGetLogger(logID)
 
 func main() {
 	flag.Parse()
@@ -56,9 +56,9 @@ func main() {
 		fmt.Printf("Setting loglevel: archive.DEBUG/aeron.INFO\n")
 		options.ArchiveLoglevel = logging.DEBUG
 		options.AeronLoglevel = logging.DEBUG
-		logging.SetLevel(logging.DEBUG, logId)
+		logging.SetLevel(logging.DEBUG, logID)
 	} else {
-		logging.SetLevel(logging.NOTICE, logId)
+		logging.SetLevel(logging.NOTICE, logID)
 	}
 
 	arch, err := archive.NewArchive(options, context)
@@ -70,21 +70,21 @@ func main() {
 	// Enable recording events although the defaults will only log in debug mode
 	arch.EnableRecordingEvents()
 
-	recordingId, err := FindLatestRecording(arch, sampleChannel, sampleStream)
+	recordingID, err := FindLatestRecording(arch, sampleChannel, sampleStream)
 	if err != nil {
 		logger.Fatalf(err.Error())
 	}
-	var position int64 = 0
+	var position int64
 	var length int64 = math.MaxInt64
 
 	logger.Infof("Start replay of channel:%s, stream:%d, position:%d, length:%d", sampleChannel, replayStream, position, length)
-	replaySessionId, err := arch.StartReplay(recordingId, position, length, sampleChannel, replayStream)
+	replaySessionID, err := arch.StartReplay(recordingID, position, length, sampleChannel, replayStream)
 	if err != nil {
 		logger.Fatalf(err.Error())
 	}
 
 	// Make the channel based upon that recording and subscribe to it
-	subChannel, err := archive.AddSessionIdToChannel(sampleChannel, archive.ReplaySessionIdToStreamId(replaySessionId))
+	subChannel, err := archive.AddSessionIdToChannel(sampleChannel, archive.ReplaySessionIdToStreamId(replaySessionID))
 	if err != nil {
 		logger.Fatalf("AddReplaySessionIdToChannel() failed: %s", err.Error())
 	}
@@ -110,7 +110,7 @@ func main() {
 	}
 }
 
-// Lookup the last recording
+// FindLatestRecording to lookup the last recording
 func FindLatestRecording(arch *archive.Archive, channel string, stream int32) (int64, error) {
 	descriptors, err := arch.ListRecordingsForUri(0, 100, channel, stream)
 
@@ -119,9 +119,9 @@ func FindLatestRecording(arch *archive.Archive, channel string, stream int32) (i
 	}
 
 	if len(descriptors) == 0 {
-		return 0, fmt.Errorf("No recordings found\n")
+		return 0, fmt.Errorf("no recordings found")
 	}
 
-	// Return the last recordingId
+	// Return the last recordingID
 	return descriptors[len(descriptors)-1].RecordingId, nil
 }

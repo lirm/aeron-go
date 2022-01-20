@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2021-2022 Talos, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ type Options struct {
 }
 
 // These are the Options used by default for an Archive object
-var defaultOptions Options = Options{
+var defaultOptions = Options{
 	RequestChannel:         "aeron:udp?endpoint=localhost:8010",
 	RequestStream:          10,
 	ResponseChannel:        "aeron:udp?endpoint=localhost:8020",
@@ -64,7 +64,7 @@ var defaultOptions Options = Options{
 	AuthResponse:           nil,
 }
 
-// Create and return a new options from the defaults.
+// DefaultOptions creates and returns a new Options from the defaults.
 func DefaultOptions() *Options {
 	options := defaultOptions
 	return &options

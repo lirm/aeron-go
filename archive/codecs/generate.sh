@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright (C) 2020 Talos, Inc.
+# Copyright (C) 2020-2022 Talos, Inc.
 
 # This isn't that useful without modification or an identical layout to the
 # defaults below so you might consider it more documentation than working
@@ -9,9 +9,10 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 AERON_DIR=$DIR/../../../aeron
 SBE_DIR=$DIR/../../../simple-binary-encoding
-AGRONA_JAR=`find ~/.gradle/ | grep agrona-1.9.0.jar | head -1`
+AGRONA_VERSION=1.12.0
+AGRONA_JAR=`find ~/.gradle/ | grep agrona-$AGRONA_VERSION.jar | head -1`
 
-if [ ! -d $AERON_DIR ];
+if [ ! -d "$AERON_DIR" ]
 then
     echo "Can't find aeron directory ($AERON_DIR)"
     exit 1
@@ -19,7 +20,7 @@ else
     echo "Using aeron from $AERON_DIR"
 fi
 
-if [ ! -d $SBE_DIR ]
+if [ ! -d "$SBE_DIR" ]
 then
     echo "Can't find SBE directory ($SBE_DIR)"
     exit 1
@@ -27,9 +28,9 @@ else
     echo "Using SBE from $SBE_DIR"
 fi
 
-if [ ! -f $AGRONA_JAR ]
+if [ ! -f "$AGRONA_JAR" ]
 then
-    echo "Can't find agrona jar"
+    echo "Can't find agrona jar (looking for version $AGRONA_VERSION)"
     exit 1
 else
     echo "Using Agrona from $AGRONA_JAR"

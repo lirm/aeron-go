@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2021-2022 Talos, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,10 +74,10 @@ func BenchmarkDescriptorFragmentHandler(b *testing.B) {
 	atomicbuffer := atomic.MakeBuffer(bytes, len(bytes))
 
 	// Mock the correlationId to Control map
-	correlationsMap[rd.CorrelationId] = new(Control)
+	correlations.Store(rd.CorrelationId, new(Control))
 
 	for n := 0; n < b.N; n++ {
-		DescriptorFragmentHandler(atomicbuffer, 0, length, nil)
+		DescriptorFragmentHandler(archive.SessionID, atomicbuffer, 0, length, nil)
 	}
 
 }
