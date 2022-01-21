@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2021-2022 Talos, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/lirm/aeron-go/archive/codecs"
 	"log"
 	"math/rand"
 	"os"
@@ -44,6 +45,32 @@ type TestCases struct {
 
 var testCases = []TestCases{
 	{int32(*TestConfig.SampleStream), *TestConfig.SampleChannel, int32(*TestConfig.ReplayStream), *TestConfig.ReplayChannel},
+}
+
+// For testing async events
+type TestCounters struct {
+	recordingSignalCount        int
+	recordingEventStartedCount  int
+	recordingEventProgressCount int
+	recordingEventStoppedCount  int
+}
+
+var testCounters TestCounters
+
+func RecordingSignalListener(rse *codecs.RecordingSignalEvent) {
+	testCounters.recordingSignalCount++
+}
+
+func RecordingEventStartedListener(rs *codecs.RecordingStarted) {
+	testCounters.recordingEventStartedCount++
+}
+
+func RecordingEventProgressListener(rp *codecs.RecordingProgress) {
+	testCounters.recordingEventProgressCount++
+}
+
+func RecordingEventStoppedListener(rs *codecs.RecordingStopped) {
+	testCounters.recordingEventStoppedCount++
 }
 
 func TestMain(m *testing.M) {
@@ -135,6 +162,122 @@ func TestKeepAlive(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
+}
+
+// Helper to check values of counters
+func CounterValuesMatch(c TestCounters, signals int, started int, progress int, stopped int, t *testing.T) bool {
+	if testCounters.recordingSignalCount != signals {
+		t.Logf("testCounters.recordingSignalCount[%d] != signals[%d]", testCounters.recordingSignalCount, signals)
+		return false
+	}
+	if testCounters.recordingEventStartedCount != started {
+		t.Logf("testCounters.recordingEventStartedCount[%d] != started[%d]", testCounters.recordingEventStartedCount, started)
+		return false
+	}
+	if testCounters.recordingEventProgressCount != progress {
+		t.Logf("testCounters.recordingEventProgressCount[%d] != progress[%d]", testCounters.recordingEventProgressCount, progress)
+		return false
+	}
+	if testCounters.recordingEventStoppedCount != stopped {
+		t.Logf("testCounters.recordingEventStoppedCount[%d] != stopped[%d]", testCounters.recordingEventStoppedCount, stopped)
+		return false
+	}
+	return true
+}
+
+// Test that Archive RPCs will fail correctly
+func TestRPCFailure(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	// Ask to stop a bogus recording
+	res, err := archive.StopRecordingByIdentity(0xdeadbeef)
+	if err == nil || res {
+		t.Logf("RPC succeeded and should have failed")
+		t.FailNow()
+	}
+
+}
+
+// Test the recording event signals appear
+func TestAsyncEvents(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	archive.Listeners.RecordingSignalListener = RecordingSignalListener
+	archive.Listeners.RecordingEventStartedListener = RecordingEventStartedListener
+	archive.Listeners.RecordingEventProgressListener = RecordingEventProgressListener
+	archive.Listeners.RecordingEventStoppedListener = RecordingEventStoppedListener
+
+	testCounters = TestCounters{0, 0, 0, 0}
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	archive.EnableRecordingEvents()
+	archive.RecordingEventsPoll()
+
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	publication, err := archive.AddRecordedPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	archive.RecordingEventsPoll()
+	if !CounterValuesMatch(testCounters, 1, 1, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	// Delay a little to get the publication is established
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+	idler.Idle(0)
+
+	if err := archive.StopRecordingByPublication(*publication); err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	if !CounterValuesMatch(testCounters, 2, 1, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	archive.RecordingEventsPoll()
+	if !CounterValuesMatch(testCounters, 2, 1, 0, 1, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	// Cleanup
+	archive.DisableRecordingEvents()
+	archive.Listeners.RecordingSignalListener = nil
+	archive.Listeners.RecordingEventStartedListener = nil
+	archive.Listeners.RecordingEventProgressListener = nil
+	archive.Listeners.RecordingEventStoppedListener = nil
+	testCounters = TestCounters{0, 0, 0, 0}
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	publication.Close()
 }
 
 // Test adding a recording and then removing it - by Publication (session specific)
@@ -357,9 +500,9 @@ func TestStartStopReplay(t *testing.T) {
 	}
 	t.Logf("ListRecording(%d) returned %#v", recordingID, *recording)
 
-	// ListRecording should not find one with a bad Id
-	badId := int64(-127)
-	recording, err = archive.ListRecording(badId)
+	// ListRecording should not find one with a bad ID
+	badID := int64(-127)
+	recording, err = archive.ListRecording(badID)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -368,7 +511,7 @@ func TestStartStopReplay(t *testing.T) {
 		t.Log("ListRecording returned a record descriptor and should not have")
 		t.FailNow()
 	}
-	t.Logf("ListRecording(%d) correctly returned nil", badId)
+	t.Logf("ListRecording(%d) correctly returned nil", badID)
 
 	// While we're here, check ListRecordingSubscription is working
 	descriptors, err := archive.ListRecordingSubscriptions(0, 10, false, 0, "aeron")

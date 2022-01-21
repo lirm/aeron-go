@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Talos, Inc.
+// Copyright (C) 2021-2022 Talos, Inc.
 // Copyright (C) 2014-2021 Real Logic Limited.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +17,11 @@
 package archive
 
 import (
+	"errors"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/archive/codecs"
 	"sync"
@@ -35,6 +37,7 @@ type Archive struct {
 	Proxy        *Proxy                  // For outgoing protocol messages (publish/request)
 	Control      *Control                // For incoming protocol messages (subscribe/reponse)
 	Events       *RecordingEventsAdapter // For async recording events (must be enabled)
+	Listeners    *ArchiveListeners       // Per client event listeners for async callbacks
 }
 
 // Constant values used to control behaviour of StartReplay
@@ -44,7 +47,7 @@ const (
 	RecordingLengthMax    = int64(2<<31 - 1) // Replay the whole stream
 )
 
-// replication flag used fir duplication instead of extension, see Replicate and variants
+// replication flag used for duplication instead of extension, see Replicate and variants
 const (
 	RecordingIdNullValue = int32(-1)
 )
@@ -54,7 +57,6 @@ const (
 // within the the FragmentAssemblers without any user data (or other
 // context). Listeners.ErrorListener() if set will be called if for
 // example protocol unmarshalling goes wrong.
-var Listeners *ArchiveListeners
 
 // ArchiveListeners contains all the callbacks
 // By default only the ErrorListener is set to a logging listener.  If
@@ -223,8 +225,8 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.Events.archive = archive
 
 	// Create the listeners and populate
-	Listeners = new(ArchiveListeners)
-	Listeners.ErrorListener = LoggingErrorListener
+	archive.Listeners = new(ArchiveListeners)
+	archive.Listeners.ErrorListener = LoggingErrorListener
 	archive.SetAeronErrorHandler(LoggingErrorListener)
 
 	// In Debug mode initialize our listeners with simple loggers
@@ -232,20 +234,20 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	if logging.GetLevel("archive") >= logging.DEBUG {
 		logger.Debugf("Setting logging listeners")
 
-		Listeners.RecordingEventStartedListener = LoggingRecordingEventStartedListener
-		Listeners.RecordingEventProgressListener = LoggingRecordingEventProgressListener
-		Listeners.RecordingEventStoppedListener = LoggingRecordingEventStoppedListener
+		archive.Listeners.RecordingEventStartedListener = LoggingRecordingEventStartedListener
+		archive.Listeners.RecordingEventProgressListener = LoggingRecordingEventProgressListener
+		archive.Listeners.RecordingEventStoppedListener = LoggingRecordingEventStoppedListener
 
-		Listeners.RecordingSignalListener = LoggingRecordingSignalListener
+		archive.Listeners.RecordingSignalListener = LoggingRecordingSignalListener
 
-		Listeners.AvailableImageListener = LoggingAvailableImageListener
-		Listeners.UnavailableImageListener = LoggingUnavailableImageListener
+		archive.Listeners.AvailableImageListener = LoggingAvailableImageListener
+		archive.Listeners.UnavailableImageListener = LoggingUnavailableImageListener
 
-		Listeners.NewSubscriptionListener = LoggingNewSubscriptionListener
-		Listeners.NewPublicationListener = LoggingNewPublicationListener
+		archive.Listeners.NewSubscriptionListener = LoggingNewSubscriptionListener
+		archive.Listeners.NewPublicationListener = LoggingNewPublicationListener
 
-		archive.aeronContext.NewSubscriptionHandler(Listeners.NewSubscriptionListener)
-		archive.aeronContext.NewPublicationHandler(Listeners.NewPublicationListener)
+		archive.aeronContext.NewSubscriptionHandler(archive.Listeners.NewSubscriptionListener)
+		archive.aeronContext.NewPublicationHandler(archive.Listeners.NewPublicationListener)
 	}
 
 	// Connect the underlying aeron
@@ -283,8 +285,13 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	}
 
 	start := time.Now()
+	pollContext := PollContext{archive.Control, correlationID}
+
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
-		fragments := archive.Control.PollWithContext(ConnectionControlFragmentHandler, correlationID, 1)
+		fragments := archive.Control.PollWithContext(
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+				ConnectionControlFragmentHandler(&pollContext, buf, offset, length, header)
+			}, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragment(s)\n", fragments)
 		}
@@ -362,6 +369,15 @@ func (archive *Archive) EnableRecordingEvents() {
 	logger.Debugf("RecordingEvents subscription: %#v", archive.Events.Subscription)
 }
 
+// IsRecordingEventsConnected returns true if the recording events subscription
+// is connected.
+func (archive *Archive) IsRecordingEventsConnected() (bool, error) {
+	if !archive.Events.Enabled {
+		return false, errors.New("recording events not enabled")
+	}
+	return archive.Events.Subscription.IsConnected(), nil
+}
+
 // DisableRecordingEvents stops recording events flowing
 func (archive *Archive) DisableRecordingEvents() {
 	archive.Events.Subscription.Close()
@@ -371,7 +387,7 @@ func (archive *Archive) DisableRecordingEvents() {
 
 // RecordingEventsPoll is used to poll for recording events
 func (archive *Archive) RecordingEventsPoll() int {
-	return archive.Events.Poll(nil, 1)
+	return archive.Events.PollWithContext(nil, 1)
 }
 
 // AddSubscription will add a new subscription to the driver.
@@ -468,6 +484,9 @@ func (archive *Archive) StopRecordingByIdentity(recordingID int64) (bool, error)
 		logger.Debugf("StopRecordingByIdentity result was %d\n", res)
 	}
 
+	if err != nil {
+		return false, err
+	}
 	return res >= 0, err
 }
 

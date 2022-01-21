@@ -103,7 +103,7 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 }
 
 // PollWithContext as for Poll() but provides an integer argument for passing contextual information
-func (sub *Subscription) PollWithContext(handler term.FragmentHandlerWithContext, context int64, fragmentLimit int) int {
+func (sub *Subscription) PollWithContext(handler term.FragmentHandler, fragmentLimit int) int {
 
 	img := sub.images.Get()
 	length := len(img)
@@ -118,11 +118,11 @@ func (sub *Subscription) PollWithContext(handler term.FragmentHandlerWithContext
 		}
 
 		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].PollWithContext(handler, context, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].PollWithContext(handler, fragmentLimit-fragmentsRead)
 		}
 
 		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].PollWithContext(handler, context, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].PollWithContext(handler, fragmentLimit-fragmentsRead)
 		}
 	}
 
@@ -169,6 +169,16 @@ func (sub *Subscription) removeImage(correlationID int64) *Image {
 // RegistrationID returns the registration id.
 func (sub *Subscription) RegistrationID() int64 {
 	return sub.registrationID
+}
+
+// IsConnected returns if this subscription is connected by having at least one open publication Image.
+func (sub *Subscription) IsConnected() bool {
+	for _, image := range sub.images.Get() {
+		if !image.IsClosed() {
+			return true
+		}
+	}
+	return false
 }
 
 // HasImages is a helper method checking whether this subscription has any images associated with it.
