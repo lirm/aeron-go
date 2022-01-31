@@ -85,6 +85,7 @@ func MakeBuffer(args ...interface{}) *Buffer {
 }
 
 // Wrap raw memory with this buffer instance
+//go:norace
 func (buf *Buffer) Wrap(buffer unsafe.Pointer, length int32) *Buffer {
 	buf.bufferPtr = buffer
 	buf.length = length
@@ -92,17 +93,20 @@ func (buf *Buffer) Wrap(buffer unsafe.Pointer, length int32) *Buffer {
 }
 
 // Ptr will return the raw memory pointer for the underlying buffer
+//go:norace
 func (buf *Buffer) Ptr() unsafe.Pointer {
 	return buf.bufferPtr
 }
 
 // Capacity of the buffer, which is used for bound checking
+//go:norace
 func (buf *Buffer) Capacity() int32 {
 	return buf.length
 }
 
 // Fill the buffer with the value of the argument byte. Generally used for initialization,
 // since it's somewhat expensive.
+//go:norace
 func (buf *Buffer) Fill(b uint8) {
 	if buf.length == 0 {
 		return
@@ -113,6 +117,7 @@ func (buf *Buffer) Fill(b uint8) {
 	}
 }
 
+//go:norace
 func (buf *Buffer) GetUInt8(offset int32) uint8 {
 	BoundsCheck(offset, 1, buf.length)
 
@@ -121,6 +126,7 @@ func (buf *Buffer) GetUInt8(offset int32) uint8 {
 	return *(*uint8)(uptr)
 }
 
+//go:norace
 func (buf *Buffer) GetUInt16(offset int32) uint16 {
 	BoundsCheck(offset, 2, buf.length)
 
@@ -129,6 +135,7 @@ func (buf *Buffer) GetUInt16(offset int32) uint16 {
 	return *(*uint16)(uptr)
 }
 
+//go:norace
 func (buf *Buffer) GetInt32(offset int32) int32 {
 	BoundsCheck(offset, 4, buf.length)
 
@@ -137,6 +144,7 @@ func (buf *Buffer) GetInt32(offset int32) int32 {
 	return *(*int32)(uptr)
 }
 
+//go:norace
 func (buf *Buffer) GetInt64(offset int32) int64 {
 	BoundsCheck(offset, 8, buf.length)
 
@@ -145,6 +153,7 @@ func (buf *Buffer) GetInt64(offset int32) int64 {
 	return *(*int64)(uptr)
 }
 
+//go:norace
 func (buf *Buffer) PutUInt8(offset int32, value uint8) {
 	BoundsCheck(offset, 1, buf.length)
 
@@ -153,6 +162,7 @@ func (buf *Buffer) PutUInt8(offset int32, value uint8) {
 	*(*uint8)(uptr) = value
 }
 
+//go:norace
 func (buf *Buffer) PutInt8(offset int32, value int8) {
 	BoundsCheck(offset, 1, buf.length)
 
@@ -161,6 +171,7 @@ func (buf *Buffer) PutInt8(offset int32, value int8) {
 	*(*int8)(uptr) = value
 }
 
+//go:norace
 func (buf *Buffer) PutUInt16(offset int32, value uint16) {
 	BoundsCheck(offset, 2, buf.length)
 
@@ -169,6 +180,7 @@ func (buf *Buffer) PutUInt16(offset int32, value uint16) {
 	*(*uint16)(uptr) = value
 }
 
+//go:norace
 func (buf *Buffer) PutInt32(offset int32, value int32) {
 	BoundsCheck(offset, 4, buf.length)
 
@@ -177,6 +189,7 @@ func (buf *Buffer) PutInt32(offset int32, value int32) {
 	*(*int32)(uptr) = value
 }
 
+//go:norace
 func (buf *Buffer) PutInt64(offset int32, value int64) {
 	BoundsCheck(offset, 8, buf.length)
 
@@ -185,6 +198,7 @@ func (buf *Buffer) PutInt64(offset int32, value int64) {
 	*(*int64)(uptr) = value
 }
 
+//go:norace
 func (buf *Buffer) GetAndAddInt64(offset int32, delta int64) int64 {
 	BoundsCheck(offset, 8, buf.length)
 
@@ -194,6 +208,7 @@ func (buf *Buffer) GetAndAddInt64(offset int32, delta int64) int64 {
 	return int64(newVal) - delta
 }
 
+//go:norace
 func (buf *Buffer) GetInt32Volatile(offset int32) int32 {
 	BoundsCheck(offset, 4, buf.length)
 
@@ -203,6 +218,7 @@ func (buf *Buffer) GetInt32Volatile(offset int32) int32 {
 	return int32(cur)
 }
 
+//go:norace
 func (buf *Buffer) GetInt64Volatile(offset int32) int64 {
 	BoundsCheck(offset, 8, buf.length)
 
@@ -212,6 +228,7 @@ func (buf *Buffer) GetInt64Volatile(offset int32) int64 {
 	return int64(cur)
 }
 
+//go:norace
 func (buf *Buffer) PutInt64Ordered(offset int32, value int64) {
 	BoundsCheck(offset, 8, buf.length)
 
@@ -219,6 +236,7 @@ func (buf *Buffer) PutInt64Ordered(offset int32, value int64) {
 	atomic.StoreInt64((*int64)(uptr), value)
 }
 
+//go:norace
 func (buf *Buffer) PutInt32Ordered(offset int32, value int32) {
 	BoundsCheck(offset, 4, buf.length)
 
@@ -226,6 +244,7 @@ func (buf *Buffer) PutInt32Ordered(offset int32, value int32) {
 	atomic.StoreInt32((*int32)(uptr), value)
 }
 
+//go:norace
 func (buf *Buffer) PutIntOrdered(offset int32, value int) {
 	BoundsCheck(offset, 4, buf.length)
 
@@ -233,6 +252,7 @@ func (buf *Buffer) PutIntOrdered(offset int32, value int) {
 	atomic.StoreInt32((*int32)(uptr), int32(value))
 }
 
+//go:norace
 func (buf *Buffer) CompareAndSetInt64(offset int32, expectedValue, updateValue int64) bool {
 	BoundsCheck(offset, 8, buf.length)
 
@@ -240,6 +260,7 @@ func (buf *Buffer) CompareAndSetInt64(offset int32, expectedValue, updateValue i
 	return atomic.CompareAndSwapInt64((*int64)(uptr), expectedValue, updateValue)
 }
 
+//go:norace
 func (buf *Buffer) CompareAndSetInt32(offset int32, expectedValue, updateValue int32) bool {
 	BoundsCheck(offset, 4, buf.length)
 
@@ -247,6 +268,7 @@ func (buf *Buffer) CompareAndSetInt32(offset int32, expectedValue, updateValue i
 	return atomic.CompareAndSwapInt32((*int32)(uptr), expectedValue, updateValue)
 }
 
+//go:norace
 func (buf *Buffer) PutBytes(index int32, srcBuffer *Buffer, srcint32 int32, length int32) {
 	BoundsCheck(index, length, buf.length)
 	BoundsCheck(srcint32, length, srcBuffer.length)
@@ -254,6 +276,7 @@ func (buf *Buffer) PutBytes(index int32, srcBuffer *Buffer, srcint32 int32, leng
 	util.Memcpy(uintptr(buf.bufferPtr)+uintptr(index), uintptr(srcBuffer.bufferPtr)+uintptr(srcint32), length)
 }
 
+//go:norace
 func (buf *Buffer) GetBytesArray(offset int32, length int32) []byte {
 	BoundsCheck(offset, length, buf.length)
 
@@ -266,6 +289,7 @@ func (buf *Buffer) GetBytesArray(offset int32, length int32) []byte {
 	return bArr
 }
 
+//go:norace
 func (buf *Buffer) GetBytes(offset int32, b []byte) {
 	length := len(b)
 	BoundsCheck(offset, int32(length), buf.length)
@@ -278,6 +302,7 @@ func (buf *Buffer) GetBytes(offset int32, b []byte) {
 
 // WriteBytes writes data from offset and length to the given dest buffer. This will
 // grow the buffer as needed.
+//go:norace
 func (buf *Buffer) WriteBytes(dest *bytes.Buffer, offset int32, length int32) {
 	BoundsCheck(offset, length, buf.length)
 	// grow the buffer all at once to prevent additional allocations.
@@ -288,6 +313,7 @@ func (buf *Buffer) WriteBytes(dest *bytes.Buffer, offset int32, length int32) {
 	}
 }
 
+//go:norace
 func (buf *Buffer) PutBytesArray(index int32, arr *[]byte, srcint32 int32, length int32) {
 	BoundsCheck(index, length, buf.length)
 	BoundsCheck(srcint32, length, int32(len(*arr)))
@@ -299,6 +325,7 @@ func (buf *Buffer) PutBytesArray(index int32, arr *[]byte, srcint32 int32, lengt
 
 // BoundsCheck is helper function to make sure buffer writes and reads to
 // not go out of bounds on stated buffer capacity
+//go:norace
 func BoundsCheck(index int32, length int32, myLength int32) {
 	if (index + length) > myLength {
 		log.Fatal(fmt.Sprintf("Out of Bounds. int32: %d + %d Capacity: %d", index, length, myLength))

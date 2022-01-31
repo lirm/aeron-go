@@ -41,11 +41,13 @@ func NewPosition(buffer *atomic.Buffer, id int32) Position {
 	return pos
 }
 
+//go:norace
 func (pos *Position) get() int64 {
 	p := pos.buffer.GetInt64(pos.offset)
 	return p
 }
 
+//go:norace
 func (pos *Position) set(value int64) {
 	pos.buffer.PutInt64(pos.offset, value)
 }

@@ -607,6 +607,7 @@ func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatu
 
 }
 
+//go:norace
 func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, logFilename string, sourceIdentity string,
 	subscriberPositionID int32, subsRegID int64, corrID int64) {
 	logger.Debugf("OnAvailableImage: streamId=%d, sessionId=%d, logFilename=%s, sourceIdentity=%s, subsRegID=%d, corrID=%d",
