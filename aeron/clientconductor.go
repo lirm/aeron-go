@@ -174,7 +174,7 @@ func (cc *ClientConductor) Close() error {
 	var err error
 	if cc.running.CompareAndSet(true, false) {
 		for _, pub := range cc.pubs {
-			if pub.publication != nil {
+			if pub != nil && pub.publication != nil {
 				err = pub.publication.Close()
 				if err != nil {
 					cc.errorHandler(err)
@@ -183,7 +183,7 @@ func (cc *ClientConductor) Close() error {
 		}
 
 		for _, sub := range cc.subs {
-			if sub.subscription != nil {
+			if sub != nil && sub.subscription != nil {
 				err = sub.subscription.Close()
 				if err != nil {
 					cc.errorHandler(err)
