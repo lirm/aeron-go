@@ -7,5 +7,5 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/sys v0.0.0-20190609082536-301114b31cce // indirect
+	go.uber.org/zap v1.20.0 // indirect
 )

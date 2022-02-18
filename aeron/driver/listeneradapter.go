@@ -17,7 +17,7 @@ limitations under the License.
 package driver
 
 import (
-	logging "github.com/op/go-logging"
+	"github.com/lirm/aeron-go/aeron/logging"
 
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/broadcast"

@@ -19,9 +19,9 @@ package logbuffer
 import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"github.com/op/go-logging"
 	"testing"
 	"unsafe"
 )

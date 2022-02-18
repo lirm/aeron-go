@@ -22,8 +22,8 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/archive/codecs"
-	logging "github.com/op/go-logging"
 	"sync"
 	"time"
 )

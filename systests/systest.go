@@ -21,11 +21,10 @@ import (
 	"fmt"
 	"time"
 
-	logging "github.com/op/go-logging"
-
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
 )
 
 var ExamplesConfig = struct {

@@ -18,13 +18,13 @@ package aeron
 
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/aeron/ringbuffer"
+	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"github.com/op/go-logging"
 	"os"
 	"testing"
 	"time"

@@ -16,7 +16,7 @@ package archive
 
 import (
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	logging "github.com/op/go-logging"
+	"go.uber.org/zap/zapcore"
 	"time"
 )
 
@@ -34,8 +34,8 @@ type Options struct {
 	ResponseStream         int32              // [init] and stream
 	RecordingEventsChannel string             // [enable] Recording progress events
 	RecordingEventsStream  int32              // [enable] and stream
-	ArchiveLoglevel        logging.Level      // [runtime]
-	AeronLoglevel          logging.Level      // [runtime]
+	ArchiveLoglevel        zapcore.Level      // [runtime] via logging.SetLevel()
+	AeronLoglevel          zapcore.Level      // [runtime] via logging.SetLevel()
 	Timeout                time.Duration      // [runtime] How long to try sending/receiving control messages
 	IdleStrategy           idlestrategy.Idler // [runtime] Idlestrategy for sending/receiving control messages
 	RangeChecking          bool               // [runtime] archive protocol marshalling checks
@@ -53,8 +53,8 @@ var defaultOptions = Options{
 	ResponseStream:         20,
 	RecordingEventsChannel: "aeron:udp?control-mode=dynamic|control=localhost:8030",
 	RecordingEventsStream:  30,
-	ArchiveLoglevel:        logging.NOTICE,
-	AeronLoglevel:          logging.NOTICE,
+	ArchiveLoglevel:        zapcore.WarnLevel,
+	AeronLoglevel:          zapcore.WarnLevel,
 	Timeout:                time.Second * 5,
 	IdleStrategy:           idlestrategy.Sleeping{SleepFor: time.Millisecond * 50}, // FIXME: tune
 	RangeChecking:          false,
