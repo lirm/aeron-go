@@ -173,60 +173,60 @@ func (z *ZapLogger) IsEnabledFor(level zapcore.Level) bool {
 
 // Fatalf logs a formatted string at log level Fatal and will then always exit()
 func (z *ZapLogger) Fatalf(template string, args ...interface{}) {
-	z.sugar.Fatalf(template, args)
+	z.sugar.Fatalf(template, args...)
 }
 
 // Errorf logs a formatted string at log level Error
 func (z *ZapLogger) Errorf(template string, args ...interface{}) {
-	z.sugar.Errorf(template, args)
+	z.sugar.Errorf(template, args...)
 }
 
 // Warningf logs a formatted string at log level Warning
 func (z *ZapLogger) Warningf(template string, args ...interface{}) {
-	z.sugar.Warnf(template, args)
+	z.sugar.Warnf(template, args...)
 }
 
 // Infof logs a formatted string at log level Info
 func (z *ZapLogger) Infof(template string, args ...interface{}) {
-	z.sugar.Infof(template, args)
+	z.sugar.Infof(template, args...)
 }
 
 // Noticef logs a formatted string at log level *Info*
 func (z *ZapLogger) Noticef(template string, args ...interface{}) {
-	z.sugar.Infof(template, args)
+	z.sugar.Infof(template, args...)
 }
 
 // Debugf logs a formatted string at log level Debug
 func (z *ZapLogger) Debugf(template string, args ...interface{}) {
-	z.sugar.Debugf(template, args)
+	z.sugar.Debugf(template, args...)
 }
 
 // Fatal logs it's arguments at log level Fatal
 func (z *ZapLogger) Fatal(args ...interface{}) {
-	z.sugar.Fatal(args)
+	z.sugar.Fatal(args...)
 }
 
 // Error logs it's arguments at log level Error
 func (z *ZapLogger) Error(args ...interface{}) {
-	z.sugar.Error(args)
+	z.sugar.Error(args...)
 }
 
 // Warning logs it's arguments at log level Warning
 func (z *ZapLogger) Warning(args ...interface{}) {
-	z.sugar.Warn(args)
+	z.sugar.Warn(args...)
 }
 
 // Info logs it's arguments at log level Info
 func (z *ZapLogger) Info(args ...interface{}) {
-	z.sugar.Info(args)
+	z.sugar.Info(args...)
 }
 
 // Notice logs it's arguments at log level *Info*
 func (z *ZapLogger) Notice(args ...interface{}) {
-	z.sugar.Info(args)
+	z.sugar.Info(args...)
 }
 
 // Debug logs it's arguments at log level Debug
 func (z *ZapLogger) Debug(args ...interface{}) {
-	z.sugar.Debug(args)
+	z.sugar.Debug(args...)
 }
