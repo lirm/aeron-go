@@ -146,6 +146,7 @@ func TestConnection(t *testing.T) {
 		return
 	}
 
+	t.FailNow()
 }
 
 // Test KeepAlive
@@ -344,6 +345,18 @@ func TestPollForErrorEvents(t *testing.T) {
 	}
 	if count != 1 {
 		t.Logf("PollForErrorResponse failed correctly but count is %d and should have been 1", count)
+		t.FailNow()
+	}
+
+	// Then PollForErrorResponse should see no further messages
+	idler.Idle(0)
+	err, count = archive.Control.PollForErrorResponse()
+	if err != nil {
+		t.Logf("PollForErrorResponse failed")
+		t.FailNow()
+	}
+	if count != 0 {
+		t.Logf("PollForErrorResponse succeeded but count is %d and should have been 0", count)
 		t.FailNow()
 	}
 }
