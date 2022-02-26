@@ -517,6 +517,7 @@ func (control *Control) PollWithContext(handler term.FragmentHandler, fragmentLi
 
 	control.Results.ControlResponse = nil  // Clear old results
 	control.Results.IsPollComplete = false // Clear completion flag
+	control.Results.ErrorResponse = nil    // Clear ErrorResponse
 
 	return control.Subscription.PollWithContext(handler, fragmentLimit)
 }
