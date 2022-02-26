@@ -390,6 +390,21 @@ func (archive *Archive) RecordingEventsPoll() int {
 	return archive.Events.PollWithContext(nil, 1)
 }
 
+// PollForErrorResponse polls the response stream for an error draining the queue.
+//
+// If any control messages are present then they will be discarded so this
+// call should not be used unless there are no outstanding operations.
+//
+// This may be used to check for errors, to dispatch async events, and
+// to catch up on messages not for this session if for example the
+// same channel and stream are in use by other sessions.
+//
+// Returns an error if we detect an archive operation in progress
+// and a count of how many messages were consumed
+func (archive *Archive) PollForErrorResponse() (error, int) {
+	return archive.Control.PollForErrorResponse()
+}
+
 // AddSubscription will add a new subscription to the driver.
 //
 // Returns a channel, which can be used for either blocking or non-blocking wait for media driver confirmation

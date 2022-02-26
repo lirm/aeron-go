@@ -46,6 +46,7 @@ type ControlResults struct {
 	RecordingSubscriptionDescriptors []*codecs.RecordingSubscriptionDescriptor
 	IsPollComplete                   bool
 	FragmentsReceived                int
+	ErrorResponse                    error // Used by PollForErrorResponse
 }
 
 // PollContext contains the information we'll need in the image Poll()
@@ -324,6 +325,174 @@ func ConnectionControlFragmentHandler(context *PollContext, buffer *atomic.Buffe
 
 	default:
 		fmt.Printf("ConnectionControlFragmentHandler: Insert decoder for type: %d", hdr.TemplateId)
+	}
+}
+
+// PollForErrorResponse polls the response stream for an error draining the queue.
+//
+// If any control messages are present then they will be discarded so this
+// call should not be used unless there are no outstanding operations.
+//
+// This may be used to check for errors, to dispatch async events, and
+// to catch up on messages not for this session if for example the
+// same channel and stream are in use by other sessions.
+//
+// Returns an error if we detect an archive operation in progress
+// and a count of how many messages were consumed
+func (control *Control) PollForErrorResponse() (error, int) {
+
+	logger.Debugf("PollForErrorResponse(%d)", control.archive.SessionID)
+	context := PollContext{control, 0}
+	received := 0
+
+	// Poll for async events, errors etc until the queue is drained
+	for {
+		ret := control.PollWithContext(
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+				errorResponseFragmentHandler(&context, buf, offset, length, header)
+			}, 10)
+		received += ret
+
+		// If we received a response with an error then return it
+		if control.Results.ErrorResponse != nil {
+			return control.Results.ErrorResponse, received
+		}
+
+		// If we polled and did nothing then return
+		if ret == 0 {
+			return nil, received
+		}
+	}
+
+	return nil, 0 // Should not happen
+}
+
+// errorResponseFragmentHandler is used to check for errors and async events on an idle control
+// session. Essentially:
+//    ignore messages not on our session ID
+//    process recordingSignalEvents
+//    Log a warning if we have interrupted a synchronous event
+func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	pollContext, ok := context.(*PollContext)
+	if !ok {
+		logger.Errorf("context conversion failed")
+		return
+	}
+
+	logger.Debugf("errorResponseFragmentHandler: offset:%d length: %d", offset, length)
+
+	var hdr codecs.SbeGoMessageHeader
+
+	buf := new(bytes.Buffer)
+	buffer.WriteBytes(buf, offset, length)
+
+	marshaller := codecs.NewSbeGoMarshaller()
+	if err := hdr.Decode(marshaller, buf); err != nil {
+		// Not much to be done here as we can't correlate
+		err2 := fmt.Errorf("ConnectionControlFragmentHandler() failed to decode control message header: %w", err)
+		// Call the global error handler, ugly, but it's all we've got
+		if pollContext.control.archive.Listeners.ErrorListener != nil {
+			pollContext.control.archive.Listeners.ErrorListener(err2)
+		}
+	}
+
+	switch hdr.TemplateId {
+	case codecIds.controlResponse:
+		var controlResponse = new(codecs.ControlResponse)
+		logger.Debugf("controlFragmentHandler/controlResponse: Received controlResponse: length %d", buf.Len())
+		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't see what's gone wrong
+			err2 := fmt.Errorf("errorResponseFragmentHandler failed to decode control response:%w", err)
+			// Call the global error handler, ugly, but it's all we've got
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
+			}
+			return
+		}
+
+		// If this was for us then that's bad
+		if controlResponse.ControlSessionId == pollContext.control.archive.SessionID {
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("errorResponseFragmentHandler received and ignoring controlResponse errorResponse should not be called on in parallel with sync operations")
+			logger.Warning(pollContext.control.Results.ErrorResponse)
+			return
+		}
+
+	case codecIds.challenge:
+		var challenge = new(codecs.Challenge)
+
+		if err := challenge.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			err2 := fmt.Errorf("errorResponseFragmentHandler failed to decode challenge: %w", err)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
+			}
+		}
+
+		// If this was for us then that's bad
+		if challenge.ControlSessionId == pollContext.control.archive.SessionID {
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring challenge: errorResponse should not be called on in parallel with sync operations")
+			logger.Warning(pollContext.control.Results.ErrorResponse)
+			return
+		}
+
+	case codecIds.recordingDescriptor:
+		var rd = new(codecs.RecordingDescriptor)
+
+		if err := rd.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			err2 := fmt.Errorf("errorResponseFragmentHandler failed to decode recordingSubscription: %w", err)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
+			}
+		}
+
+		// If this was for us then that's bad
+		if rd.ControlSessionId == pollContext.control.archive.SessionID {
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring recordingDescriptor: errorResponse should not be called on in parallel with sync operations")
+			logger.Warning(pollContext.control.Results.ErrorResponse)
+			return
+		}
+
+	case codecIds.recordingSubscriptionDescriptor:
+		var rsd = new(codecs.RecordingSubscriptionDescriptor)
+
+		if err := rsd.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			err2 := fmt.Errorf("errorResponseFragmentHandler failed to decode recordingSubscription: %w", err)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
+			}
+		}
+
+		// If this was for us then that's bad
+		if rsd.ControlSessionId == pollContext.control.archive.SessionID {
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring recordingsubscriptionDescriptor: errorResponse should not be called on in parallel with sync operations")
+			logger.Warning(pollContext.control.Results.ErrorResponse)
+		}
+
+	case codecIds.recordingSignalEvent:
+		var rse = new(codecs.RecordingSignalEvent)
+
+		if err := rse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't really tell what went wrong
+			err2 := fmt.Errorf("errorResponseFragmentHandler failed to decode recording signal: %w", err)
+			if pollContext.control.archive.Listeners.ErrorListener != nil {
+				pollContext.control.archive.Listeners.ErrorListener(err2)
+			}
+		}
+		if pollContext.control.archive.Listeners.RecordingSignalListener != nil {
+			pollContext.control.archive.Listeners.RecordingSignalListener(rse)
+		}
+
+		if rse.ControlSessionId == pollContext.control.archive.SessionID {
+			// We can call the async callback if it exists
+			if pollContext.control.archive.Listeners.RecordingSignalListener != nil {
+				pollContext.control.archive.Listeners.RecordingSignalListener(rse)
+			}
+		}
+
+	default:
+		fmt.Printf("errorResponseFragmentHandler: Insert decoder for type: %d", hdr.TemplateId)
 	}
 }
 

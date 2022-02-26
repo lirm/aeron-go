@@ -280,6 +280,74 @@ func TestAsyncEvents(t *testing.T) {
 	publication.Close()
 }
 
+// Test PollForErrorEvents
+func TestPollForErrorEvents(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	archive.Listeners.RecordingSignalListener = RecordingSignalListener
+
+	testCounters = TestCounters{0, 0, 0, 0}
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	publication, err := archive.AddRecordedPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	// PollForErrorEvents should simply return successfully with the recording signal event having arrived
+	err, _ = archive.PollForErrorResponse()
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	if !CounterValuesMatch(testCounters, 1, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	// Delay a little to get the publication established
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 500}
+	idler.Idle(0)
+
+	if err := archive.StopRecordingByPublication(*publication); err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	publication.Close()
+
+	// Now we'll reach inside the archive a little to leave an outstanding request in the queue
+	// We know a StopRecording of a non-existent recording should fail but this call will succeed
+	// as it's only teh request half
+	err = archive.Proxy.StopRecordingSubscriptionRequest(12345, 54321)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	// So now PollForErrorResponse should get the reply to that and fail because
+	// overlapping I/O is very bad
+	idler.Idle(0)
+	err, count := archive.Control.PollForErrorResponse()
+	if err == nil {
+		t.Logf("PollForErrorResponse succeeded and should have failed: count is %d", count)
+		t.FailNow()
+	}
+	if count != 1 {
+		t.Logf("PollForErrorResponse failed correctly but count is %d and should have been 1", count)
+		t.FailNow()
+	}
+}
+
 // Test adding a recording and then removing it - by Publication (session specific)
 func TestStartStopRecordingByPublication(t *testing.T) {
 	if !haveArchive {
@@ -305,6 +373,7 @@ func TestStartStopRecordingByPublication(t *testing.T) {
 		t.FailNow()
 	}
 	publication.Close()
+
 }
 
 // Test adding a recording and then removing it - by Subscription
