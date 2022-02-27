@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright (C) 2022 Talos, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -197,6 +198,60 @@ func (driver *Proxy) SendClientKeepalive() {
 	}
 
 	driver.writeCommandToDriver(filler)
+}
+
+// AddDestination sends driver command to add a new destination to an exsiting MDC Publication
+func (driver *Proxy) AddDestination(registrationID int64, channel string) int64 {
+
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.AddDestination: clientID=%d registrationID=%d correlationID=%d",
+		driver.clientID, registrationID, correlationID)
+
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
+
+		var message command.DestinationMessage
+		message.Wrap(buffer, 0)
+		message.RegistrationCorrelationID.Set(registrationID)
+		message.Channel.Set(channel)
+		message.CorrelationID.Set(correlationID)
+		message.ClientID.Set(driver.clientID)
+
+		*length = message.Size()
+
+		return command.AddDestination
+	}
+
+	driver.writeCommandToDriver(filler)
+
+	return correlationID
+}
+
+// RemoveDestination sends driver command to add a new destination to an exsiting MDC Publication
+func (driver *Proxy) RemoveDestination(registrationID int64, channel string) int64 {
+
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.RemoveDestination: clientID=%d registrationID=%d correlationID=%d",
+		driver.clientID, registrationID, correlationID)
+
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
+
+		var message command.DestinationMessage
+		message.Wrap(buffer, 0)
+		message.RegistrationCorrelationID.Set(registrationID)
+		message.Channel.Set(channel)
+		message.CorrelationID.Set(correlationID)
+		message.ClientID.Set(driver.clientID)
+
+		*length = message.Size()
+
+		return command.RemoveDestination
+	}
+
+	driver.writeCommandToDriver(filler)
+
+	return correlationID
 }
 
 func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int32) {

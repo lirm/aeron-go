@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright (C) 2022 Talos, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -202,6 +203,28 @@ func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 		}
 	}
 	return nil
+}
+
+// Add a destination manually to a multi-destination Subscription.
+// Multi-destination routing is used for ReplayMerge but is generally available
+func (sub *Subscription) AddDestination(endpointChannel string) bool {
+	if sub.IsClosed() {
+		return false
+	}
+
+	sub.conductor.AddDestination(sub.registrationID, endpointChannel)
+	return true
+}
+
+// Add a destination manually to a multi-destination Subscription.
+// Multi-destination routing is used for ReplayMerge but is generally available
+func (sub *Subscription) RemoveDestination(endpointChannel string) bool {
+	if sub.IsClosed() {
+		return false
+	}
+
+	sub.conductor.RemoveDestination(sub.registrationID, endpointChannel)
+	return true
 }
 
 // IsConnectedTo is a helper function used primarily by tests, which is used within the same process to verify that

@@ -1,5 +1,6 @@
 /*
 Copyright 2016-2018 Stanislav Liberman
+Copyright (C) 2022 Talos, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -447,6 +448,30 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 		}
 	}
 	cc.subs = cc.subs[:subcnt]
+}
+
+// AddDestination sends the add destination command through the driver proxy
+func (cc *ClientConductor) AddDestination(registrationID int64, endpointChannel string) {
+	logger.Debugf("AddDestination: regID=%d endpointChannel=%s", registrationID, endpointChannel)
+
+	cc.verifyDriverIsActive()
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	cc.driverProxy.AddDestination(registrationID, endpointChannel)
+}
+
+// RemoveDestination sends the remove destination command through the driver proxy
+func (cc *ClientConductor) RemoveDestination(registrationID int64, endpointChannel string) {
+	logger.Debugf("RemoveDestination: regID=%d endpointChannel=%s", registrationID, endpointChannel)
+
+	cc.verifyDriverIsActive()
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	cc.driverProxy.RemoveDestination(registrationID, endpointChannel)
 }
 
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
