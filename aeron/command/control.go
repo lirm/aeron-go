@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright (C) 2022 Talos, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,4 +42,7 @@ const (
 	RemoveCounter = 0x0A
 	// Client Close
 	ClientClose = 0x0B
+
+	// The position a recording has reached when being archived.
+	RecordingPosition = 0x64 // 100
 )
