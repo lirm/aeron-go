@@ -1,4 +1,5 @@
 // Copyright 2016 Stanislav Liberman
+// Copyright 2022 Talos, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -181,4 +182,9 @@ func (aeron *Aeron) NextCorrelationID() int64 {
 // ClientID returns the client identity that has been allocated for communicating with the media driver.
 func (aeron *Aeron) ClientID() int64 {
 	return aeron.driverProxy.ClientID()
+}
+
+// CounterReader returns Aeron's clientconductor's counterReader
+func (aeron *Aeron) CounterReader() *counters.Reader {
+	return aeron.conductor.CounterReader()
 }
