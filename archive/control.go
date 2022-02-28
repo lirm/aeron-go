@@ -412,7 +412,7 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 
 		// If this was for us then that's bad
 		if controlResponse.ControlSessionId == pollContext.control.archive.SessionID {
-			pollContext.control.Results.ErrorResponse = fmt.Errorf("errorResponseFragmentHandler received and ignoring controlResponse errorResponse should not be called on in parallel with sync operations")
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("errorResponseFragmentHandler received and ignoring controlResponse (correlationID:%d). ErrorResponse should not be called on in parallel with sync operations", controlResponse.CorrelationId)
 			logger.Warning(pollContext.control.Results.ErrorResponse)
 			return
 		}
@@ -430,7 +430,7 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 
 		// If this was for us then that's bad
 		if challenge.ControlSessionId == pollContext.control.archive.SessionID {
-			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring challenge: errorResponse should not be called on in parallel with sync operations")
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring challenge  (correlationID:%d). EerrorResponse should not be called on in parallel with sync operations", challenge.CorrelationId)
 			logger.Warning(pollContext.control.Results.ErrorResponse)
 			return
 		}
@@ -448,7 +448,7 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 
 		// If this was for us then that's bad
 		if rd.ControlSessionId == pollContext.control.archive.SessionID {
-			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring recordingDescriptor: errorResponse should not be called on in parallel with sync operations")
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring recordingDescriptor (correlationID:%d). ErrorResponse should not be called on in parallel with sync operations", rd.CorrelationId)
 			logger.Warning(pollContext.control.Results.ErrorResponse)
 			return
 		}
@@ -466,7 +466,7 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 
 		// If this was for us then that's bad
 		if rsd.ControlSessionId == pollContext.control.archive.SessionID {
-			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring recordingsubscriptionDescriptor: errorResponse should not be called on in parallel with sync operations")
+			pollContext.control.Results.ErrorResponse = fmt.Errorf("Received and ignoring recordingsubscriptionDescriptor (correlationID:%d). ErrorResponse should not be called on in parallel with sync operations", rsd.CorrelationId)
 			logger.Warning(pollContext.control.Results.ErrorResponse)
 		}
 

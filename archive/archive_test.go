@@ -145,8 +145,6 @@ func TestConnection(t *testing.T) {
 	if !haveArchive {
 		return
 	}
-
-	t.FailNow()
 }
 
 // Test KeepAlive
