@@ -339,7 +339,7 @@ func ConnectionControlFragmentHandler(context *PollContext, buffer *atomic.Buffe
 //
 // Returns an error if we detect an archive operation in progress
 // and a count of how many messages were consumed
-func (control *Control) PollForErrorResponse() (error, int) {
+func (control *Control) PollForErrorResponse() (int, error) {
 
 	logger.Debugf("PollForErrorResponse(%d)", control.archive.SessionID)
 	context := PollContext{control, 0}
@@ -355,16 +355,16 @@ func (control *Control) PollForErrorResponse() (error, int) {
 
 		// If we received a response with an error then return it
 		if control.Results.ErrorResponse != nil {
-			return control.Results.ErrorResponse, received
+			return received, control.Results.ErrorResponse
 		}
 
 		// If we polled and did nothing then return
 		if ret == 0 {
-			return nil, received
+			return received, nil
 		}
 	}
 
-	return nil, 0 // Should not happen
+	return 0, nil // Should not happen
 }
 
 // errorResponseFragmentHandler is used to check for errors and async events on an idle control
@@ -399,7 +399,7 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 	switch hdr.TemplateId {
 	case codecIds.controlResponse:
 		var controlResponse = new(codecs.ControlResponse)
-		logger.Debugf("controlFragmentHandler/controlResponse: Received controlResponse: length %d", buf.Len())
+		logger.Debugf("controlFragmentHandler/controlResponse: Received controlResponse")
 		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
 			// Not much to be done here as we can't see what's gone wrong
 			err2 := fmt.Errorf("errorResponseFragmentHandler failed to decode control response:%w", err)
@@ -410,12 +410,13 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 			return
 		}
 
-		// If this was for us then that's bad
+		// If this was for us then check for errors
 		if controlResponse.ControlSessionId == pollContext.control.archive.SessionID {
-			pollContext.control.Results.ErrorResponse = fmt.Errorf("errorResponseFragmentHandler received and ignoring controlResponse (correlationID:%d). ErrorResponse should not be called on in parallel with sync operations", controlResponse.CorrelationId)
-			logger.Warning(pollContext.control.Results.ErrorResponse)
-			return
+			if controlResponse.Code == codecs.ControlResponseCode.ERROR {
+				pollContext.control.Results.ErrorResponse = fmt.Errorf("PollForErrorResponse received a ControlResponse (correlationId:%d Code:ERROR error=\"%s\"", controlResponse.CorrelationId, controlResponse.ErrorMessage)
+			}
 		}
+		return
 
 	case codecIds.challenge:
 		var challenge = new(codecs.Challenge)

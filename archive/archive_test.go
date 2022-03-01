@@ -145,6 +145,18 @@ func TestConnection(t *testing.T) {
 	if !haveArchive {
 		return
 	}
+
+	// PollForErrorEvents should be safe
+	for i := 0; i < 10; i++ {
+		count, err := archive.PollForErrorResponse()
+		if err != nil {
+			t.Logf("PollforErrorRespose() recieved %d responses, err is %s", count, err)
+			t.FailNow()
+		}
+		idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+		idler.Idle(0)
+	}
+
 }
 
 // Test KeepAlive
@@ -304,7 +316,7 @@ func TestPollForErrorEvents(t *testing.T) {
 	}
 
 	// PollForErrorEvents should simply return successfully with the recording signal event having arrived
-	err, _ = archive.PollForErrorResponse()
+	_, err = archive.PollForErrorResponse()
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -336,7 +348,7 @@ func TestPollForErrorEvents(t *testing.T) {
 	// So now PollForErrorResponse should get the reply to that and fail because
 	// overlapping I/O is very bad
 	idler.Idle(0)
-	err, count := archive.Control.PollForErrorResponse()
+	count, err := archive.Control.PollForErrorResponse()
 	if err == nil {
 		t.Logf("PollForErrorResponse succeeded and should have failed: count is %d", count)
 		t.FailNow()
@@ -348,7 +360,7 @@ func TestPollForErrorEvents(t *testing.T) {
 
 	// Then PollForErrorResponse should see no further messages
 	idler.Idle(0)
-	err, count = archive.Control.PollForErrorResponse()
+	count, err = archive.Control.PollForErrorResponse()
 	if err != nil {
 		t.Logf("PollForErrorResponse failed")
 		t.FailNow()

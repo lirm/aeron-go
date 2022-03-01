@@ -401,7 +401,7 @@ func (archive *Archive) RecordingEventsPoll() int {
 //
 // Returns an error if we detect an archive operation in progress
 // and a count of how many messages were consumed
-func (archive *Archive) PollForErrorResponse() (error, int) {
+func (archive *Archive) PollForErrorResponse() (int, error) {
 	return archive.Control.PollForErrorResponse()
 }
 
