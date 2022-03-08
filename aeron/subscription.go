@@ -65,6 +65,16 @@ func (sub *Subscription) IsClosed() bool {
 	return sub.isClosed.Get()
 }
 
+// Status returns the Registration Status
+func (sub *Subscription) Status() (int, error) {
+	return sub.conductor.FindSubscriptionStatus(sub.registrationID)
+}
+
+// ChannelStatusID returns the ChannelStatusID
+func (sub *Subscription) ChannelStatusID() (int, error) {
+	return sub.conductor.FindSubscriptionChannelStatusID(sub.registrationID)
+}
+
 // Close will release all images in this subscription, send command to the driver and block waiting for response from
 // the media driver. Images will be lingered by the ClientConductor.
 func (sub *Subscription) Close() error {
@@ -203,6 +213,24 @@ func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 		}
 	}
 	return nil
+}
+
+// ResolvedEndpoint finds the resolved endpoint for the channel. This
+// may be nil if MDS is used and no destination is yet added.
+// The result is simply the first in the list of addresses found if
+// multiple addresses exist
+func (sub *Subscription) ResolvedEndpoint() []byte {
+	reader := sub.conductor.CounterReader()
+	channelStatus, err := sub.Status()
+	if err != nil {
+		return nil
+	}
+	channelStatusID, err := sub.ChannelStatusID()
+	if err != nil {
+		return nil
+	}
+	// logger.Debugf("ResolvedEndpoint: statusID:%d, status:%d\n", channelStatus, channelStatusID)
+	return reader.FindAddress(channelStatus, channelStatusID)
 }
 
 // Add a destination manually to a multi-destination Subscription.
