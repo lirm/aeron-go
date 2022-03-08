@@ -84,6 +84,16 @@ limitations under the License.
 // ...                                                              |
 //  +---------------------------------------------------------------+
 
+// See: SubscriptionReadyFlyweights.java
+//   0                   1                   2                   3
+//   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//  |                        Correlation ID                         |
+//  |                                                               |
+//  +---------------------------------------------------------------+
+//  |                  Channel Status Indicator ID                  |
+//  +---------------------------------------------------------------+
+
 package counters
 
 import (
@@ -111,12 +121,43 @@ const RECORD_UNUSED int32 = 0
 const RECORD_ALLOCATED int32 = 1
 
 const RECORDING_ID_OFFSET = 0
-const SESSION_ID_OFFSET = RECORDING_ID_OFFSET + 64
-const SOURCE_IDENTITY_LENGTH_OFFSET = SESSION_ID_OFFSET + 32
-const SOURCE_IDENTITY_OFFSET = SOURCE_IDENTITY_LENGTH_OFFSET + 32
+const SESSION_ID_OFFSET = RECORDING_ID_OFFSET + 8
+const SOURCE_IDENTITY_LENGTH_OFFSET = SESSION_ID_OFFSET + 4
+const SOURCE_IDENTITY_OFFSET = SOURCE_IDENTITY_LENGTH_OFFSET + 4
 
 const NULL_RECORDING_ID = -1
 const NULL_COUNTER_ID = -1
+
+// From LocalSocketAddressStatus.Java
+const CHANNEL_STATUS_ID_OFFSET = 0
+const LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET = CHANNEL_STATUS_ID_OFFSET + 4
+const LOCAL_SOCKET_ADDRESS_STRING_OFFSET = LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET + 4
+const MAX_IPV6_LENGTH = len("[ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255]:65536")
+const LOCAL_SOCKET_ADDRESS_STATUS_TYPE_ID = 14
+
+// Channel Status is set when the listeneradapter callbacks are invoked
+const (
+	ChannelStatusErrored      = -1 // Channel has errored. Check logs for information
+	ChannelStatusInitializing = 0  // Channel is being initialized
+	ChannelStatusActive       = 1  // Channel has finished initialization and is active
+	ChannelStatusClosing      = 2  // Channel is being closed
+)
+
+// StatusString provides a convenience method for logging and error handling
+func ChannelStatusString(channelStatus int) string {
+	switch channelStatus {
+	case ChannelStatusErrored:
+		return "ChannelStatusErrored"
+	case ChannelStatusInitializing:
+		return "ChannelStatusInitializing"
+	case ChannelStatusActive:
+		return "ChannelStatusActive"
+	case ChannelStatusClosing:
+		return "ChannelStatusClosing"
+	default:
+		return "Unknown"
+	}
+}
 
 type Reader struct {
 	metaData *atomic.Buffer
@@ -196,6 +237,7 @@ func (reader *Reader) FindCounterIDByRecording(recordingID int64) int32 {
 	for i, size := int32(0), reader.MaxCounterID(); i < int32(size); i++ {
 		counterState := reader.CounterState(i)
 		if counterState == RECORD_ALLOCATED && reader.CounterTypeID(i) == command.RecordingPosition {
+			// fmt.Printf("recordingID=%d, lookup=%d\n", recordingID, buffer.GetInt64((i*METADATA_LENGTH)+KEY_OFFSET+RECORDING_ID_OFFSET))
 			if recordingID == buffer.GetInt64((i*METADATA_LENGTH)+KEY_OFFSET+RECORDING_ID_OFFSET) {
 				return i
 			}
@@ -214,6 +256,7 @@ func (reader *Reader) FindCounterIDBySession(sessionID int32) int32 {
 		counterState := reader.CounterState(i)
 		counterTypeID := reader.CounterTypeID(i)
 		if counterState == RECORD_ALLOCATED && counterTypeID == command.RecordingPosition {
+			// fmt.Printf("i=%d, counterState=%d, counterTypeID=%d, %d=%d\n", i, counterState, counterTypeID, sessionID, buffer.GetInt32((i*METADATA_LENGTH)+KEY_OFFSET+SESSION_ID_OFFSET))
 			if sessionID == buffer.GetInt32((i*METADATA_LENGTH)+KEY_OFFSET+SESSION_ID_OFFSET) {
 				return i
 			}
@@ -233,8 +276,8 @@ func (reader *Reader) RecordingID(counterID int32) int64 {
 	return NULL_RECORDING_ID
 }
 
-// SourceIdentity retturns the source identity for the recording
-func (reader *Reader) SourceIdentity(counterID int32) string {
+// SourceIdentity returns the source identity for the recording
+func (reader *Reader) GetSourceIdentity(counterID int32) string {
 	buffer := reader.MetaData()
 	if reader.CounterState(counterID) == RECORD_ALLOCATED && reader.CounterTypeID(counterID) == command.RecordingPosition {
 		offset := (counterID * METADATA_LENGTH) + KEY_OFFSET
@@ -260,22 +303,23 @@ func (reader *Reader) CounterValue(counterID int32) int64 {
 	return buffer.GetInt64Volatile(offset)
 }
 
-// AwaitRecordingCounterID waits for a specific counterID to appear
-// and return it On timeout return (NULLCOUNTER_ID, error)
+// AwaitRecordingCounterID waits for a specific counterID to appear and return it
+// On timeout return (NULL_COUNTER_ID, error)
 func (reader *Reader) AwaitRecordingCounterID(sessionID int32) (int32, error) {
 	start := time.Now()
-	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 10}
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 50} // FIXME: tune, // FIXME: parameterize?
 
 	for {
 		counterID := reader.FindCounterIDBySession(sessionID)
+		//fmt.Printf("counterID:%d, sessionID:%d\n", counterID, sessionID)
 		if counterID != NULL_COUNTER_ID {
 			return counterID, nil
-		}
-
-		// Idle and check timeout
-		idler.Idle(0)
-		if time.Since(start) > time.Second*5 { // FIXME: tune, // FIXME: paramterize?
-			return NULL_COUNTER_ID, fmt.Errorf("Timeout waiting for counter:%d", counterID)
+		} else {
+			// Idle and check timeout
+			idler.Idle(0)
+			if time.Since(start) > time.Second*15 { // FIXME: tune, // FIXME: parameterize?
+				return NULL_COUNTER_ID, fmt.Errorf("Timeout waiting for counter:%d", counterID)
+			}
 		}
 	}
 }
@@ -297,5 +341,82 @@ func (reader *Reader) AwaitPosition(counterID int32, position int64) error {
 		}
 	}
 
+	return nil
+}
+
+// FindAddresses returns the list of currently bound local sockets.
+// Based on LocalSocketAddressStatus.java
+// channelStatusId is the identity of the counter for the channel which aggregates the transports.
+// returns a list of active bound local socket addresses.
+func (reader *Reader) FindAddresses(channelStatusID int) (addresses [][]byte) {
+
+	buffer := reader.MetaData()
+
+	for i, size := int32(0), reader.MaxCounterID(); i < int32(size); i++ {
+		counterState := reader.CounterState(i)
+		counterTypeID := reader.CounterTypeID(i)
+		if counterState == RECORD_ALLOCATED && counterTypeID == LOCAL_SOCKET_ADDRESS_STATUS_TYPE_ID {
+
+			// fmt.Printf("FindAddreses i=%d, counterState=%d, counterTypeID=%d\n", i, counterState, counterTypeID)
+			keyOffset := i*METADATA_LENGTH + KEY_OFFSET
+			counterChannelStatusID := int(buffer.GetInt32(keyOffset + CHANNEL_STATUS_ID_OFFSET))
+			counterValue := reader.CounterValue(i)
+
+			if channelStatusID == counterChannelStatusID && counterValue == ChannelStatusActive {
+				length := buffer.GetInt32(keyOffset + LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET)
+				if length > 0 {
+					b := make([]byte, length)
+					buffer.GetBytes(keyOffset+LOCAL_SOCKET_ADDRESS_STRING_OFFSET, b)
+					addresses = append(addresses, b)
+					// fmt.Printf("FindAddreses: this one is %s\n", b)
+				}
+			}
+		} else if counterState == RECORD_UNUSED {
+			break
+		}
+	}
+	return addresses
+}
+
+// FindAddress returns the first currently bound local sockets.
+// Based on LocalSocketAddressStatus.java
+//   channelStatus   is the value for the channel which aggregates the transports.
+//   channelStatusID is the identity of the counter for the channel which aggregates the transports.
+// returns a list of active bound local socket addresses.
+func (reader *Reader) FindAddress(channelStatus int, channelStatusID int) (address []byte) {
+
+	buffer := reader.MetaData()
+
+	if channelStatus != ChannelStatusActive {
+		return nil
+	}
+
+	for i, size := int32(0), reader.MaxCounterID(); i < int32(size); i++ {
+		counterState := reader.CounterState(i)
+		counterTypeID := reader.CounterTypeID(i)
+
+		if counterState == RECORD_ALLOCATED && counterTypeID == LOCAL_SOCKET_ADDRESS_STATUS_TYPE_ID {
+
+			// fmt.Printf("FindAddreses(%d, %d)) i=%d, counterState=%d, counterTypeID=%d\n", channelStatus, channelStatusID, i, counterState, counterTypeID)
+			keyOffset := i*METADATA_LENGTH + KEY_OFFSET
+			counterChannelStatusID := buffer.GetInt32(keyOffset + CHANNEL_STATUS_ID_OFFSET)
+			counterValue := reader.CounterValue(i)
+
+			// fmt.Printf("\tFindAddreses channelStatusID(%d) == int(counterChannelStatusID)(%d)\n", channelStatusID, int(counterChannelStatusID))
+			// fmt.Printf("\tFindAddreses counterValue(%d) == int64(ChannelStatusActive)(%d)\n", counterValue, ChannelStatusActive)
+			if channelStatusID == int(counterChannelStatusID) && counterValue == int64(ChannelStatusActive) {
+				fmt.Printf("\t\tFindAddreses XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX grabbing value\n")
+				length := buffer.GetInt32(keyOffset + LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET)
+				if length > 0 {
+					b := make([]byte, length)
+					buffer.GetBytes(keyOffset+LOCAL_SOCKET_ADDRESS_STRING_OFFSET, b)
+					// fmt.Printf("FindAddreses: this one is %s\n", b)
+					return b
+				}
+			}
+		} else if counterState == RECORD_UNUSED {
+			break
+		}
+	}
 	return nil
 }
