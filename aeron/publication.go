@@ -33,7 +33,7 @@ const (
 	BackPressured int64 = -2
 	// AdminAction indicates that terms needs to be rotated. User should retry the Offer
 	AdminAction int64 = -3
-	// PublicationClosed indicates that this Publication is closed an no further Offers shall succeed
+	// PublicationClosed indicates that this Publication is closed and no further Offers shall succeed
 	PublicationClosed int64 = -4
 	// MaxPositionExceeded indicates that ...
 	MaxPositionExceeded int64 = -5
