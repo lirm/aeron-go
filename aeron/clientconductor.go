@@ -84,6 +84,7 @@ type subscriptionStateDefn struct {
 	streamID           int32
 	errorCode          int32
 	status             int
+	channelStatusID    int
 	channel            string
 	errorMessage       string
 	subscription       *Subscription
@@ -95,6 +96,7 @@ func (sub *subscriptionStateDefn) Init(ch string, regID int64, sID int32, now in
 	sub.streamID = sID
 	sub.timeOfRegistration = now
 	sub.status = RegistrationStatus.AwaitingMediaDriver
+	sub.channelStatusID = ctr.ChannelStatusInitializing
 
 	return sub
 }
@@ -402,6 +404,37 @@ func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
 
 	return subscription
 }
+
+// FindSubscriptionStatus returns the RegistrationStatus of a subscription
+// Returned error will be set iff the subscription is not found
+func (cc *ClientConductor) FindSubscriptionStatus(regID int64) (int, error) {
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	for _, sub := range cc.subs {
+		if sub.regID == regID {
+			return sub.status, nil
+		}
+	}
+	return 0, fmt.Errorf("registrationID not found")
+}
+
+// FindSubscriptionChannelStatusID returns the ChannelStatusID of a subscription
+// Returned error will be set iff the subscription is not found
+func (cc *ClientConductor) FindSubscriptionChannelStatusID(regID int64) (int, error) {
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	for _, sub := range cc.subs {
+		if sub.regID == regID {
+			return sub.channelStatusID, nil
+		}
+	}
+	return 0, fmt.Errorf("registrationID not found")
+}
+
 func waitForMediaDriver(timeOfRegistration int64, cc *ClientConductor) {
 	if now := time.Now().UnixNano(); now > (timeOfRegistration + cc.driverTimeoutNs) {
 		errStr := fmt.Sprintf("No response from driver. started: %d, now: %d, to: %d",
@@ -575,10 +608,12 @@ func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatu
 	defer cc.adminLock.Unlock()
 
 	for _, sub := range cc.subs {
+
 		if sub.regID == correlationID {
 			sub.status = RegistrationStatus.RegisteredMediaDriver
 
 			sub.subscription = NewSubscription(cc, sub.channel, correlationID, sub.streamID)
+			sub.channelStatusID = int(channelStatusIndicatorID)
 
 			if cc.onNewSubscriptionHandler != nil {
 				cc.onNewSubscriptionHandler(sub.channel, sub.streamID, correlationID)
@@ -597,8 +632,11 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 	defer cc.adminLock.Unlock()
 
 	for _, sub := range cc.subs {
-		if sub.streamID == streamID && sub.subscription != nil {
-			if !sub.subscription.hasImage(sessionID) && sub.regID == subsRegID {
+
+		// if sub.streamID == streamID && sub.subscription != nil {
+		if sub.subscription != nil {
+			// logger.Debugf("OnAvailableImage: sub.regID=%d subsRegID=%d corrID=%d %#v", sub.regID, subsRegID, corrID, sub)
+			if sub.regID == subsRegID {
 
 				image := NewImage(sessionID, corrID, logbuffer.Wrap(logFilename))
 				image.subscriptionRegistrationID = sub.regID
