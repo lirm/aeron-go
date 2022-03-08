@@ -328,7 +328,9 @@ func ConnectionControlFragmentHandler(context *PollContext, buffer *atomic.Buffe
 	}
 }
 
-// PollForErrorResponse polls the response stream for an error draining the queue.
+// PollForErrorResponse polls the response stream for errors or async events.
+//
+// It will continue until it either receives an error or the queue is empty.
 //
 // If any control messages are present then they will be discarded so this
 // call should not be used unless there are no outstanding operations.
@@ -350,7 +352,7 @@ func (control *Control) PollForErrorResponse() (int, error) {
 		ret := control.PollWithContext(
 			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 				errorResponseFragmentHandler(&context, buf, offset, length, header)
-			}, 10)
+			}, 1)
 		received += ret
 
 		// If we received a response with an error then return it
