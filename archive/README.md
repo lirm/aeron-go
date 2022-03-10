@@ -83,6 +83,8 @@ The actual semantics of the security are dependent upon which authenticator supp
   * test cleanup in the media driver can be problematic
  * Auth should provide some callout mechanism
  * various FIXMEs
+ * There seems to be problems if there are multiple archive
+   instances. Particularly noticeable when calling aeron.Close()
 
 # Bigger picture issues
  * Java and C++ poll the counters to determine when a recording has actually started but the counters are not
@@ -91,6 +93,10 @@ The actual semantics of the security are dependent upon which authenticator supp
  * Within aeron-go there are cases of Log.Fatalf(), see for example trying to add a publication on a "bogus" channel.
 
 ## Release Notes
+
+### 1.0b3 (in-progress)
+ * Add PollForErrorResponse()
+ * concurrency improvements by having the library lock around RPCs
 
 ### 1.0b2
  * Handle different archive clients using same channel/stream pairing
