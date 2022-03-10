@@ -58,17 +58,13 @@ The implementation provides a synchronous API as the underlying
 mechanism is largely an RPC mechanism and archive operations are not
 considered high frequency.
 
-Associated with this, the library does not lock and assumes management
-of reentrancy is handled by the caller.
-
 If needed it is simple in golang to wrap a synchronous API with a
-channel (see for example aeron.AddSubscription(). If overlapping
-asynchronous calls are needed then this is where you can add locking.
+channel (see for example aeron.AddSubscription().
 
-Some asynchronous events do exist (e.g, recording events) and to be
-delivered a polling mechanism is provided. Again this can be easily
-wrapped in a goroutine if it's desired but ensure there are no other
-operations in progress when polling.
+Some asynchronous events do exist (e.g, recording events and
+heartbeats) and to be delivered the polling mechanisms of
+RecordingEventsPoll() and PollForErrorResponse() are provided. These
+may be easily wrapped in a goroutine if desired,
 
 ## Examples
 
@@ -89,8 +85,6 @@ The actual semantics of the security are dependent upon which authenticator supp
  * various FIXMEs
 
 # Bigger picture issues
- * Decided not to do locking in sync api, could subsequently add locks, or just async with locks.
-   It may be that the control marshaller should be parameterized for this.
  * Java and C++ poll the counters to determine when a recording has actually started but the counters are not
    available in go. As a result we use delays and 'hope' which isn't ideal.
  * It would be nice to silence the OnAvailableCounter noise

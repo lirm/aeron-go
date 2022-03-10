@@ -338,15 +338,17 @@ func TestPollForErrorEvents(t *testing.T) {
 
 	// Now we'll reach inside the archive a little to leave an outstanding request in the queue
 	// We know a StopRecording of a non-existent recording should fail but this call will succeed
-	// as it's only teh request half
+	// as it's only the request half
 	err = archive.Proxy.StopRecordingSubscriptionRequest(12345, 54321)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
 
-	// So now PollForErrorResponse should get the reply to that and fail because
-	// overlapping I/O is very bad
+	// So now PollForErrorResponse should get the reply to that
+	// and fail because overlapping I/O is very bad. Note that if
+	// normal archive calls are made then we have locking to
+	// prevent this
 	idler.Idle(0)
 	count, err := archive.Control.PollForErrorResponse()
 	if err == nil {

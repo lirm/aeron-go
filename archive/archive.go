@@ -38,6 +38,7 @@ type Archive struct {
 	Control      *Control                // For incoming protocol messages (subscribe/reponse)
 	Events       *RecordingEventsAdapter // For async recording events (must be enabled)
 	Listeners    *ArchiveListeners       // Per client event listeners for async callbacks
+	mtx          sync.Mutex              // To ensure no overlapped I/O on archive RPC calls
 }
 
 // Constant values used to control behaviour of StartReplay
@@ -319,6 +320,9 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 
 // Close will terminate client conductor and remove all publications and subscriptions from the media driver
 func (archive *Archive) Close() error {
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
+
 	archive.Proxy.CloseSessionRequest()
 	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
@@ -387,13 +391,12 @@ func (archive *Archive) DisableRecordingEvents() {
 
 // RecordingEventsPoll is used to poll for recording events
 func (archive *Archive) RecordingEventsPoll() int {
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	return archive.Events.PollWithContext(nil, 1)
 }
 
 // PollForErrorResponse polls the response stream for an error draining the queue.
-//
-// If any control messages are present then they will be discarded so this
-// call should not be used unless there are no outstanding operations.
 //
 // This may be used to check for errors, to dispatch async events, and
 // to catch up on messages not for this session if for example the
@@ -402,6 +405,8 @@ func (archive *Archive) RecordingEventsPoll() int {
 // Returns an error if we detect an archive operation in progress
 // and a count of how many messages were consumed
 func (archive *Archive) PollForErrorResponse() (int, error) {
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	return archive.Control.PollForErrorResponse()
 }
 
@@ -454,6 +459,8 @@ func (archive *Archive) StartRecording(channel string, stream int32, isLocal boo
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StartRecordingRequest(correlationID, stream, isLocal, autoStop, channel); err != nil {
 		return 0, err
 	}
@@ -474,6 +481,8 @@ func (archive *Archive) StopRecording(channel string, stream int32) error {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StopRecordingRequest(correlationID, stream, channel); err != nil {
 		return err
 	}
@@ -491,6 +500,8 @@ func (archive *Archive) StopRecordingByIdentity(recordingID int64) (bool, error)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StopRecordingByIdentityRequest(correlationID, recordingID); err != nil {
 		return false, err
 	}
@@ -519,6 +530,8 @@ func (archive *Archive) StopRecordingBySubscriptionId(subscriptionID int64) erro
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StopRecordingSubscriptionRequest(correlationID, subscriptionID); err != nil {
 		return err
 	}
@@ -563,6 +576,8 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 		return nil, err
 	}
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StartRecordingRequest(correlationID, stream, true, false, sessionChannel); err != nil {
 		publication.Close()
 		return nil, err
@@ -584,6 +599,8 @@ func (archive *Archive) ListRecordings(fromRecordingID int64, recordCount int32)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ListRecordingsRequest(correlationID, fromRecordingID, recordCount); err != nil {
 		return nil, err
 	}
@@ -618,6 +635,8 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingID int64, recordCount 
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ListRecordingsForUriRequest(correlationID, fromRecordingID, recordCount, stream, channelFragment); err != nil {
 		return nil, err
 	}
@@ -651,6 +670,8 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ListRecordingRequest(correlationID, recordingID); err != nil {
 		return nil, err
 	}
@@ -698,6 +719,8 @@ func (archive *Archive) StartReplay(recordingID int64, position int64, length in
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ReplayRequest(correlationID, recordingID, position, length, replayChannel, replayStream); err != nil {
 		return 0, err
 	}
@@ -729,6 +752,8 @@ func (archive *Archive) BoundedReplay(recordingID int64, position int64, length 
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.BoundedReplayRequest(correlationID, recordingID, position, length, limitCounterID, replayStream, replayChannel); err != nil {
 		return 0, err
 	}
@@ -745,6 +770,8 @@ func (archive *Archive) StopReplay(replaySessionID int64) error {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StopReplayRequest(correlationID, replaySessionID); err != nil {
 		return err
 	}
@@ -762,6 +789,8 @@ func (archive *Archive) StopAllReplays(recordingID int64) error {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StopAllReplaysRequest(correlationID, recordingID); err != nil {
 		return err
 	}
@@ -781,6 +810,8 @@ func (archive *Archive) ExtendRecording(recordingID int64, stream int32, sourceL
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ExtendRecordingRequest(correlationID, recordingID, stream, sourceLocation, autoStop, channel); err != nil {
 		return 0, err
 	}
@@ -798,6 +829,8 @@ func (archive *Archive) GetRecordingPosition(recordingID int64) (int64, error) {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.RecordingPositionRequest(correlationID, recordingID); err != nil {
 		return 0, err
 	}
@@ -821,6 +854,8 @@ func (archive *Archive) TruncateRecording(recordingID int64, position int64) err
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.TruncateRecordingRequest(correlationID, recordingID, position); err != nil {
 		return err
 	}
@@ -838,6 +873,8 @@ func (archive *Archive) GetStartPosition(recordingID int64) (int64, error) {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StartPositionRequest(correlationID, recordingID); err != nil {
 		return 0, err
 	}
@@ -854,6 +891,8 @@ func (archive *Archive) GetStopPosition(recordingID int64) (int64, error) {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StopPositionRequest(correlationID, recordingID); err != nil {
 		return 0, err
 	}
@@ -870,6 +909,8 @@ func (archive *Archive) FindLastMatchingRecording(minRecordingID int64, sessionI
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.FindLastMatchingRecordingRequest(correlationID, minRecordingID, sessionID, stream, channel); err != nil {
 		return 0, err
 	}
@@ -888,6 +929,8 @@ func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscripti
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ListRecordingSubscriptionsRequest(correlationID, pseudoIndex, subscriptionCount, applyStreamID, stream, channelFragment); err != nil {
 		return nil, err
 	}
@@ -926,6 +969,8 @@ func (archive *Archive) DetachSegments(recordingID int64, newStartPosition int64
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.DetachSegmentsRequest(correlationID, recordingID, newStartPosition); err != nil {
 		return err
 	}
@@ -943,6 +988,8 @@ func (archive *Archive) DeleteDetachedSegments(recordingID int64) (int64, error)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.DeleteDetachedSegmentsRequest(correlationID, recordingID); err != nil {
 		return 0, err
 	}
@@ -963,6 +1010,8 @@ func (archive *Archive) PurgeSegments(recordingID int64, newStartPosition int64)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.PurgeSegmentsRequest(correlationID, recordingID, newStartPosition); err != nil {
 		return 0, err
 	}
@@ -982,6 +1031,8 @@ func (archive *Archive) AttachSegments(recordingID int64) (int64, error) {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.AttachSegmentsRequest(correlationID, recordingID); err != nil {
 		return 0, err
 	}
@@ -1008,6 +1059,8 @@ func (archive *Archive) MigrateSegments(recordingID int64, position int64) (int6
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.MigrateSegmentsRequest(correlationID, recordingID, position); err != nil {
 		return 0, err
 	}
@@ -1015,14 +1068,12 @@ func (archive *Archive) MigrateSegments(recordingID int64, position int64) (int6
 	return archive.Control.PollForResponse(correlationID, archive.SessionID)
 }
 
-// KeepAlive will perform a simple packet exchange with the media-driver
+// KeepAlive sends a simple packet to the media-driver
 //
 // Returns error on failure, nil on success
 func (archive *Archive) KeepAlive() error {
 	correlationID := nextCorrelationID()
 	logger.Debugf("KeepAlive(), correlationID:%d\n", correlationID)
-	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
-	defer correlations.Delete(correlationID)           // Clear the lookup
 
 	return archive.Proxy.KeepAliveRequest(correlationID)
 }
@@ -1054,6 +1105,8 @@ func (archive *Archive) Replicate(srcRecordingID int64, dstRecordingID int64, sr
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ReplicateRequest(correlationID, srcRecordingID, dstRecordingID, srcControlStreamID, srcControlChannel, liveDestination); err != nil {
 		return 0, err
 	}
@@ -1090,6 +1143,8 @@ func (archive *Archive) Replicate2(srcRecordingID int64, dstRecordingID int64, s
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.ReplicateRequest2(correlationID, srcRecordingID, dstRecordingID, stopPosition, channelTagID, srcControlStreamID, srcControlChannel, liveDestination, replicationChannel); err != nil {
 		return 0, err
 	}
@@ -1127,6 +1182,8 @@ func (archive *Archive) TaggedReplicate(srcRecordingID int64, dstRecordingID int
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.TaggedReplicateRequest(correlationID, srcRecordingID, dstRecordingID, channelTagID, subscriptionTagID, srcControlStreamID, srcControlChannel, liveDestination); err != nil {
 		return 0, err
 	}
@@ -1143,6 +1200,8 @@ func (archive *Archive) StopReplication(replicationID int64) error {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.StopReplicationRequest(correlationID, replicationID); err != nil {
 		return err
 	}
@@ -1162,6 +1221,8 @@ func (archive *Archive) PurgeRecording(recordingID int64) error {
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
+	archive.mtx.Lock()
+	defer archive.mtx.Unlock()
 	if err := archive.Proxy.PurgeRecordingRequest(correlationID, recordingID); err != nil {
 		return err
 	}
