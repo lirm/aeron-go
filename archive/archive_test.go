@@ -250,15 +250,15 @@ func TestAsyncEvents(t *testing.T) {
 		t.FailNow()
 	}
 
+	// Delay a little to get the publication is established
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+	idler.Idle(0)
+
 	archive.RecordingEventsPoll()
 	if !CounterValuesMatch(testCounters, 1, 1, 0, 0, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
-
-	// Delay a little to get the publication is established
-	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
-	idler.Idle(0)
 
 	if err := archive.StopRecordingByPublication(*publication); err != nil {
 		t.Log(err)
@@ -645,27 +645,27 @@ func DisabledTestAddRecordedPublicationFailure(t *testing.T) {
 }
 
 // Test concurrency
-func xTestConcurrentConnections(t *testing.T) {
+func DisabledTestConcurrentConnections(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go ConcurrentSimple(&wg, i)
+		go ConcurrentSimple(&wg, i, t)
 	}
 	wg.Wait()
 
 }
 
-func ConcurrentSimple(wg *sync.WaitGroup, n int) {
+func ConcurrentSimple(wg *sync.WaitGroup, n int, t *testing.T) {
 
 	var err error
 	context := aeron.NewContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
 	options := DefaultOptions()
-	options.ArchiveLoglevel = logging.DEBUG
+	// options.ArchiveLoglevel = logging.DEBUG
 
 	defer wg.Done()
-	log.Printf("Worker %d starting", n)
+	t.Logf("Worker %d starting", n)
 
 	// Randomize our stream
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -673,10 +673,21 @@ func ConcurrentSimple(wg *sync.WaitGroup, n int) {
 
 	archive, err = NewArchive(options, context)
 	if err != nil || archive == nil {
-		log.Printf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
+		t.Logf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
 		return
 	}
-	archive.Close()
 
-	log.Printf("Worker %d exiting", n)
+	// Thump out some Start and Stop RecordingRequests. If we do too many we'tll timeout, or need to backoff
+	if false {
+		for i := 0; i < 5; i++ {
+			_, err := archive.StartRecording(testCases[0].sampleChannel, int32(20000+n*100+i), true, true)
+			if err != nil {
+				t.Logf("StartRecording failed for worker %d, attempt %d: %s", n, i, err.Error())
+				return
+			}
+		}
+	}
+
+	archive.Close()
+	t.Logf("Worker %d exiting", n)
 }
