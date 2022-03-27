@@ -146,6 +146,17 @@ func TestConnection(t *testing.T) {
 		return
 	}
 
+	// PollForErrorEvents should be safe
+	for i := 0; i < 10; i++ {
+		count, err := archive.PollForErrorResponse()
+		if err != nil {
+			t.Logf("PollforErrorRespose() recieved %d responses, err is %s", count, err)
+			t.FailNow()
+		}
+		idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+		idler.Idle(0)
+	}
+
 }
 
 // Test KeepAlive
@@ -239,15 +250,15 @@ func TestAsyncEvents(t *testing.T) {
 		t.FailNow()
 	}
 
+	// Delay a little to get the publication is established
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+	idler.Idle(0)
+
 	archive.RecordingEventsPoll()
 	if !CounterValuesMatch(testCounters, 1, 1, 0, 0, t) {
 		t.Log("Async event counters mismatch")
 		t.FailNow()
 	}
-
-	// Delay a little to get the publication is established
-	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
-	idler.Idle(0)
 
 	if err := archive.StopRecordingByPublication(*publication); err != nil {
 		t.Log(err)
@@ -280,6 +291,88 @@ func TestAsyncEvents(t *testing.T) {
 	publication.Close()
 }
 
+// Test PollForErrorEvents
+func TestPollForErrorEvents(t *testing.T) {
+	if !haveArchive {
+		return
+	}
+
+	if testing.Verbose() && DEBUG {
+		logging.SetLevel(logging.DEBUG, "archive")
+	}
+
+	archive.Listeners.RecordingSignalListener = RecordingSignalListener
+
+	testCounters = TestCounters{0, 0, 0, 0}
+	if !CounterValuesMatch(testCounters, 0, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	publication, err := archive.AddRecordedPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	// PollForErrorEvents should simply return successfully with the recording signal event having arrived
+	_, err = archive.PollForErrorResponse()
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	if !CounterValuesMatch(testCounters, 1, 0, 0, 0, t) {
+		t.Log("Async event counters mismatch")
+		t.FailNow()
+	}
+
+	// Delay a little to get the publication established
+	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 500}
+	idler.Idle(0)
+
+	if err := archive.StopRecordingByPublication(*publication); err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	publication.Close()
+
+	// Now we'll reach inside the archive a little to leave an outstanding request in the queue
+	// We know a StopRecording of a non-existent recording should fail but this call will succeed
+	// as it's only the request half
+	err = archive.Proxy.StopRecordingSubscriptionRequest(12345, 54321)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	// So now PollForErrorResponse should get the reply to that
+	// and fail because overlapping I/O is very bad. Note that if
+	// normal archive calls are made then we have locking to
+	// prevent this
+	idler.Idle(0)
+	count, err := archive.Control.PollForErrorResponse()
+	if err == nil {
+		t.Logf("PollForErrorResponse succeeded and should have failed: count is %d", count)
+		t.FailNow()
+	}
+	if count != 1 {
+		t.Logf("PollForErrorResponse failed correctly but count is %d and should have been 1", count)
+		t.FailNow()
+	}
+
+	// Then PollForErrorResponse should see no further messages
+	idler.Idle(0)
+	count, err = archive.Control.PollForErrorResponse()
+	if err != nil {
+		t.Logf("PollForErrorResponse failed")
+		t.FailNow()
+	}
+	if count != 0 {
+		t.Logf("PollForErrorResponse succeeded but count is %d and should have been 0", count)
+		t.FailNow()
+	}
+}
+
 // Test adding a recording and then removing it - by Publication (session specific)
 func TestStartStopRecordingByPublication(t *testing.T) {
 	if !haveArchive {
@@ -305,6 +398,7 @@ func TestStartStopRecordingByPublication(t *testing.T) {
 		t.FailNow()
 	}
 	publication.Close()
+
 }
 
 // Test adding a recording and then removing it - by Subscription
@@ -551,27 +645,27 @@ func DisabledTestAddRecordedPublicationFailure(t *testing.T) {
 }
 
 // Test concurrency
-func xTestConcurrentConnections(t *testing.T) {
+func DisabledTestConcurrentConnections(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go ConcurrentSimple(&wg, i)
+		go ConcurrentSimple(&wg, i, t)
 	}
 	wg.Wait()
 
 }
 
-func ConcurrentSimple(wg *sync.WaitGroup, n int) {
+func ConcurrentSimple(wg *sync.WaitGroup, n int, t *testing.T) {
 
 	var err error
 	context := aeron.NewContext()
 	context.AeronDir(*TestConfig.AeronPrefix)
 	options := DefaultOptions()
-	options.ArchiveLoglevel = logging.DEBUG
+	// options.ArchiveLoglevel = logging.DEBUG
 
 	defer wg.Done()
-	log.Printf("Worker %d starting", n)
+	t.Logf("Worker %d starting", n)
 
 	// Randomize our stream
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -579,10 +673,21 @@ func ConcurrentSimple(wg *sync.WaitGroup, n int) {
 
 	archive, err = NewArchive(options, context)
 	if err != nil || archive == nil {
-		log.Printf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
+		t.Logf("archive-media-driver connection failed, skipping all archive_tests:%s", err.Error())
 		return
 	}
-	archive.Close()
 
-	log.Printf("Worker %d exiting", n)
+	// Thump out some Start and Stop RecordingRequests. If we do too many we'tll timeout, or need to backoff
+	if false {
+		for i := 0; i < 5; i++ {
+			_, err := archive.StartRecording(testCases[0].sampleChannel, int32(20000+n*100+i), true, true)
+			if err != nil {
+				t.Logf("StartRecording failed for worker %d, attempt %d: %s", n, i, err.Error())
+				return
+			}
+		}
+	}
+
+	archive.Close()
+	t.Logf("Worker %d exiting", n)
 }
