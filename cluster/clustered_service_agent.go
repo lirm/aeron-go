@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/lirm/aeron-go/cluster/codecs"
 )
 
 type ClusteredServiceAgent struct {
-	a      *aeron.Aeron
-	ctx    *aeron.Context
-	proxy  *ConsensusModuleProxy
-	reader *counters.Reader
-	sub    *aeron.Subscription
+	a       *aeron.Aeron
+	ctx     *aeron.Context
+	proxy   *ConsensusModuleProxy
+	reader  *counters.Reader
+	adapter *ServiceAdapter
 }
 
 func NewClusteredServiceAgent(
@@ -26,7 +26,6 @@ func NewClusteredServiceAgent(
 	if err != nil {
 		return nil, err
 	}
-	defer a.Close()
 
 	pub := <-a.AddPublication(
 		// TODO: constify?
@@ -40,6 +39,11 @@ func NewClusteredServiceAgent(
 		"aeron:ipc?term-length=128k|alias=consensus-control",
 		int32(104),
 	)
+	adapter := &ServiceAdapter{
+		marshaller:   codecs.NewSbeGoMarshaller(),
+		options:      options,
+		subscription: sub,
+	}
 
 	counterFile, _, _ := counters.MapFile(ctx.CncFileName())
 	reader := counters.NewReader(
@@ -47,13 +51,17 @@ func NewClusteredServiceAgent(
 		counterFile.MetaDataBuf.Get(),
 	)
 
-	return &ClusteredServiceAgent{
-		a:      a,
-		ctx:    ctx,
-		proxy:  proxy,
-		sub:    sub,
-		reader: reader,
-	}, nil
+	agent := &ClusteredServiceAgent{
+		a:       a,
+		adapter: adapter,
+		ctx:     ctx,
+		proxy:   proxy,
+		reader:  reader,
+	}
+
+	adapter.agent = agent
+
+	return agent, nil
 }
 
 func (agent *ClusteredServiceAgent) OnStart() {
@@ -102,9 +110,9 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 
 	agent.proxy.ServiceAckRequest(
 		logPosition,
-		/* TODO: get from label? */ time.Now().Unix(),
+		/* TODO: get from label? */ 0,
 		/* TODO: real value? */ 1,
-		agent.a.ClientID(),
+		/* TODO: use agent.a.ClientID()? */ -1,
 		/* TODO: real value? */ 0,
 	)
 
@@ -122,4 +130,43 @@ func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, string) {
 	})
 
 	return id, label
+}
+
+func (agent *ClusteredServiceAgent) checkForClockTick() bool {
+	return true
+}
+
+func (agent *ClusteredServiceAgent) pollServiceAdapter() {
+	agent.adapter.Poll()
+}
+
+func (agent *ClusteredServiceAgent) DoWork() int {
+	work := 0
+
+	if agent.checkForClockTick() {
+		agent.pollServiceAdapter()
+	}
+
+	return work
+}
+
+type Role int32
+
+const (
+	Follower  Role = 0
+	Candidate      = 1
+	Leader         = 2
+)
+
+func (agent *ClusteredServiceAgent) onJoinLog(
+	logPosition int64,
+	maxLogPosition int64,
+	memberId int32,
+	logSessionId int32,
+	logStreamId int32,
+	isStartup bool,
+	role Role,
+	logChannel string,
+) {
+	fmt.Println("join log called: ", logPosition, isStartup, role, logChannel)
 }

@@ -15,11 +15,11 @@
 package cluster
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/cluster/codecs"
 )
@@ -89,21 +89,25 @@ func (proxy *ConsensusModuleProxy) ServiceAckRequest(
 		relevantID,
 		serviceID,
 	)
+	fmt.Printf("len: %d, bytes: %v\n", len(bytes), bytes)
 
 	if err != nil {
 		return err
 	}
 
-	buffer := atomic.MakeBuffer(bytes, len(bytes))
-	claim := &logbuffer.Claim{}
-	claim.Wrap(buffer, 0, int32(len(bytes)))
-	proxy.publication.TryClaim(int32(len(bytes)), claim)
-	claim.Commit()
 	/*
-		if ret := proxy.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
-			return fmt.Errorf("ConsensusModuleProxy.Offer failed: %d", ret)
-		}
+		buffer := atomic.MakeBuffer(bytes, len(bytes))
+		claim := &logbuffer.Claim{}
+		claim.Wrap(buffer, 0, int32(len(bytes)))
+		proxy.publication.TryClaim(int32(len(bytes)), claim)
+		claim.Commit()
 	*/
+	fmt.Println("publisher is connected: ", proxy.publication.IsConnected())
+
+	//if ret := proxy.Offer(atomic.MakeBuffer(bytes, len(bytes)), 0, int32(len(bytes)), nil); ret < 0 {
+	if ret := proxy.Offer(atomic.MakeBuffer(bytes), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("ConsensusModuleProxy.Offer failed: %d", ret)
+	}
 
 	return nil
 }

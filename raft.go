@@ -21,4 +21,7 @@ func main() {
 	}
 
 	agent.OnStart()
+	for {
+		opts.IdleStrategy.Idle(agent.DoWork())
+	}
 }
