@@ -135,7 +135,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	agent.proxy.ServiceAckRequest(
 		logPosition,
 		/* TODO: get from label? */ 0,
-		/* TODO: real value? */ 1,
+		/* TODO: real value? */ 0,
 		/* TODO: use agent.a.ClientID()? */ -1,
 		/* TODO: real value? */ 0,
 	)
