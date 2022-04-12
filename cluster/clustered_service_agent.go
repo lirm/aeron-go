@@ -11,6 +11,7 @@ import (
 	"github.com/lirm/aeron-go/cluster/codecs"
 )
 
+const serviceId = 0
 const MarkFileUpdateIntervalMs = 1000
 const ServiceStreamId = 104
 const ConsensusModuleStreamId = 105
@@ -18,12 +19,20 @@ const ConsensusModuleStreamId = 105
 type ClusteredServiceAgent struct {
 	a                        *aeron.Aeron
 	ctx                      *aeron.Context
+	opts                     *Options
 	proxy                    *ConsensusModuleProxy
 	reader                   *counters.Reader
-	adapter                  *ServiceAdapter
+	serviceAdapter           *ServiceAdapter
+	logAdapter               *BoundedLogAdapter
 	markFile                 *ClusterMarkFile
+	activeLogEvent           *activeLogEvent
 	cachedTimeMs             int64
 	markFileUpdateDeadlineMs int64
+	logPosition              int64
+	clusterTime              int64
+	memberId                 int32
+	nextAckId                int64
+	role                     Role
 }
 
 func NewClusteredServiceAgent(
@@ -47,10 +56,14 @@ func NewClusteredServiceAgent(
 		"aeron:ipc?term-length=128k|alias=consensus-control",
 		int32(ServiceStreamId),
 	)
-	adapter := &ServiceAdapter{
+	serviceAdapter := &ServiceAdapter{
 		marshaller:   codecs.NewSbeGoMarshaller(),
 		options:      options,
 		subscription: sub,
+	}
+	logAdapter := &BoundedLogAdapter{
+		marshaller: codecs.NewSbeGoMarshaller(),
+		options:    options,
 	}
 
 	counterFile, _, _ := counters.MapFile(ctx.CncFileName())
@@ -65,21 +78,24 @@ func NewClusteredServiceAgent(
 	}
 
 	agent := &ClusteredServiceAgent{
-		a:        a,
-		adapter:  adapter,
-		ctx:      ctx,
-		proxy:    proxy,
-		reader:   reader,
-		markFile: cmf,
+		a:              a,
+		opts:           options,
+		serviceAdapter: serviceAdapter,
+		logAdapter:     logAdapter,
+		ctx:            ctx,
+		proxy:          proxy,
+		reader:         reader,
+		markFile:       cmf,
+		role:           Follower,
 	}
-	adapter.agent = agent
+	serviceAdapter.agent = agent
 
 	cmf.flyweight.ArchiveStreamId.Set(10)
 	cmf.flyweight.ServiceStreamId.Set(ServiceStreamId)
 	cmf.flyweight.ConsensusModuleStreamId.Set(ConsensusModuleStreamId)
 	cmf.flyweight.IngressStreamId.Set(-1)
 	cmf.flyweight.MemberId.Set(-1)
-	cmf.flyweight.ServiceId.Set(0)
+	cmf.flyweight.ServiceId.Set(serviceId)
 	cmf.flyweight.ClusterId.Set(0)
 
 	cmf.UpdateActivityTimestamp(time.Now().UnixMilli())
@@ -132,12 +148,14 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		// TODO: load snapshot
 	}
 
+	ackId := agent.nextAckId
+	agent.nextAckId++
 	agent.proxy.ServiceAckRequest(
 		logPosition,
-		/* TODO: get from label? */ 0,
-		/* TODO: real value? */ 0,
+		agent.clusterTime,
+		ackId,
 		/* TODO: use agent.a.ClientID()? */ -1,
-		/* TODO: real value? */ 0,
+		serviceId,
 	)
 
 	return nil
@@ -170,7 +188,19 @@ func (agent *ClusteredServiceAgent) checkForClockTick() bool {
 }
 
 func (agent *ClusteredServiceAgent) pollServiceAdapter() {
-	agent.adapter.Poll()
+	agent.serviceAdapter.Poll()
+
+	if agent.activeLogEvent != nil && agent.logAdapter.image == nil {
+		event := agent.activeLogEvent
+		agent.activeLogEvent = nil
+		agent.joinActiveLog(event)
+	}
+
+	// TODO:
+	//if (NULL_POSITION != terminationPosition && logPosition >= terminationPosition)
+	//{
+	//	terminate();
+	//}
 }
 
 func (agent *ClusteredServiceAgent) DoWork() int {
@@ -178,6 +208,14 @@ func (agent *ClusteredServiceAgent) DoWork() int {
 
 	if agent.checkForClockTick() {
 		agent.pollServiceAdapter()
+	}
+
+	if agent.logAdapter.image != nil {
+		polled := agent.logAdapter.Poll()
+		work += polled
+		if polled == 0 && agent.logAdapter.IsDone() {
+			agent.closeLog()
+		}
 	}
 
 	return work
@@ -202,4 +240,74 @@ func (agent *ClusteredServiceAgent) onJoinLog(
 	logChannel string,
 ) {
 	fmt.Println("join log called: ", logPosition, isStartup, role, logChannel)
+	agent.logAdapter.maxLogPosition = logPosition
+	event := activeLogEvent{
+		logPosition:    logPosition,
+		maxLogPosition: maxLogPosition,
+		memberId:       memberId,
+		logSessionId:   logSessionId,
+		logStreamId:    logStreamId,
+		isStartup:      isStartup,
+		role:           role,
+		logChannel:     logChannel,
+	}
+	agent.activeLogEvent = &event
+}
+
+type activeLogEvent struct {
+	logPosition    int64
+	maxLogPosition int64
+	memberId       int32
+	logSessionId   int32
+	logStreamId    int32
+	isStartup      bool
+	role           Role
+	logChannel     string
+}
+
+func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
+	logSub := <-agent.a.AddSubscription(event.logChannel, event.logStreamId)
+	img := agent.awaitImage(event.logSessionId, logSub)
+	if img.Position() != agent.logPosition {
+		fmt.Printf("joinActiveLog - image.position: %v expected: %v\n", img.Position(), agent.logPosition)
+		// TODO: close logSub and return error
+	}
+	agent.logAdapter.image = img
+	agent.logAdapter.maxLogPosition = event.maxLogPosition
+
+	ackId := agent.nextAckId
+	agent.nextAckId++
+	agent.proxy.ServiceAckRequest(event.logPosition, agent.clusterTime, ackId, -1, serviceId)
+
+	agent.memberId = event.memberId
+	agent.markFile.flyweight.MemberId.Set(agent.memberId)
+
+	agent.setRole(event.role)
+}
+
+func (agent *ClusteredServiceAgent) closeLog() {
+	imageLogPos := agent.logAdapter.image.Position()
+	if imageLogPos > agent.logPosition {
+		agent.logPosition = imageLogPos
+	}
+	if err := agent.logAdapter.Close(); err != nil {
+		fmt.Println("error closing log image: ", err)
+	}
+	agent.setRole(Follower)
+}
+
+func (agent *ClusteredServiceAgent) setRole(newRole Role) {
+	if newRole != agent.role {
+		agent.role = newRole
+		// TODO: service.onRoleChange(newRole)
+	}
+}
+
+func (agent *ClusteredServiceAgent) awaitImage(sessionId int32, subscription *aeron.Subscription) *aeron.Image {
+	for {
+		if img := subscription.ImageBySessionID(sessionId); img != nil {
+			return img
+		}
+		agent.opts.IdleStrategy.Idle(0)
+	}
 }

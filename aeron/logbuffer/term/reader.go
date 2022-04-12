@@ -83,3 +83,31 @@ func ReadWithContext(termBuffer *atomic.Buffer, termOffset int32, handler Fragme
 
 	return termOffset, fragmentsRead
 }
+
+// BoundedRead will attempt to read frames from the term up to the specified offsetLimit.
+// Method will return a tuple of new term offset and number of fragments read
+func BoundedRead(termBuffer *atomic.Buffer, termOffset int32, offsetLimit int32, handler FragmentHandler,
+	fragmentsLimit int, header *logbuffer.Header) (int32, int) {
+
+	var fragmentsRead int
+	for fragmentsRead < fragmentsLimit && termOffset < offsetLimit {
+		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
+		if frameLength <= 0 {
+			break
+		}
+
+		fragmentOffset := termOffset
+		termOffset += util.AlignInt32(frameLength, logbuffer.FrameAlignment)
+
+		if !logbuffer.IsPaddingFrame(termBuffer, fragmentOffset) {
+			header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
+			header.SetOffset(fragmentOffset)
+			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
+				frameLength-logbuffer.DataFrameHeader.Length, header)
+
+			fragmentsRead++
+		}
+	}
+
+	return termOffset, fragmentsRead
+}
