@@ -4,18 +4,26 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/cluster/codecs"
 )
 
+const MarkFileUpdateIntervalMs = 1000
+const ServiceStreamId = 104
+const ConsensusModuleStreamId = 105
+
 type ClusteredServiceAgent struct {
-	a       *aeron.Aeron
-	ctx     *aeron.Context
-	proxy   *ConsensusModuleProxy
-	reader  *counters.Reader
-	adapter *ServiceAdapter
+	a                        *aeron.Aeron
+	ctx                      *aeron.Context
+	proxy                    *ConsensusModuleProxy
+	reader                   *counters.Reader
+	adapter                  *ServiceAdapter
+	markFile                 *ClusterMarkFile
+	cachedTimeMs             int64
+	markFileUpdateDeadlineMs int64
 }
 
 func NewClusteredServiceAgent(
@@ -30,14 +38,14 @@ func NewClusteredServiceAgent(
 	pub := <-a.AddPublication(
 		// TODO: constify?
 		"aeron:ipc?term-length=128k|alias=consensus-control",
-		int32(105),
+		int32(ConsensusModuleStreamId),
 	)
 	proxy := NewConsensusModuleProxy(options, pub)
 
 	sub := <-a.AddSubscription(
 		// TODO: constify?
 		"aeron:ipc?term-length=128k|alias=consensus-control",
-		int32(104),
+		int32(ServiceStreamId),
 	)
 	adapter := &ServiceAdapter{
 		marshaller:   codecs.NewSbeGoMarshaller(),
@@ -51,15 +59,31 @@ func NewClusteredServiceAgent(
 		counterFile.MetaDataBuf.Get(),
 	)
 
-	agent := &ClusteredServiceAgent{
-		a:       a,
-		adapter: adapter,
-		ctx:     ctx,
-		proxy:   proxy,
-		reader:  reader,
+	cmf, err := NewClusterMarkFile("/tmp/aeron-cluster/cluster-mark-service-0.dat")
+	if err != nil {
+		return nil, err
 	}
 
+	agent := &ClusteredServiceAgent{
+		a:        a,
+		adapter:  adapter,
+		ctx:      ctx,
+		proxy:    proxy,
+		reader:   reader,
+		markFile: cmf,
+	}
 	adapter.agent = agent
+
+	cmf.flyweight.ArchiveStreamId.Set(10)
+	cmf.flyweight.ServiceStreamId.Set(ServiceStreamId)
+	cmf.flyweight.ConsensusModuleStreamId.Set(ConsensusModuleStreamId)
+	cmf.flyweight.IngressStreamId.Set(-1)
+	cmf.flyweight.MemberId.Set(-1)
+	cmf.flyweight.ServiceId.Set(0)
+	cmf.flyweight.ClusterId.Set(0)
+
+	cmf.UpdateActivityTimestamp(time.Now().UnixMilli())
+	cmf.SignalReady()
 
 	return agent, nil
 }
@@ -133,7 +157,16 @@ func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, string) {
 }
 
 func (agent *ClusteredServiceAgent) checkForClockTick() bool {
-	return true
+	nowMs := time.Now().UnixMilli()
+	if agent.cachedTimeMs != nowMs {
+		agent.cachedTimeMs = nowMs
+		if nowMs > agent.markFileUpdateDeadlineMs {
+			agent.markFileUpdateDeadlineMs = nowMs + MarkFileUpdateIntervalMs
+			agent.markFile.UpdateActivityTimestamp(nowMs)
+		}
+		return true
+	}
+	return false
 }
 
 func (agent *ClusteredServiceAgent) pollServiceAdapter() {

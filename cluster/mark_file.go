@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/lirm/aeron-go/aeron/util"
 	"os"
 	"time"
 
@@ -36,7 +37,7 @@ func NewClusterMarkFile(filename string) (*ClusterMarkFile, error) {
 	fly.HeaderLength.Set(HeaderLength)
 	fly.ErrorBufferLength.Set(ErrorBufferLength)
 	fly.Pid.Set(int64(os.Getpid()))
-	fly.StartTimestamp.Set(time.Now().Unix())
+	fly.StartTimestamp.Set(time.Now().UnixMilli())
 
 	return &ClusterMarkFile{
 		file:      f,
@@ -46,5 +47,15 @@ func NewClusterMarkFile(filename string) (*ClusterMarkFile, error) {
 }
 
 func (cmf *ClusterMarkFile) SignalReady() {
-	// util.SemanticVersionCompose()
+	semanticVersion := util.SemanticVersionCompose(0, 3, 0)
+	//cmf.flyweight.Version.Set(int32(semanticVersion))
+	cmf.buffer.PutInt32Ordered(0, int32(semanticVersion))
+}
+
+func (cmf *ClusterMarkFile) SignalFailedStart() {
+	cmf.flyweight.Version.Set(-1)
+}
+
+func (cmf *ClusterMarkFile) UpdateActivityTimestamp(timestamp int64) {
+	cmf.flyweight.ActivityTimestamp.Set(timestamp)
 }
