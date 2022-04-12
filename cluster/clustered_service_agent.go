@@ -311,3 +311,35 @@ func (agent *ClusteredServiceAgent) awaitImage(sessionId int32, subscription *ae
 		agent.opts.IdleStrategy.Idle(0)
 	}
 }
+
+func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
+	leadershipTermId int64,
+	logPosition int64,
+	timestamp int64,
+	termBaseLogPosition int64,
+	leaderMemberId int32,
+	logSessionId int32,
+	// timeUnit int,
+	appVersion int32) {
+	//if (util.SemanticVersionMajor(ctx.appVersion()) != SemanticVersion.major(appVersion))
+	//{
+	//	ctx.errorHandler().onError(new ClusterException(
+	//	"incompatible version: " + SemanticVersion.toString(ctx.appVersion()) +
+	//	" log=" + SemanticVersion.toString(appVersion)));
+	//	throw new AgentTerminationException();
+	//}
+	//sessionMessageHeaderEncoder.leadershipTermId(leadershipTermId)
+	agent.logPosition = logPosition
+	agent.clusterTime = timestamp
+	// agent.timeUnit = timeUnit
+
+	//service.onNewLeadershipTermEvent(
+	//	leadershipTermId,
+	//	logPosition,
+	//	timestamp,
+	//	termBaseLogPosition,
+	//	leaderMemberId,
+	//	logSessionId,
+	//	timeUnit,
+	//	appVersion)
+}
