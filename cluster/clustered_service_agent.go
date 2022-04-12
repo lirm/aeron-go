@@ -241,7 +241,7 @@ func (agent *ClusteredServiceAgent) onJoinLog(
 ) {
 	fmt.Println("join log called: ", logPosition, isStartup, role, logChannel)
 	agent.logAdapter.maxLogPosition = logPosition
-	event := activeLogEvent{
+	event := &activeLogEvent{
 		logPosition:    logPosition,
 		maxLogPosition: maxLogPosition,
 		memberId:       memberId,
@@ -251,7 +251,7 @@ func (agent *ClusteredServiceAgent) onJoinLog(
 		role:           role,
 		logChannel:     logChannel,
 	}
-	agent.activeLogEvent = &event
+	agent.activeLogEvent = event
 }
 
 type activeLogEvent struct {

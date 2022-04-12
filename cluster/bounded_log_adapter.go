@@ -10,6 +10,17 @@ import (
 	"github.com/lirm/aeron-go/cluster/codecs"
 )
 
+const (
+	schemaId                       = 111
+	sessionMessageHeaderTemplateId = 1
+	timerEventTemplateId           = 20
+	sessionOpenTemplateId          = 21
+	sessionCloseTemplateId         = 22
+	clusterActionReqTemplateId     = 23
+	newLeadershipTermTemplateId    = 24
+	membershipChangeTemplateId     = 25
+)
+
 type BoundedLogAdapter struct {
 	marshaller     *codecs.SbeGoMarshaller
 	options        *Options
@@ -37,36 +48,64 @@ func (adapter *BoundedLogAdapter) onFragment(
 	buffer.WriteBytes(buf, offset, length)
 
 	if err := hdr.Decode(adapter.marshaller, buf); err != nil {
-		fmt.Println("header decode error: ", err)
+		fmt.Println("BoundedLogAdaptor - header decode error: ", err)
+	}
+	if hdr.SchemaId != schemaId {
+		fmt.Println("BoundedLogAdaptor - unexpected schemaId: ", hdr)
+		return
 	}
 
-	j := codecs.JoinLog{}
-	t := codecs.ServiceTerminationPosition{}
 	switch hdr.TemplateId {
-	case j.SbeTemplateId():
-		joinLog := &codecs.JoinLog{}
-		if err := joinLog.Decode(
+	case timerEventTemplateId:
+		fmt.Println("BoundedLogAdaptor - got timer event")
+	case sessionOpenTemplateId:
+		open := &codecs.SessionOpenEvent{}
+		if err := open.Decode(
 			adapter.marshaller,
 			buf,
 			hdr.Version,
 			hdr.BlockLength,
 			adapter.options.RangeChecking,
 		); err != nil {
-			fmt.Println("join log decode error: ", err)
+			fmt.Println("session open decode error: ", err)
 		} else {
-			adapter.agent.onJoinLog(
-				joinLog.LogPosition,
-				joinLog.MaxLogPosition,
-				joinLog.MemberId,
-				joinLog.LogSessionId,
-				joinLog.LogStreamId,
-				joinLog.IsStartup == codecs.BooleanType.TRUE,
-				Role(joinLog.Role),
-				string(joinLog.LogChannel),
-			)
+			fmt.Println("BoundedLogAdaptor - got session open: ", open)
 		}
-	case t.SbeTemplateId():
-		fmt.Println("got termination position log")
+	case sessionCloseTemplateId:
+		ce := &codecs.SessionCloseEvent{}
+		if err := ce.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+			fmt.Println("session close decode error: ", err)
+		} else {
+			fmt.Println("BoundedLogAdaptor - got session close: ", ce)
+		}
+	case clusterActionReqTemplateId:
+		e := &codecs.ClusterActionRequest{}
+		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+			fmt.Println("cluster action request decode error: ", err)
+		} else {
+			fmt.Println("BoundedLogAdaptor - got cluster action request: ", e)
+		}
+	case newLeadershipTermTemplateId:
+		e := &codecs.NewLeadershipTermEvent{}
+		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+			fmt.Println("new leadership term decode error: ", err)
+		} else {
+			fmt.Println("BoundedLogAdaptor - got new leadership term: ", e)
+		}
+	case membershipChangeTemplateId:
+		e := &codecs.MembershipChangeEvent{}
+		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+			fmt.Println("membership change event decode error: ", err)
+		} else {
+			fmt.Println("BoundedLogAdaptor - got membership change event: ", e)
+		}
+	case sessionMessageHeaderTemplateId:
+		e := &codecs.SessionMessageHeader{}
+		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+			fmt.Println("session message header decode error: ", err)
+		} else {
+			fmt.Println("BoundedLogAdaptor - got session message: ", e)
+		}
 	default:
 		fmt.Println("unexpected template id: ", hdr.TemplateId)
 	}
