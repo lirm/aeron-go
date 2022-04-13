@@ -69,14 +69,16 @@ func (adapter *BoundedLogAdapter) onFragment(
 		); err != nil {
 			fmt.Println("session open decode error: ", err)
 		} else {
-			fmt.Println("BoundedLogAdaptor - got session open: ", open)
+			fmt.Printf("BoundedLogAdaptor - got session open: leadershipTermId=%v clusterSessionId=%v\n",
+				open.LeadershipTermId, open.ClusterSessionId)
 		}
 	case sessionCloseTemplateId:
 		ce := &codecs.SessionCloseEvent{}
 		if err := ce.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("session close decode error: ", err)
 		} else {
-			fmt.Println("BoundedLogAdaptor - got session close: ", ce)
+			fmt.Printf("BoundedLogAdaptor - got session close: leadershipTermId=%v clusterSessionId=%v reason=%s\n",
+				ce.LeadershipTermId, ce.ClusterSessionId, ce.CloseReason)
 		}
 	case clusterActionReqTemplateId:
 		e := &codecs.ClusterActionRequest{}

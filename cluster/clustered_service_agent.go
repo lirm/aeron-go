@@ -78,7 +78,7 @@ func NewClusteredServiceAgent(
 		counterFile.MetaDataBuf.Get(),
 	)
 
-	cmf, err := NewClusterMarkFile("/tmp/aeron-cluster/cluster-mark-service-0.dat")
+	cmf, err := NewClusterMarkFile(options.ClusterDir + "/cluster-mark-service-0.dat")
 	if err != nil {
 		return nil, err
 	}

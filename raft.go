@@ -63,6 +63,7 @@ func (s *Service) OnNewLeadershipTermEvent(
 func main() {
 	ctx := aeron.NewContext()
 	opts := cluster.NewOptions()
+	opts.ClusterDir = "/tmp/aeron-go-poc/cluster"
 	service := &Service{}
 	agent, err := cluster.NewClusteredServiceAgent(ctx, opts, service)
 	if err != nil {
