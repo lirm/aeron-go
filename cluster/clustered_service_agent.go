@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/cluster/codecs"
 )
 
@@ -315,6 +317,29 @@ func (agent *ClusteredServiceAgent) awaitImage(sessionId int32, subscription *ae
 		}
 		agent.opts.IdleStrategy.Idle(0)
 	}
+}
+
+func (agent *ClusteredServiceAgent) onSessionMessage(
+	logPosition int64,
+	clusterSessionId int64,
+	timestamp int64,
+	buffer *atomic.Buffer,
+	offset int32,
+	length int32,
+	header *logbuffer.Header,
+) {
+	agent.logPosition = logPosition
+	agent.clusterTime = timestamp
+	// TODO: implement _SOMETHING_ for client session
+	// final ClientSession clientSession = sessionByIdMap.get(clusterSessionId);
+	agent.service.OnSessionMessage(
+		nil,
+		timestamp,
+		buffer,
+		offset,
+		length,
+		header,
+	)
 }
 
 func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(

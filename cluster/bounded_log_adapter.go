@@ -106,7 +106,15 @@ func (adapter *BoundedLogAdapter) onFragment(
 		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("session message header decode error: ", err)
 		} else {
-			fmt.Println("BoundedLogAdaptor - got session message: ", e)
+			adapter.agent.onSessionMessage(
+				header.Position(),
+				e.ClusterSessionId,
+				e.Timestamp,
+				buffer,
+				offset+SessionMessageHeaderLength,
+				length-SessionMessageHeaderLength,
+				header,
+			)
 		}
 	default:
 		fmt.Println("unexpected template id: ", hdr.TemplateId)
