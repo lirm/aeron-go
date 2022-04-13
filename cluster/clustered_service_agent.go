@@ -10,6 +10,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/cluster/codecs"
 )
 
@@ -36,6 +37,7 @@ type ClusteredServiceAgent struct {
 	nextAckId                int64
 	role                     Role
 	service                  ClusteredService
+	sessions                 map[int64]ClientSession
 }
 
 func NewClusteredServiceAgent(
@@ -92,6 +94,7 @@ func NewClusteredServiceAgent(
 		markFile:       cmf,
 		role:           Follower,
 		service:        service,
+		sessions:       map[int64]ClientSession{},
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
@@ -284,7 +287,13 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
 
 	ackId := agent.nextAckId
 	agent.nextAckId++
-	agent.proxy.ServiceAckRequest(event.logPosition, agent.clusterTime, ackId, -1, serviceId)
+	agent.proxy.ServiceAckRequest(
+		event.logPosition,
+		agent.clusterTime,
+		ackId,
+		-1,
+		serviceId,
+	)
 
 	agent.memberId = event.memberId
 	agent.markFile.flyweight.MemberId.Set(agent.memberId)
@@ -310,13 +319,24 @@ func (agent *ClusteredServiceAgent) setRole(newRole Role) {
 	}
 }
 
-func (agent *ClusteredServiceAgent) awaitImage(sessionId int32, subscription *aeron.Subscription) *aeron.Image {
+func (agent *ClusteredServiceAgent) awaitImage(
+	sessionId int32,
+	subscription *aeron.Subscription,
+) *aeron.Image {
 	for {
 		if img := subscription.ImageBySessionID(sessionId); img != nil {
 			return img
 		}
 		agent.opts.IdleStrategy.Idle(0)
 	}
+}
+
+func (agent *ClusteredServiceAgent) onSessionOpen() {
+	// TODO: implement
+}
+
+func (agent *ClusteredServiceAgent) onSessionClose() {
+	// TODO: implement
 }
 
 func (agent *ClusteredServiceAgent) onSessionMessage(
@@ -374,6 +394,28 @@ func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
 		appVersion)
 }
 
+func (agent *ClusteredServiceAgent) Offer(
+	buffer *atomic.Buffer,
+	offset int32,
+	length int32,
+	reservedValueSupplier term.ReservedValueSupplier,
+) int64 {
+	// TODO: implement. Needed for client session
+	return 0
+}
+
+func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, bool) {
+	session, ok := agent.sessions[id]
+	return session, ok
+}
+
+func (agent *ClusteredServiceAgent) closeClientSession(id int64) (ClientSession, bool) {
+	// TODO: implement
+	return nil, false
+}
+
+// BEGIN CLUSTER IMPLEMENTATION
+
 func (agent *ClusteredServiceAgent) LogPosition() int64 {
 	return agent.logPosition
 }
@@ -389,3 +431,5 @@ func (agent *ClusteredServiceAgent) Role() Role {
 func (agent *ClusteredServiceAgent) Time() int64 {
 	return agent.clusterTime
 }
+
+// END CLUSTER IMPLEMENTATION
