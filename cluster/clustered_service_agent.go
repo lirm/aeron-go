@@ -33,11 +33,13 @@ type ClusteredServiceAgent struct {
 	memberId                 int32
 	nextAckId                int64
 	role                     Role
+	service                  ClusteredService
 }
 
 func NewClusteredServiceAgent(
 	ctx *aeron.Context,
 	options *Options,
+	service ClusteredService,
 ) (*ClusteredServiceAgent, error) {
 	a, err := aeron.Connect(ctx)
 	if err != nil {
@@ -87,8 +89,10 @@ func NewClusteredServiceAgent(
 		reader:         reader,
 		markFile:       cmf,
 		role:           Follower,
+		service:        service,
 	}
 	serviceAdapter.agent = agent
+	logAdapter.agent = agent
 
 	cmf.flyweight.ArchiveStreamId.Set(10)
 	cmf.flyweight.ServiceStreamId.Set(ServiceStreamId)
@@ -143,7 +147,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	fmt.Println("recovery position counter: ", id)
 
 	if leadershipTermID == -1 {
-		// TODO: add service callback class
+		agent.service.OnStart(agent, nil)
 	} else {
 		// TODO: load snapshot
 	}
@@ -221,6 +225,7 @@ func (agent *ClusteredServiceAgent) DoWork() int {
 	return work
 }
 
+// TODO: move this to its own file please :)
 type Role int32
 
 const (
@@ -299,7 +304,7 @@ func (agent *ClusteredServiceAgent) closeLog() {
 func (agent *ClusteredServiceAgent) setRole(newRole Role) {
 	if newRole != agent.role {
 		agent.role = newRole
-		// TODO: service.onRoleChange(newRole)
+		agent.service.OnRoleChange(newRole)
 	}
 }
 
@@ -333,13 +338,29 @@ func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
 	agent.clusterTime = timestamp
 	// agent.timeUnit = timeUnit
 
-	//service.onNewLeadershipTermEvent(
-	//	leadershipTermId,
-	//	logPosition,
-	//	timestamp,
-	//	termBaseLogPosition,
-	//	leaderMemberId,
-	//	logSessionId,
-	//	timeUnit,
-	//	appVersion)
+	agent.service.OnNewLeadershipTermEvent(
+		leadershipTermId,
+		logPosition,
+		timestamp,
+		termBaseLogPosition,
+		leaderMemberId,
+		logSessionId,
+		codecs.ClusterTimeUnit.MILLIS,
+		appVersion)
+}
+
+func (agent *ClusteredServiceAgent) LogPosition() int64 {
+	return agent.logPosition
+}
+
+func (agent *ClusteredServiceAgent) MemberId() int32 {
+	return agent.memberId
+}
+
+func (agent *ClusteredServiceAgent) Role() Role {
+	return agent.role
+}
+
+func (agent *ClusteredServiceAgent) Time() int64 {
+	return agent.clusterTime
 }
