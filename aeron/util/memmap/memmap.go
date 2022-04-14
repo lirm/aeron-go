@@ -23,8 +23,8 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
 	mapper "github.com/edsrzf/mmap-go"
-	"github.com/lirm/aeron-go/aeron/logging"
 )
 
 // File is the wrapper around memory mapped file

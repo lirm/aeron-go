@@ -17,9 +17,9 @@ limitations under the License.
 package logbuffer
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logging"
-	"github.com/lirm/aeron-go/aeron/util/memmap"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util/memmap"
 	"unsafe"
 )
 

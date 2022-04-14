@@ -23,12 +23,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/aeron/logging"
-	"github.com/lirm/aeron-go/examples"
+	"github.com/corymonroe-coinbase/aeron-go/aeron"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
+	"github.com/corymonroe-coinbase/aeron-go/examples"
 )
 
 var logger = logging.MustGetLogger("basic_subscriber")

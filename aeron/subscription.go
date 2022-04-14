@@ -17,8 +17,8 @@ limitations under the License.
 package aeron
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logbuffer/term"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer/term"
 )
 
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and

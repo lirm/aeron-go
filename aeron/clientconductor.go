@@ -25,13 +25,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/broadcast"
-	ctr "github.com/lirm/aeron-go/aeron/counters"
-	"github.com/lirm/aeron-go/aeron/driver"
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
-	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/broadcast"
+	ctr "github.com/corymonroe-coinbase/aeron-go/aeron/counters"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/driver"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
 )
 
 var RegistrationStatus = struct {

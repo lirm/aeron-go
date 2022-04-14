@@ -17,11 +17,11 @@ limitations under the License.
 package driver
 
 import (
-	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
 
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/command"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/broadcast"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/command"
 )
 
 var logger = logging.MustGetLogger("driver")

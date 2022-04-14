@@ -17,10 +17,10 @@ package archive
 import (
 	"bytes"
 	"fmt"
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/archive/codecs"
+	"github.com/corymonroe-coinbase/aeron-go/aeron"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/archive/codecs"
 )
 
 // RecordingEventsAdapter is used to poll for recording events on a subscription.

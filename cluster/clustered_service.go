@@ -1,10 +1,10 @@
 package cluster
 
 import (
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/cluster/codecs"
+	"github.com/corymonroe-coinbase/aeron-go/aeron"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
 )
 
 type ClusteredService interface {

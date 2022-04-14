@@ -16,8 +16,8 @@ package archive
 
 import (
 	"bytes"
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/archive/codecs"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/archive/codecs"
 	"testing"
 )
 

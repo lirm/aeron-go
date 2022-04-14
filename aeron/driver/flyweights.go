@@ -17,8 +17,8 @@ limitations under the License.
 package driver
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/flyweight"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/flyweight"
 )
 
 /**

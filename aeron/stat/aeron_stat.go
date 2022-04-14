@@ -18,8 +18,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/corymonroe-coinbase/aeron-go/aeron"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/counters"
 	"time"
 )
 

@@ -19,8 +19,8 @@ package logbuffer
 import (
 	"unsafe"
 
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 )
 
 type Header struct {

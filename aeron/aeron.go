@@ -17,12 +17,12 @@ package aeron
 import (
 	"time"
 
-	"github.com/lirm/aeron-go/aeron/broadcast"
-	"github.com/lirm/aeron-go/aeron/counters"
-	"github.com/lirm/aeron-go/aeron/driver"
-	"github.com/lirm/aeron-go/aeron/logging"
-	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
-	"github.com/lirm/aeron-go/aeron/util/memmap"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/broadcast"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/counters"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/driver"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
+	rb "github.com/corymonroe-coinbase/aeron-go/aeron/ringbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util/memmap"
 )
 
 // NewPublicationHandler is the handler type for new publication notification from the media driver

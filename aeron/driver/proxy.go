@@ -17,9 +17,9 @@ limitations under the License.
 package driver
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/command"
-	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/command"
+	rb "github.com/corymonroe-coinbase/aeron-go/aeron/ringbuffer"
 )
 
 // Proxy is a media driver proxy class that is used to send commands

@@ -19,9 +19,9 @@ package broadcast
 import (
 	"log"
 
-	"github.com/lirm/aeron-go/aeron/atomic"
-	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
-	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	rb "github.com/corymonroe-coinbase/aeron-go/aeron/ringbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 )
 
 var BufferDescriptor = struct {

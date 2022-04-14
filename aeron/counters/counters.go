@@ -20,12 +20,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
 
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/flyweight"
-	"github.com/lirm/aeron-go/aeron/util"
-	"github.com/lirm/aeron-go/aeron/util/memmap"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/flyweight"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util/memmap"
 )
 
 var logger = logging.MustGetLogger("counters")

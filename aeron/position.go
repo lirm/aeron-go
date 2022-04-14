@@ -17,8 +17,8 @@ limitations under the License.
 package aeron
 
 import (
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 )
 
 // Position is a wrapper for a buffer location of a position counter

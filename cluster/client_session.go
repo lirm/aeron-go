@@ -1,9 +1,9 @@
 package cluster
 
 import (
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logbuffer/term"
+	"github.com/corymonroe-coinbase/aeron-go/aeron"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer/term"
 )
 
 type ClientSession interface {

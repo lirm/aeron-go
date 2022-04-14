@@ -16,7 +16,7 @@ package memmap
 
 import (
 	"fmt"
-	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
 	"testing"
 )
 

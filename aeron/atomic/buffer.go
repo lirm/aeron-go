@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 )
 
 // Buffer is the equivalent of AtomicBuffer used by Aeron Java and C++ implementations. It provides

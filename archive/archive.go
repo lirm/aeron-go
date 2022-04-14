@@ -19,11 +19,11 @@ package archive
 import (
 	"errors"
 	"fmt"
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logbuffer"
-	"github.com/lirm/aeron-go/aeron/logging"
-	"github.com/lirm/aeron-go/archive/codecs"
+	"github.com/corymonroe-coinbase/aeron-go/aeron"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
+	"github.com/corymonroe-coinbase/aeron-go/archive/codecs"
 	"sync"
 	"time"
 )

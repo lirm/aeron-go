@@ -16,7 +16,7 @@ limitations under the License.
 
 package flyweight
 
-import "github.com/lirm/aeron-go/aeron/atomic"
+import "github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
 
 type Flyweight interface {
 	Wrap(*atomic.Buffer, int) Flyweight

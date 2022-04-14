@@ -3,7 +3,7 @@ package cluster
 import (
 	"time"
 
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
 )
 
 type Options struct {

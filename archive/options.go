@@ -15,7 +15,7 @@
 package archive
 
 import (
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
 	"go.uber.org/zap/zapcore"
 	"time"
 )

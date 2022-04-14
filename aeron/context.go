@@ -19,8 +19,8 @@ package aeron
 import (
 	"time"
 
-	"github.com/lirm/aeron-go/aeron/counters"
-	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/counters"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
 )
 
 // Context configuration options are located here https://github.com/real-logic/Aeron/wiki/Configuration-Options#aeron-client-options
