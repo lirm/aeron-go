@@ -31,6 +31,7 @@ import (
 //
 // The codecs are generated from that specification using Simple
 // Binary Encoding (SBE) from https://github.com/real-logic/simple-binary-encoding
+
 func ServiceAckRequestPacket(
 	marshaller *SbeGoMarshaller,
 	rangeChecking bool,
@@ -64,5 +65,73 @@ func ServiceAckRequestPacket(
 		return nil, err
 	}
 
+	return buffer.Bytes(), nil
+}
+
+func SnapshotMarkerPacket(
+	marshaller *SbeGoMarshaller,
+	rangeChecking bool,
+	typeId int64,
+	logPosition int64,
+	leadershipTermId int64,
+	index int32,
+	mark SnapshotMarkEnum,
+	timeUnit ClusterTimeUnitEnum,
+	appVersion int32,
+) ([]byte, error) {
+	request := SnapshotMarker{
+		TypeId:           typeId,
+		LogPosition:      logPosition,
+		LeadershipTermId: leadershipTermId,
+		Index:            index,
+		Mark:             mark,
+		TimeUnit:         timeUnit,
+		AppVersion:       appVersion,
+	}
+	header := MessageHeader{
+		BlockLength: request.SbeBlockLength(),
+		TemplateId:  request.SbeTemplateId(),
+		SchemaId:    request.SbeSchemaId(),
+		Version:     request.SbeSchemaVersion(),
+	}
+
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+func ClientSessionPacket(
+	marshaller *SbeGoMarshaller,
+	rangeChecking bool,
+	clusterSessionId int64,
+	responseStreamId int32,
+	responseChannel []byte,
+	encodedPrincipal []byte,
+) ([]byte, error) {
+	request := ClientSession{
+		ClusterSessionId: clusterSessionId,
+		ResponseStreamId: responseStreamId,
+		ResponseChannel:  responseChannel,
+		EncodedPrincipal: encodedPrincipal,
+	}
+	header := MessageHeader{
+		BlockLength: request.SbeBlockLength(),
+		TemplateId:  request.SbeTemplateId(),
+		SchemaId:    request.SbeSchemaId(),
+		Version:     request.SbeSchemaVersion(),
+	}
+
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
 	return buffer.Bytes(), nil
 }

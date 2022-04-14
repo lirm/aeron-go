@@ -52,7 +52,7 @@ func (adapter *ServiceAdapter) fragmentAssembler(
 			hdr.BlockLength,
 			adapter.options.RangeChecking,
 		); err != nil {
-			fmt.Println("join log decode error: ", err)
+			fmt.Println("ServiceAdaptor: join log decode error: ", err)
 		} else {
 			adapter.agent.onJoinLog(
 				joinLog.LogPosition,
@@ -66,8 +66,13 @@ func (adapter *ServiceAdapter) fragmentAssembler(
 			)
 		}
 	case t.SbeTemplateId():
-		fmt.Println("got termination position log")
+		e := codecs.ServiceTerminationPosition{}
+		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+			fmt.Println("ServiceAdaptor: service termination pos decode error: ", err)
+		} else {
+			adapter.agent.onServiceTerminationPosition(e.LogPosition)
+		}
 	default:
-		fmt.Println("unexpected template id: ", hdr.TemplateId)
+		//fmt.Println("ServiceAdaptor: unexpected template id: ", hdr.TemplateId)
 	}
 }

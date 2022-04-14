@@ -45,7 +45,9 @@ func (s *Service) OnRoleChange(role cluster.Role) {
 	fmt.Printf("OnRoleChange called: %v\n", role)
 }
 
-func (s *Service) OnTerminate(cluster cluster.Cluster) {}
+func (s *Service) OnTerminate(cluster cluster.Cluster) {
+	fmt.Printf("OnTerminate called - role=%v logPos=%d\n", cluster.Role(), cluster.LogPosition())
+}
 
 func (s *Service) OnNewLeadershipTermEvent(
 	leadershipTermId int64,
@@ -70,8 +72,5 @@ func main() {
 		panic(err)
 	}
 
-	agent.OnStart()
-	for {
-		opts.IdleStrategy.Idle(agent.DoWork())
-	}
+	agent.StartAndRun()
 }

@@ -85,7 +85,7 @@ func (adapter *BoundedLogAdapter) onFragment(
 		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("cluster action request decode error: ", err)
 		} else {
-			fmt.Println("BoundedLogAdaptor - got cluster action request: ", e)
+			adapter.agent.onServiceAction(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.Action)
 		}
 	case newLeadershipTermTemplateId:
 		e := &codecs.NewLeadershipTermEvent{}
@@ -94,7 +94,7 @@ func (adapter *BoundedLogAdapter) onFragment(
 		} else {
 			fmt.Println("BoundedLogAdaptor - got new leadership term: ", e)
 			adapter.agent.onNewLeadershipTermEvent(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.TermBaseLogPosition,
-				e.LeaderMemberId, e.LogSessionId, e.AppVersion)
+				e.LeaderMemberId, e.LogSessionId, e.TimeUnit, e.AppVersion)
 		}
 	case membershipChangeTemplateId:
 		e := &codecs.MembershipChangeEvent{}
@@ -119,7 +119,7 @@ func (adapter *BoundedLogAdapter) onFragment(
 			)
 		}
 	default:
-		fmt.Println("unexpected template id: ", hdr.TemplateId)
+		fmt.Println("BoundedLogAdaptor: unexpected template id: ", hdr.TemplateId)
 	}
 }
 

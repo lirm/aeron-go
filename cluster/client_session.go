@@ -8,7 +8,7 @@ import (
 
 type ClientSession interface {
 	Id() int64
-	ResponseStreamId() int64
+	ResponseStreamId() int32
 	ResponseChannel() string
 	// EncodedPrinciple() []byte
 	Close()

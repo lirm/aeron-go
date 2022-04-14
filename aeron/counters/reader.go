@@ -17,6 +17,7 @@ limitations under the License.
 package counters
 
 import (
+	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/util"
 )
@@ -24,8 +25,10 @@ import (
 const COUNTER_LENGTH = util.CacheLineLength * 2
 
 const FULL_LABEL_LENGTH = util.CacheLineLength * 6
+const KEY_OFFSET = 16
 const LABEL_OFFSET = util.CacheLineLength * 2
 const METADATA_LENGTH = LABEL_OFFSET + FULL_LABEL_LENGTH
+const MAX_KEY_LENGTH = (util.CacheLineLength * 2) - (util.SizeOfInt32 * 2) - util.SizeOfInt64
 
 const RECORD_UNUSED int32 = 0
 const RECORD_ALLOCATED int32 = 1
@@ -63,8 +66,7 @@ func (reader *Reader) Scan(cb func(Counter)) {
 			break
 		} else if RECORD_ALLOCATED == recordStatus {
 			typeId := reader.metaData.GetInt32(i + 4)
-			labelSize := reader.metaData.GetInt32(i + LABEL_OFFSET)
-			label := string(reader.metaData.GetBytesArray(i+4+LABEL_OFFSET, labelSize))
+			label := reader.labelValue(i)
 
 			// TODO Get the key buffer
 
@@ -76,4 +78,45 @@ func (reader *Reader) Scan(cb func(Counter)) {
 		}
 		id++
 	}
+}
+
+// GetKeyPartInt32 returns an int32 portion of the key at the specified offset
+func (reader *Reader) GetKeyPartInt32(counterId int32, offset int32) (int32, error) {
+	if err := reader.validateCounterIdAndOffset(counterId, offset+util.SizeOfInt32); err != nil {
+		return 0, err
+	}
+	metaDataOffset := counterId * METADATA_LENGTH
+	recordStatus := reader.metaData.GetInt32Volatile(metaDataOffset)
+	if recordStatus != RECORD_ALLOCATED {
+		return 0, fmt.Errorf("counterId=%d recordStatus=%d", counterId, recordStatus)
+	}
+	return reader.metaData.GetInt32(metaDataOffset + KEY_OFFSET + offset), nil
+}
+
+// GetKeyPartInt64 returns an int64 portion of the key at the specified offset
+func (reader *Reader) GetKeyInt64(counterId int32, offset int32) (int64, error) {
+	if err := reader.validateCounterIdAndOffset(counterId, offset+util.SizeOfInt64); err != nil {
+		return 0, err
+	}
+	metaDataOffset := counterId * METADATA_LENGTH
+	recordStatus := reader.metaData.GetInt32Volatile(metaDataOffset)
+	if recordStatus != RECORD_ALLOCATED {
+		return 0, fmt.Errorf("counterId=%d recordStatus=%d", counterId, recordStatus)
+	}
+	return reader.metaData.GetInt64(metaDataOffset + KEY_OFFSET + offset), nil
+}
+
+func (reader *Reader) validateCounterIdAndOffset(counterId int32, offset int32) error {
+	if counterId < 0 || counterId >= int32(reader.maxCounterID) {
+		return fmt.Errorf("counterId=%d maxCounterId=%d", counterId, reader.maxCounterID)
+	}
+	if offset < 0 || offset >= MAX_KEY_LENGTH {
+		return fmt.Errorf("counterId=%d offset=%d maxKeyLength=%d", counterId, offset, MAX_KEY_LENGTH)
+	}
+	return nil
+}
+
+func (reader *Reader) labelValue(metaDataOffset int32) string {
+	labelSize := reader.metaData.GetInt32(metaDataOffset + LABEL_OFFSET)
+	return string(reader.metaData.GetBytesArray(metaDataOffset+LABEL_OFFSET+4, labelSize))
 }
