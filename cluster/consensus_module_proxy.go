@@ -80,7 +80,27 @@ func (proxy *ConsensusModuleProxy) ServiceAckRequest(
 	}
 
 	if ret := proxy.Offer(atomic.MakeBuffer(bytes), 0, int32(len(bytes)), nil); ret < 0 {
-		return fmt.Errorf("ConsensusModuleProxy.Offer failed: %d", ret)
+		return fmt.Errorf("ConsensusModuleProxy.ServiceAckRequest failed: %d", ret)
+	}
+
+	return nil
+}
+
+func (proxy *ConsensusModuleProxy) CloseSessionRequest(
+	clusterSessionId int64,
+) error {
+	// Create a packet and send it
+	bytes, err := codecs.CloseSessionRequestPacket(
+		proxy.marshaller,
+		proxy.options.RangeChecking,
+		clusterSessionId,
+	)
+	if err != nil {
+		return err
+	}
+
+	if ret := proxy.Offer(atomic.MakeBuffer(bytes), 0, int32(len(bytes)), nil); ret < 0 {
+		return fmt.Errorf("ConsensusModuleProxy.CloseSessionRequest failed: %d", ret)
 	}
 
 	return nil

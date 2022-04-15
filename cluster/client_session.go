@@ -70,5 +70,12 @@ func (s *ContainerClientSession) Offer(
 	length int32,
 	reservedValueSupplier term.ReservedValueSupplier,
 ) int64 {
-	return s.agent.Offer(buffer, offset, length, reservedValueSupplier)
+	return s.agent.Offer(
+		s.id,
+		s.response,
+		buffer,
+		offset,
+		length,
+		reservedValueSupplier,
+	)
 }

@@ -2,10 +2,11 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/archive"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/corymonroe-coinbase/aeron-go/archive"
 
 	"github.com/corymonroe-coinbase/aeron-go/aeron"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
@@ -380,12 +381,50 @@ func (agent *ClusteredServiceAgent) awaitImage(
 	}
 }
 
-func (agent *ClusteredServiceAgent) onSessionOpen() {
-	// TODO: implement
+func (agent *ClusteredServiceAgent) onSessionOpen(
+	leadershipTermId int64,
+	logPosition int64,
+	clusterSessionId int64,
+	timestamp int64,
+	responseStreamId int32,
+	responseChannel string,
+	encodedPrincipal []byte,
+) {
+	agent.logPosition = logPosition
+	agent.clusterTime = timestamp
+	if _, ok := agent.sessions[clusterSessionId]; ok {
+		fmt.Printf("clashing session id: %d, ignored\n", clusterSessionId)
+	} else {
+		session := NewContainerClientSession(
+			clusterSessionId,
+			responseStreamId,
+			responseChannel,
+			agent,
+		)
+		// TODO: looks like we only want to connect if this is the leader
+		// currently always connecting
+
+		agent.sessions[session.id] = session
+		agent.service.OnSessionOpen(session, timestamp)
+	}
 }
 
-func (agent *ClusteredServiceAgent) onSessionClose() {
-	// TODO: implement
+func (agent *ClusteredServiceAgent) onSessionClose(
+	leadershipTermId int64,
+	logPosition int64,
+	clusterSessionId int64,
+	timestamp int64,
+	closeReason codecs.CloseReasonEnum,
+) {
+	agent.logPosition = logPosition
+	agent.clusterTime = timestamp
+
+	if session, ok := agent.sessions[clusterSessionId]; ok {
+		delete(agent.sessions, clusterSessionId)
+		agent.service.OnSessionClose(session, timestamp, closeReason)
+	} else {
+		fmt.Printf("unknown session id: %d, ignored\n", clusterSessionId)
+	}
 }
 
 func (agent *ClusteredServiceAgent) onSessionMessage(
@@ -539,13 +578,30 @@ func (agent *ClusteredServiceAgent) getAndIncrementNextAckId() int64 {
 // BEGIN CLUSTER IMPLEMENTATION
 
 func (agent *ClusteredServiceAgent) Offer(
+	clusterSessionId int64,
+	publication *aeron.Publication,
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
 	reservedValueSupplier term.ReservedValueSupplier,
 ) int64 {
-	// TODO: implement. Needed for client session
-	return 0
+	bytes, err := codecs.SessionMessageHeaderPacket(
+		codecs.NewSbeGoMarshaller(),
+		agent.opts.RangeChecking,
+		/* leaderTermId??? */ 0,
+		clusterSessionId,
+		agent.clusterTime,
+	)
+	if err != nil {
+		fmt.Printf("error on ClusteredServiceAgent.Offer: %v\n", err)
+		return 0
+	}
+
+	return publication.Offer(
+		atomic.MakeBuffer(bytes),
+		0, int32(len(bytes)),
+		reservedValueSupplier,
+	)
 }
 
 func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, bool) {
@@ -553,9 +609,12 @@ func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, b
 	return session, ok
 }
 
-func (agent *ClusteredServiceAgent) closeClientSession(id int64) (ClientSession, bool) {
-	// TODO: implement
-	return nil, false
+func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
+	if _, ok := agent.sessions[id]; ok {
+		agent.proxy.CloseSessionRequest(id)
+	} else {
+		fmt.Printf("unknown session id: %d, ignored\n", id)
+	}
 }
 
 func (agent *ClusteredServiceAgent) LogPosition() int64 {

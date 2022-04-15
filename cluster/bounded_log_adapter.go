@@ -30,7 +30,9 @@ type BoundedLogAdapter struct {
 }
 
 func (adapter *BoundedLogAdapter) IsDone() bool {
-	return adapter.image.Position() >= adapter.maxLogPosition || adapter.image.IsEndOfStream() || adapter.image.IsClosed()
+	return adapter.image.Position() >= adapter.maxLogPosition ||
+		adapter.image.IsEndOfStream() ||
+		adapter.image.IsClosed()
 }
 
 func (adapter *BoundedLogAdapter) Poll(limitPos int64) int {
@@ -59,8 +61,8 @@ func (adapter *BoundedLogAdapter) onFragment(
 	case timerEventTemplateId:
 		fmt.Println("BoundedLogAdaptor - got timer event")
 	case sessionOpenTemplateId:
-		open := &codecs.SessionOpenEvent{}
-		if err := open.Decode(
+		event := &codecs.SessionOpenEvent{}
+		if err := event.Decode(
 			adapter.marshaller,
 			buf,
 			hdr.Version,
@@ -68,18 +70,38 @@ func (adapter *BoundedLogAdapter) onFragment(
 			adapter.options.RangeChecking,
 		); err != nil {
 			fmt.Println("session open decode error: ", err)
-		} else {
-			fmt.Printf("BoundedLogAdaptor - got session open: leadershipTermId=%v clusterSessionId=%v\n",
-				open.LeadershipTermId, open.ClusterSessionId)
+			return
 		}
+
+		adapter.agent.onSessionOpen(
+			event.LeadershipTermId,
+			header.Position(),
+			event.ClusterSessionId,
+			event.Timestamp,
+			event.ResponseStreamId,
+			string(event.ResponseChannel),
+			event.EncodedPrincipal,
+		)
 	case sessionCloseTemplateId:
-		ce := &codecs.SessionCloseEvent{}
-		if err := ce.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+		event := &codecs.SessionCloseEvent{}
+		if err := event.Decode(
+			adapter.marshaller,
+			buf,
+			hdr.Version,
+			hdr.BlockLength,
+			adapter.options.RangeChecking,
+		); err != nil {
 			fmt.Println("session close decode error: ", err)
-		} else {
-			fmt.Printf("BoundedLogAdaptor - got session close: leadershipTermId=%v clusterSessionId=%v reason=%s\n",
-				ce.LeadershipTermId, ce.ClusterSessionId, ce.CloseReason)
+			return
 		}
+
+		adapter.agent.onSessionClose(
+			event.LeadershipTermId,
+			header.Position(),
+			event.ClusterSessionId,
+			event.Timestamp,
+			event.CloseReason,
+		)
 	case clusterActionReqTemplateId:
 		e := &codecs.ClusterActionRequest{}
 		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {

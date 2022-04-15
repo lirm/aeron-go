@@ -135,3 +135,63 @@ func ClientSessionPacket(
 	}
 	return buffer.Bytes(), nil
 }
+
+func CloseSessionRequestPacket(
+	marshaller *SbeGoMarshaller,
+	rangeChecking bool,
+	clusterSessionId int64,
+) ([]byte, error) {
+	request := CloseSession{
+		ClusterSessionId: clusterSessionId,
+	}
+
+	// Marshal it
+	header := MessageHeader{
+		BlockLength: request.SbeBlockLength(),
+		TemplateId:  request.SbeTemplateId(),
+		SchemaId:    request.SbeSchemaId(),
+		Version:     request.SbeSchemaVersion(),
+	}
+
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func SessionMessageHeaderPacket(
+	marshaller *SbeGoMarshaller,
+	rangeChecking bool,
+	leadershipTermId int64,
+	clusterSessionId int64,
+	timestamp int64,
+) ([]byte, error) {
+	request := SessionMessageHeader{
+		LeadershipTermId: leadershipTermId,
+		ClusterSessionId: clusterSessionId,
+		Timestamp:        timestamp,
+	}
+
+	// Marshal it
+	header := MessageHeader{
+		BlockLength: request.SbeBlockLength(),
+		TemplateId:  request.SbeTemplateId(),
+		SchemaId:    request.SbeSchemaId(),
+		Version:     request.SbeSchemaVersion(),
+	}
+
+	buffer := new(bytes.Buffer)
+	if err := header.Encode(marshaller, buffer); err != nil {
+		return nil, err
+	}
+	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
