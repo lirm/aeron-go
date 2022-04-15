@@ -12,6 +12,7 @@ type Options struct {
 	RangeChecking    bool               // [runtime] archive protocol marshalling checks
 	LogFragmentLimit int
 	ClusterDir       string
+	ClusterId        int32
 	AppVersion       int32
 }
 

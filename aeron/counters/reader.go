@@ -94,7 +94,7 @@ func (reader *Reader) GetKeyPartInt32(counterId int32, offset int32) (int32, err
 }
 
 // GetKeyPartInt64 returns an int64 portion of the key at the specified offset
-func (reader *Reader) GetKeyInt64(counterId int32, offset int32) (int64, error) {
+func (reader *Reader) GetKeyPartInt64(counterId int32, offset int32) (int64, error) {
 	if err := reader.validateCounterIdAndOffset(counterId, offset+util.SizeOfInt64); err != nil {
 		return 0, err
 	}

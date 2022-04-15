@@ -23,7 +23,11 @@ const ServiceStreamId = 104
 const ConsensusModuleStreamId = 105
 const SnapshotStreamId = 106
 
-const RecordingPosCounterTypeId = 100
+const (
+	RecordingPosCounterTypeId  = 100
+	CommitPosCounterTypeId     = 203
+	RecoveryStateCounterTypeId = 204
+)
 
 type ClusteredServiceAgent struct {
 	a                        *aeron.Aeron
@@ -134,16 +138,21 @@ func (agent *ClusteredServiceAgent) StartAndRun() {
 }
 
 func (agent *ClusteredServiceAgent) OnStart() error {
-	id := agent.awaitCommitPositionCounter( /* TODO: get real cluster_id */ 0)
+	id := agent.awaitCommitPositionCounter(agent.opts.ClusterId)
 	fmt.Println("commit position counter: ", id)
 	return agent.recoverState()
 }
 
-func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterID int) int32 {
+func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterId int32) int32 {
 	id := int32(-1)
 	agent.reader.Scan(func(counter counters.Counter) {
-		if counter.TypeId == /* TODO: constify? */ 203 {
-			id = counter.Id
+		if counter.TypeId == CommitPosCounterTypeId {
+			thisClusterId, err := agent.reader.GetKeyPartInt32(counter.Id, 0)
+			if err != nil {
+				fmt.Println("WARNING: failed to get commit pos clusterId: ", err)
+			} else if thisClusterId == clusterId {
+				id = counter.Id
+			}
 		}
 	})
 	return id
@@ -187,12 +196,11 @@ func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, string) {
 	id := int32(-1)
 	label := ""
 	agent.reader.Scan(func(counter counters.Counter) {
-		if counter.TypeId == /* TODO: constify? */ 204 {
+		if counter.TypeId == RecoveryStateCounterTypeId {
 			id = counter.Id
 			label = counter.Label
 		}
 	})
-
 	return id, label
 }
 
@@ -507,7 +515,7 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 	if err != nil {
 		return 0, err
 	}
-	return agent.reader.GetKeyInt64(counterId, 0)
+	return agent.reader.GetKeyPartInt64(counterId, 0)
 }
 
 func (agent *ClusteredServiceAgent) onServiceTerminationPosition(position int64) {
