@@ -159,7 +159,7 @@ func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterId int32) 
 		}
 	})
 	if id == NullValue {
-		return fmt.Errorf("commit position not found for clusterId: ", clusterId)
+		return fmt.Errorf("commit position not found for clusterId: %d", clusterId)
 	}
 	commitPos, err := counters.NewReadableCounter(agent.reader, id)
 	fmt.Printf("found commit position counter - id=%d value=%d\n", id, commitPos.Get())
@@ -575,8 +575,6 @@ func (agent *ClusteredServiceAgent) getAndIncrementNextAckId() int64 {
 	return ackId
 }
 
-// BEGIN CLUSTER IMPLEMENTATION
-
 func (agent *ClusteredServiceAgent) Offer(
 	clusterSessionId int64,
 	publication *aeron.Publication,
@@ -597,9 +595,11 @@ func (agent *ClusteredServiceAgent) Offer(
 		return 0
 	}
 
+	combined := append(bytes, buffer.GetBytesArray(offset, length)...)
+
 	return publication.Offer(
-		atomic.MakeBuffer(bytes),
-		0, int32(len(bytes)),
+		atomic.MakeBuffer(combined),
+		0, int32(len(combined)),
 		reservedValueSupplier,
 	)
 }
@@ -616,6 +616,8 @@ func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
 		fmt.Printf("unknown session id: %d, ignored\n", id)
 	}
 }
+
+// BEGIN CLUSTER IMPLEMENTATION
 
 func (agent *ClusteredServiceAgent) LogPosition() int64 {
 	return agent.logPosition

@@ -34,7 +34,10 @@ func (s *Service) OnSessionMessage(
 	length int32,
 	header *logbuffer.Header,
 ) {
-	fmt.Printf("OnSessionMessage called: %s\n", string(buffer.GetBytesArray(offset, length)))
+	msg := buffer.GetBytesArray(offset, length)
+	echo := append([]byte("echo: "), msg...)
+	session.Offer(atomic.MakeBuffer(echo), 0, int32(len(echo)), nil)
+	fmt.Printf("OnSessionMessage called: %s\n", string(msg))
 }
 
 func (s *Service) OnTimerEvent(correlationId, timestamp int64) {}
