@@ -2,8 +2,7 @@ package cluster
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 	"time"
 
 	"github.com/corymonroe-coinbase/aeron-go/archive"
@@ -20,9 +19,13 @@ const NullValue = -1
 const NullPosition = -1
 const serviceId = 0
 const MarkFileUpdateIntervalMs = 1000
-const ServiceStreamId = 104
-const ConsensusModuleStreamId = 105
-const SnapshotStreamId = 106
+
+const (
+	ReplayStreamId          = 103
+	ServiceStreamId         = 104
+	ConsensusModuleStreamId = 105
+	SnapshotStreamId        = 106
+)
 
 const (
 	RecordingPosCounterTypeId  = 100
@@ -140,26 +143,26 @@ func (agent *ClusteredServiceAgent) StartAndRun() {
 }
 
 func (agent *ClusteredServiceAgent) OnStart() error {
-	if err := agent.awaitCommitPositionCounter(agent.opts.ClusterId); err != nil {
+	if err := agent.awaitCommitPositionCounter(); err != nil {
 		return err
 	}
 	return agent.recoverState()
 }
 
-func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterId int32) error {
+func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
 	id := int32(NullValue)
 	agent.reader.Scan(func(counter counters.Counter) {
 		if counter.TypeId == CommitPosCounterTypeId {
-			thisClusterId, err := agent.reader.GetKeyPartInt32(counter.Id, 0)
+			clusterId, err := agent.reader.GetKeyPartInt32(counter.Id, 0)
 			if err != nil {
 				fmt.Println("WARNING: failed to get commit pos clusterId: ", err)
-			} else if thisClusterId == clusterId {
+			} else if clusterId == agent.opts.ClusterId {
 				id = counter.Id
 			}
 		}
 	})
 	if id == NullValue {
-		return fmt.Errorf("commit position not found for clusterId: %d", clusterId)
+		return fmt.Errorf("commit position not found for clusterId: %d", agent.opts.ClusterId)
 	}
 	commitPos, err := counters.NewReadableCounter(agent.reader, id)
 	fmt.Printf("found commit position counter - id=%d value=%d\n", id, commitPos.Get())
@@ -169,27 +172,45 @@ func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterId int32) 
 
 func (agent *ClusteredServiceAgent) recoverState() error {
 	id, label := agent.awaitRecoveryCounter()
-	fmt.Println("label: ", label)
-
-	parts := strings.Split(label, " ")
-	leadershipTermID, err := strconv.ParseInt(strings.Split(parts[2], "=")[1], 10, 64)
+	if id == NullValue {
+		return fmt.Errorf("recovery counter not found for clusterId: %d", agent.opts.ClusterId)
+	}
+	logPosition, err := agent.reader.GetKeyPartInt64(id, 8)
+	if err != nil {
+		return err
+	}
+	clusterTime, err := agent.reader.GetKeyPartInt64(id, 16)
+	if err != nil {
+		return err
+	}
+	leadershipTermId, err := agent.reader.GetKeyPartInt64(id, 0)
 	if err != nil {
 		return err
 	}
 
-	logPosition, err := strconv.ParseInt(strings.Split(parts[3], "=")[1], 10, 64)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("leader term id: %d, log position: %d\n", leadershipTermID, logPosition)
-	fmt.Println("recovery position counter: ", id)
+	fmt.Printf("found recovery counter - id=%d leadershipTermId=%d logPos=%d clusterTime=%d (%s)\n",
+		id, leadershipTermId, logPosition, clusterTime, label)
+	agent.logPosition = logPosition
+	agent.clusterTime = clusterTime
 	agent.isServiceActive = true
 
-	if leadershipTermID == -1 {
+	if leadershipTermId == -1 {
 		agent.service.OnStart(agent, nil)
 	} else {
-		// TODO: load snapshot
+		serviceCount, err := agent.reader.GetKeyPartInt32(id, 28)
+		if err != nil {
+			return err
+		}
+		if serviceCount < 1 {
+			return fmt.Errorf("invalid service count: %d", serviceCount)
+		}
+		snapshotRecId, err := agent.reader.GetKeyPartInt64(id, 32+(serviceId*util.SizeOfInt64))
+		if err != nil {
+			return err
+		}
+		if err := agent.loadSnapshot(snapshotRecId); err != nil {
+			return err
+		}
 	}
 
 	return agent.proxy.ServiceAckRequest(
@@ -202,15 +223,50 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 }
 
 func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, string) {
-	id := int32(-1)
+	id := int32(NullValue)
 	label := ""
 	agent.reader.Scan(func(counter counters.Counter) {
 		if counter.TypeId == RecoveryStateCounterTypeId {
-			id = counter.Id
-			label = counter.Label
+			clusterId, _ := agent.reader.GetKeyPartInt32(counter.Id, 24)
+			if clusterId == agent.opts.ClusterId {
+				id = counter.Id
+				label = counter.Label
+			}
 		}
 	})
 	return id, label
+}
+
+func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
+	archOps := archive.DefaultOptions()
+	arch, err := archive.NewArchive(archOps, agent.ctx)
+	if err != nil {
+		return err
+	}
+	defer arch.Close()
+
+	channel := "aeron:ipc?alias=snapshot-replay"
+	replaySessionId, err := arch.StartReplay(recordingId, 0, NullValue, channel, ReplayStreamId)
+	if err != nil {
+		return err
+	}
+	subChannel, err := archive.AddSessionIdToChannel(channel, archive.ReplaySessionIdToStreamId(replaySessionId))
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("replaying snapshot - recId=%d sessionId=%d streamId=%d\n", recordingId, replaySessionId, ReplayStreamId)
+	subscription := <-arch.AddSubscription(subChannel, ReplayStreamId)
+	defer subscription.Close()
+
+	img := agent.awaitImage(int32(replaySessionId), subscription)
+	loader := newSnapshotLoader(agent, img)
+	for !loader.isDone {
+		agent.opts.IdleStrategy.Idle(loader.poll())
+	}
+	agent.timeUnit = loader.timeUnit
+	agent.service.OnStart(agent, img)
+	return nil
 }
 
 func (agent *ClusteredServiceAgent) checkForClockTick() bool {

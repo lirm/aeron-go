@@ -10,17 +10,6 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
 )
 
-const (
-	schemaId                       = 111
-	sessionMessageHeaderTemplateId = 1
-	timerEventTemplateId           = 20
-	sessionOpenTemplateId          = 21
-	sessionCloseTemplateId         = 22
-	clusterActionReqTemplateId     = 23
-	newLeadershipTermTemplateId    = 24
-	membershipChangeTemplateId     = 25
-)
-
 type BoundedLogAdapter struct {
 	marshaller     *codecs.SbeGoMarshaller
 	options        *Options
@@ -52,7 +41,7 @@ func (adapter *BoundedLogAdapter) onFragment(
 	if err := hdr.Decode(adapter.marshaller, buf); err != nil {
 		fmt.Println("BoundedLogAdaptor - header decode error: ", err)
 	}
-	if hdr.SchemaId != schemaId {
+	if hdr.SchemaId != clusterSchemaId {
 		fmt.Println("BoundedLogAdaptor - unexpected schemaId: ", hdr)
 		return
 	}

@@ -38,12 +38,15 @@ func (adapter *ServiceAdapter) fragmentAssembler(
 
 	if err := hdr.Decode(adapter.marshaller, buf); err != nil {
 		fmt.Println("header decode error: ", err)
+		return
 	}
 
-	j := codecs.JoinLog{}
-	t := codecs.ServiceTerminationPosition{}
+	if hdr.SchemaId != clusterSchemaId {
+		return
+	}
+
 	switch hdr.TemplateId {
-	case j.SbeTemplateId():
+	case joinLogTemplateId:
 		joinLog := &codecs.JoinLog{}
 		if err := joinLog.Decode(
 			adapter.marshaller,
@@ -65,7 +68,7 @@ func (adapter *ServiceAdapter) fragmentAssembler(
 				string(joinLog.LogChannel),
 			)
 		}
-	case t.SbeTemplateId():
+	case serviceTerminationPosTemplateId:
 		e := codecs.ServiceTerminationPosition{}
 		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("ServiceAdaptor: service termination pos decode error: ", err)

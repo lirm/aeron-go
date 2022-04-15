@@ -9,7 +9,7 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
 )
 
-const SnapshotTypeId = 2
+const snapshotTypeId = 2
 
 type SnapshotTaker struct {
 	marshaller  *codecs.SbeGoMarshaller // currently shared as we're not reentrant (but could be here)
@@ -56,7 +56,7 @@ func (st *SnapshotTaker) markSnapshot(
 	bytes, err := codecs.SnapshotMarkerPacket(
 		st.marshaller,
 		st.options.RangeChecking,
-		SnapshotTypeId,
+		snapshotTypeId,
 		logPosition,
 		leadershipTermId,
 		0,
