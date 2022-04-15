@@ -51,6 +51,7 @@ type ClusteredServiceAgent struct {
 	role                     Role
 	service                  ClusteredService
 	sessions                 map[int64]ClientSession
+	commitPosition           *counters.ReadableCounter
 }
 
 func NewClusteredServiceAgent(
@@ -138,13 +139,14 @@ func (agent *ClusteredServiceAgent) StartAndRun() {
 }
 
 func (agent *ClusteredServiceAgent) OnStart() error {
-	id := agent.awaitCommitPositionCounter(agent.opts.ClusterId)
-	fmt.Println("commit position counter: ", id)
+	if err := agent.awaitCommitPositionCounter(agent.opts.ClusterId); err != nil {
+		return err
+	}
 	return agent.recoverState()
 }
 
-func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterId int32) int32 {
-	id := int32(-1)
+func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterId int32) error {
+	id := int32(NullValue)
 	agent.reader.Scan(func(counter counters.Counter) {
 		if counter.TypeId == CommitPosCounterTypeId {
 			thisClusterId, err := agent.reader.GetKeyPartInt32(counter.Id, 0)
@@ -155,7 +157,13 @@ func (agent *ClusteredServiceAgent) awaitCommitPositionCounter(clusterId int32) 
 			}
 		}
 	})
-	return id
+	if id == NullValue {
+		return fmt.Errorf("commit position not found for clusterId: ", clusterId)
+	}
+	commitPos, err := counters.NewReadableCounter(agent.reader, id)
+	fmt.Printf("found commit position counter - id=%d value=%d\n", id, commitPos.Get())
+	agent.commitPosition = commitPos
+	return err
 }
 
 func (agent *ClusteredServiceAgent) recoverState() error {
@@ -260,7 +268,7 @@ func (agent *ClusteredServiceAgent) DoWork() int {
 	}
 
 	if agent.logAdapter.image != nil {
-		polled := agent.logAdapter.Poll()
+		polled := agent.logAdapter.Poll(agent.commitPosition.Get())
 		work += polled
 		if polled == 0 && agent.logAdapter.IsDone() {
 			agent.closeLog()

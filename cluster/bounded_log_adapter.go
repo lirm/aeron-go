@@ -33,8 +33,8 @@ func (adapter *BoundedLogAdapter) IsDone() bool {
 	return adapter.image.Position() >= adapter.maxLogPosition || adapter.image.IsEndOfStream() || adapter.image.IsClosed()
 }
 
-func (adapter *BoundedLogAdapter) Poll() int {
-	return adapter.image.BoundedPoll(adapter.onFragment, adapter.maxLogPosition, adapter.options.LogFragmentLimit)
+func (adapter *BoundedLogAdapter) Poll(limitPos int64) int {
+	return adapter.image.BoundedPoll(adapter.onFragment, limitPos, adapter.options.LogFragmentLimit)
 }
 
 func (adapter *BoundedLogAdapter) onFragment(

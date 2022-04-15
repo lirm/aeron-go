@@ -32,6 +32,7 @@ const MAX_KEY_LENGTH = (util.CacheLineLength * 2) - (util.SizeOfInt32 * 2) - uti
 
 const RECORD_UNUSED int32 = 0
 const RECORD_ALLOCATED int32 = 1
+const RECORD_RECLAIMED int32 = -1
 
 type Reader struct {
 	metaData *atomic.Buffer
