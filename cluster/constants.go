@@ -5,6 +5,14 @@ const (
 	SessionMessageHeaderLength = SBEHeaderLength + 24
 )
 
+type Role int32
+
+const (
+	Follower  Role = 0
+	Candidate      = 1
+	Leader         = 2
+)
+
 const (
 	clusterSchemaId                 = 111
 	sessionMessageHeaderTemplateId  = 1

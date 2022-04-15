@@ -6,6 +6,10 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer/term"
 )
 
+const (
+	ClientSessionMockedOffer = 1
+)
+
 type ClientSession interface {
 	Id() int64
 	ResponseStreamId() int32

@@ -335,15 +335,6 @@ func (agent *ClusteredServiceAgent) DoWork() int {
 	return work
 }
 
-// TODO: move this to its own file please :)
-type Role int32
-
-const (
-	Follower  Role = 0
-	Candidate      = 1
-	Leader         = 2
-)
-
 func (agent *ClusteredServiceAgent) onJoinLog(
 	logPosition int64,
 	maxLogPosition int64,
@@ -639,6 +630,10 @@ func (agent *ClusteredServiceAgent) Offer(
 	length int32,
 	reservedValueSupplier term.ReservedValueSupplier,
 ) int64 {
+	if agent.role != Leader {
+		return ClientSessionMockedOffer
+	}
+
 	bytes, err := codecs.SessionMessageHeaderPacket(
 		codecs.NewSbeGoMarshaller(),
 		agent.opts.RangeChecking,
