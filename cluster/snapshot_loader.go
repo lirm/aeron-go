@@ -85,7 +85,8 @@ func (loader *snapshotLoader) onFragment(
 			loader.err = err
 			loader.isDone = true
 		} else {
-			// TODO: agent.addSession
+			loader.agent.addSessionFromSnapshot(NewContainerClientSession(s.ClusterSessionId,
+				s.ResponseStreamId, string(s.ResponseChannel), loader.agent))
 		}
 	default:
 		//fmt.Println("SnapshotLoader: unknown template id: ", hdr.TemplateId)

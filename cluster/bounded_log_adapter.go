@@ -103,7 +103,7 @@ func (adapter *BoundedLogAdapter) onFragment(
 		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("new leadership term decode error: ", err)
 		} else {
-			fmt.Println("BoundedLogAdaptor - got new leadership term: ", e)
+			//fmt.Println("BoundedLogAdaptor - got new leadership term: ", e)
 			adapter.agent.onNewLeadershipTermEvent(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.TermBaseLogPosition,
 				e.LeaderMemberId, e.LogSessionId, e.TimeUnit, e.AppVersion)
 		}

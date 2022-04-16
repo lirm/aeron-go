@@ -243,7 +243,7 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	if err != nil {
 		return err
 	}
-	defer arch.Close()
+	defer closeArchive(arch)
 
 	channel := "aeron:ipc?alias=snapshot-replay"
 	replaySessionId, err := arch.StartReplay(recordingId, 0, NullValue, channel, ReplayStreamId)
@@ -257,7 +257,7 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 
 	fmt.Printf("replaying snapshot - recId=%d sessionId=%d streamId=%d\n", recordingId, replaySessionId, ReplayStreamId)
 	subscription := <-arch.AddSubscription(subChannel, ReplayStreamId)
-	defer subscription.Close()
+	defer closeSubscription(subscription)
 
 	img := agent.awaitImage(int32(replaySessionId), subscription)
 	loader := newSnapshotLoader(agent, img)
@@ -267,6 +267,10 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	agent.timeUnit = loader.timeUnit
 	agent.service.OnStart(agent, img)
 	return nil
+}
+
+func (agent *ClusteredServiceAgent) addSessionFromSnapshot(session *ContainerClientSession) {
+	agent.sessions[session.id] = session
 }
 
 func (agent *ClusteredServiceAgent) checkForClockTick() bool {
@@ -554,13 +558,13 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	if err != nil {
 		return NullValue, err
 	}
-	defer arch.Close()
+	defer closeArchive(arch)
 
 	pub, err := arch.AddRecordedPublication("aeron:ipc?alias=snapshot", SnapshotStreamId)
 	if err != nil {
 		return NullValue, err
 	}
-	defer pub.Close()
+	defer closePublication(pub)
 
 	recordingId, err := agent.awaitRecordingId(pub.SessionID())
 	if err != nil {
@@ -665,6 +669,27 @@ func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
 		agent.proxy.CloseSessionRequest(id)
 	} else {
 		fmt.Printf("unknown session id: %d, ignored\n", id)
+	}
+}
+
+func closeArchive(arch *archive.Archive) {
+	err := arch.Close()
+	if err != nil {
+		fmt.Println("error closing archive connection: ", err)
+	}
+}
+
+func closeSubscription(sub *aeron.Subscription) {
+	err := sub.Close()
+	if err != nil {
+		fmt.Printf("error closing subscription, streamId=%d channel=%s: %s\n", sub.StreamID(), sub.Channel(), err)
+	}
+}
+
+func closePublication(pub *aeron.Publication) {
+	err := pub.Close()
+	if err != nil {
+		fmt.Printf("error closing publication, streamId=%d channel=%s: %s\n", pub.StreamID(), pub.Channel(), err)
 	}
 }
 
