@@ -34,28 +34,31 @@ func (adapter *BoundedLogAdapter) onFragment(
 	length int32,
 	header *logbuffer.Header,
 ) {
-	var hdr codecs.SbeGoMessageHeader
-	buf := &bytes.Buffer{}
-	buffer.WriteBytes(buf, offset, length)
-
-	if err := hdr.Decode(adapter.marshaller, buf); err != nil {
-		fmt.Println("BoundedLogAdaptor - header decode error: ", err)
-	}
-	if hdr.SchemaId != clusterSchemaId {
-		fmt.Println("BoundedLogAdaptor - unexpected schemaId: ", hdr)
+	if length < SBEHeaderLength {
 		return
 	}
+	blockLength := buffer.GetUInt16(offset)
+	templateId := buffer.GetUInt16(offset + 2)
+	schemaId := buffer.GetUInt16(offset + 4)
+	version := buffer.GetUInt16(offset + 6)
+	if schemaId != clusterSchemaId {
+		fmt.Printf("BoundedLogAdaptor - unexpected schemaId=%d templateId=%d blockLen=%d version=%d\n",
+			schemaId, templateId, blockLength, version)
+		return
+	}
+	offset += 8
+	length -= 8
 
-	switch hdr.TemplateId {
+	switch templateId {
 	case timerEventTemplateId:
 		fmt.Println("BoundedLogAdaptor - got timer event")
 	case sessionOpenTemplateId:
 		event := &codecs.SessionOpenEvent{}
 		if err := event.Decode(
 			adapter.marshaller,
-			buf,
-			hdr.Version,
-			hdr.BlockLength,
+			toByteBuffer(buffer, offset, length),
+			version,
+			blockLength,
 			adapter.options.RangeChecking,
 		); err != nil {
 			fmt.Println("session open decode error: ", err)
@@ -75,9 +78,9 @@ func (adapter *BoundedLogAdapter) onFragment(
 		event := &codecs.SessionCloseEvent{}
 		if err := event.Decode(
 			adapter.marshaller,
-			buf,
-			hdr.Version,
-			hdr.BlockLength,
+			toByteBuffer(buffer, offset, length),
+			version,
+			blockLength,
 			adapter.options.RangeChecking,
 		); err != nil {
 			fmt.Println("session close decode error: ", err)
@@ -93,14 +96,16 @@ func (adapter *BoundedLogAdapter) onFragment(
 		)
 	case clusterActionReqTemplateId:
 		e := &codecs.ClusterActionRequest{}
-		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+		buf := toByteBuffer(buffer, offset, length)
+		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("cluster action request decode error: ", err)
 		} else {
 			adapter.agent.onServiceAction(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.Action)
 		}
 	case newLeadershipTermTemplateId:
 		e := &codecs.NewLeadershipTermEvent{}
-		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+		buf := toByteBuffer(buffer, offset, length)
+		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("new leadership term decode error: ", err)
 		} else {
 			//fmt.Println("BoundedLogAdaptor - got new leadership term: ", e)
@@ -109,29 +114,37 @@ func (adapter *BoundedLogAdapter) onFragment(
 		}
 	case membershipChangeTemplateId:
 		e := &codecs.MembershipChangeEvent{}
-		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
+		buf := toByteBuffer(buffer, offset, length)
+		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
 			fmt.Println("membership change event decode error: ", err)
 		} else {
 			fmt.Println("BoundedLogAdaptor - got membership change event: ", e)
 		}
 	case sessionMessageHeaderTemplateId:
-		e := &codecs.SessionMessageHeader{}
-		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
-			fmt.Println("session message header decode error: ", err)
-		} else {
-			adapter.agent.onSessionMessage(
-				header.Position(),
-				e.ClusterSessionId,
-				e.Timestamp,
-				buffer,
-				offset+SessionMessageHeaderLength,
-				length-SessionMessageHeaderLength,
-				header,
-			)
+		if length < SessionMessageHeaderLength {
+			fmt.Println("received invalid session message - length: ", length)
+			return
 		}
+		clusterSessionId := buffer.GetInt64(offset + 8)
+		timestamp := buffer.GetInt64(offset + 16)
+		adapter.agent.onSessionMessage(
+			header.Position(),
+			clusterSessionId,
+			timestamp,
+			buffer,
+			offset+SessionMessageHeaderLength,
+			length-SessionMessageHeaderLength,
+			header,
+		)
 	default:
-		fmt.Println("BoundedLogAdaptor: unexpected template id: ", hdr.TemplateId)
+		fmt.Println("BoundedLogAdaptor: unexpected template id: ", templateId)
 	}
+}
+
+func toByteBuffer(buffer *atomic.Buffer, offset int32, length int32) *bytes.Buffer {
+	buf := &bytes.Buffer{}
+	buffer.WriteBytes(buf, offset, length)
+	return buf
 }
 
 func (adapter *BoundedLogAdapter) Close() error {

@@ -2,7 +2,7 @@ package cluster
 
 const (
 	SBEHeaderLength            = 8
-	SessionMessageHeaderLength = SBEHeaderLength + 24
+	SessionMessageHeaderLength = 24
 )
 
 type Role int32
