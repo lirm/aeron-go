@@ -10,11 +10,18 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
 )
 
+const (
+	beginFrag    uint8 = 0x80
+	endFrag      uint8 = 0x40
+	unfragmented uint8 = 0x80 | 0x40
+)
+
 type BoundedLogAdapter struct {
 	marshaller     *codecs.SbeGoMarshaller
 	options        *Options
 	agent          *ClusteredServiceAgent
 	image          *aeron.Image
+	builder        *bytes.Buffer
 	maxLogPosition int64
 }
 
@@ -29,6 +36,35 @@ func (adapter *BoundedLogAdapter) Poll(limitPos int64) int {
 }
 
 func (adapter *BoundedLogAdapter) onFragment(
+	buffer *atomic.Buffer,
+	offset int32,
+	length int32,
+	header *logbuffer.Header,
+) {
+	flags := header.Flags()
+	if (flags & unfragmented) == unfragmented {
+		adapter.onMessage(buffer, offset, length, header)
+	} else if (flags & beginFrag) == beginFrag {
+		if adapter.builder == nil {
+			adapter.builder = &bytes.Buffer{}
+		}
+		adapter.builder.Reset()
+		buffer.WriteBytes(adapter.builder, offset, length)
+	} else if adapter.builder != nil && adapter.builder.Len() != 0 {
+		buffer.WriteBytes(adapter.builder, offset, length)
+		if (flags & endFrag) == endFrag {
+			msgLength := adapter.builder.Len()
+			adapter.onMessage(
+				atomic.MakeBuffer(adapter.builder.Bytes(), msgLength),
+				int32(0),
+				int32(msgLength),
+				header)
+			adapter.builder.Reset()
+		}
+	}
+}
+
+func (adapter *BoundedLogAdapter) onMessage(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
