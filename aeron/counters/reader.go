@@ -73,8 +73,7 @@ func (reader *Reader) Scan(cb func(Counter)) {
 			//fmt.Printf("Reading at offset %d; counterState=%d; typeId=%d\n", i, recordStatus, typeId)
 
 			cb(Counter{id, typeId, value, label})
-
-			id++
 		}
+		id++
 	}
 }
