@@ -34,10 +34,15 @@ func (s *Service) OnSessionMessage(
 	length int32,
 	header *logbuffer.Header,
 ) {
-	msg := buffer.GetBytesArray(offset, length)
-	echo := append([]byte("echo: "), msg...)
-	session.Offer(atomic.MakeBuffer(echo), 0, int32(len(echo)), nil)
-	fmt.Printf("OnSessionMessage called: %s\n", string(msg))
+	var result int64
+	for i := 0; i < 10; i++ {
+		result = session.Offer(buffer, offset, length, nil)
+		if result >= 0 {
+			return
+		}
+	}
+	fmt.Printf("failed to echo message back to source session, sessionId=%d logPos=%d length=%d lastResult=%d\n",
+		session.Id(), header.Position(), length, result)
 }
 
 func (s *Service) OnTimerEvent(correlationId, timestamp int64) {}
