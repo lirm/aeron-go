@@ -2,16 +2,16 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 	"time"
-
-	"github.com/corymonroe-coinbase/aeron-go/archive"
 
 	"github.com/corymonroe-coinbase/aeron-go/aeron"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/counters"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer/term"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
+	"github.com/corymonroe-coinbase/aeron-go/archive"
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
 )
 
@@ -693,6 +693,13 @@ func closePublication(pub *aeron.Publication) {
 	}
 }
 
+func (agent *ClusteredServiceAgent) Idle(workCount int) {
+	agent.opts.IdleStrategy.Idle(workCount)
+	if workCount <= 0 {
+		agent.checkForClockTick()
+	}
+}
+
 // BEGIN CLUSTER IMPLEMENTATION
 
 func (agent *ClusteredServiceAgent) LogPosition() int64 {
@@ -709,6 +716,10 @@ func (agent *ClusteredServiceAgent) Role() Role {
 
 func (agent *ClusteredServiceAgent) Time() int64 {
 	return agent.clusterTime
+}
+
+func (agent *ClusteredServiceAgent) IdleStrategy() idlestrategy.Idler {
+	return agent
 }
 
 // END CLUSTER IMPLEMENTATION

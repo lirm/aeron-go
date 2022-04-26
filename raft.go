@@ -13,10 +13,12 @@ import (
 )
 
 type Service struct {
+	cluster cluster.Cluster
 }
 
 func (s *Service) OnStart(cluster cluster.Cluster, image *aeron.Image) {
 	fmt.Printf("OnStart called\n")
+	s.cluster = cluster
 }
 
 func (s *Service) OnSessionOpen(session cluster.ClientSession, timestamp int64) {}
@@ -37,14 +39,13 @@ func (s *Service) OnSessionMessage(
 	header *logbuffer.Header,
 ) {
 	var result int64
-	for i := 0; i < 10; i++ {
+	for {
 		result = session.Offer(buffer, offset, length, nil)
 		if result >= 0 {
 			return
 		}
+		s.cluster.IdleStrategy().Idle(0)
 	}
-	fmt.Printf("failed to echo message back to source session, sessionId=%d logPos=%d length=%d lastResult=%d\n",
-		session.Id(), header.Position(), length, result)
 }
 
 func (s *Service) OnTimerEvent(correlationId, timestamp int64) {}
