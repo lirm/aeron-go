@@ -298,7 +298,6 @@ func (agent *ClusteredServiceAgent) terminate() {
 	}
 
 	agent.terminationPosition = NullPosition
-	// TODO: throw new ClusterTerminationException(isTerminationExpected)
 }
 
 func (agent *ClusteredServiceAgent) DoWork() int {
@@ -639,7 +638,9 @@ func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, b
 
 func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
 	if _, ok := agent.sessions[id]; ok {
-		agent.proxy.CloseSessionRequest(id)
+		if err := agent.proxy.CloseSessionRequest(id); err != nil {
+			fmt.Printf("WARNING: failed to send CloseSessionRequest (id=%d): %s\n", id, err)
+		}
 	} else {
 		fmt.Printf("unknown session id: %d, ignored\n", id)
 	}
