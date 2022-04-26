@@ -8,4 +8,8 @@ type Cluster interface {
 	Role() Role
 	Time() int64
 	IdleStrategy() idlestrategy.Idler
+
+	// ScheduleTimer schedules a timer for a given deadline
+	ScheduleTimer(correlationId int64, deadline int64) bool
+	CancelTimer(correlationId int64) bool
 }

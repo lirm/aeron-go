@@ -82,12 +82,14 @@ func (adapter *BoundedLogAdapter) onMessage(
 			schemaId, templateId, blockLength, version)
 		return
 	}
-	offset += 8
-	length -= 8
+	offset += SBEHeaderLength
+	length -= SBEHeaderLength
 
 	switch templateId {
 	case timerEventTemplateId:
-		fmt.Println("BoundedLogAdaptor - got timer event")
+		correlationId := buffer.GetInt64(offset)
+		timestamp := buffer.GetInt64(offset + 8)
+		adapter.agent.onTimerEvent(header.Position(), correlationId, timestamp)
 	case sessionOpenTemplateId:
 		event := &codecs.SessionOpenEvent{}
 		if err := event.Decode(

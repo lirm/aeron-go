@@ -37,7 +37,7 @@ type ClusteredServiceAgent struct {
 	a                        *aeron.Aeron
 	ctx                      *aeron.Context
 	opts                     *Options
-	proxy                    *ConsensusModuleProxy
+	proxy                    *consensusModuleProxy
 	reader                   *counters.Reader
 	serviceAdapter           *ServiceAdapter
 	logAdapter               *BoundedLogAdapter
@@ -73,7 +73,7 @@ func NewClusteredServiceAgent(
 		"aeron:ipc?term-length=128k|alias=consensus-control",
 		int32(ConsensusModuleStreamId),
 	)
-	proxy := NewConsensusModuleProxy(options, pub)
+	proxy := newConsensusModuleProxy(options, pub)
 
 	sub := <-a.AddSubscription(
 		// TODO: constify?
@@ -118,6 +118,7 @@ func NewClusteredServiceAgent(
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
+	proxy.idleStrategy = agent
 
 	cmf.flyweight.ArchiveStreamId.Set(10)
 	cmf.flyweight.ServiceStreamId.Set(ServiceStreamId)
@@ -189,13 +190,14 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		}
 	}
 
-	return agent.proxy.ServiceAckRequest(
+	agent.proxy.serviceAckRequest(
 		agent.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
 		agent.a.ClientID(),
 		serviceId,
 	)
+	return nil
 }
 
 func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
@@ -286,17 +288,13 @@ func (agent *ClusteredServiceAgent) pollServiceAdapter() {
 func (agent *ClusteredServiceAgent) terminate() {
 	agent.isServiceActive = false
 	agent.service.OnTerminate(agent)
-	err := agent.proxy.ServiceAckRequest(
+	agent.proxy.serviceAckRequest(
 		agent.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
 		NullValue,
 		serviceId,
 	)
-	if err != nil {
-		fmt.Println("WARNING: failed to send termination service ack: ", err)
-	}
-
 	agent.terminationPosition = NullPosition
 }
 
@@ -364,16 +362,13 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
 	agent.logAdapter.image = img
 	agent.logAdapter.maxLogPosition = event.maxLogPosition
 
-	err := agent.proxy.ServiceAckRequest(
+	agent.proxy.serviceAckRequest(
 		event.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
 		NullValue,
 		serviceId,
 	)
-	if err != nil {
-		fmt.Println("ERROR: failed to send join log service ack: ", err)
-	}
 
 	agent.memberId = event.memberId
 	agent.markFile.flyweight.MemberId.Set(agent.memberId)
@@ -520,10 +515,18 @@ func (agent *ClusteredServiceAgent) onServiceAction(leadershipTermId int64, logP
 			fmt.Println("ERROR: take snapshot failed: ", err)
 			return
 		}
-		if err := agent.proxy.ServiceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, serviceId); err != nil {
-			fmt.Println("WARNING: take snapshot service ack failed: ", err)
-		}
+		agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, serviceId)
 	}
+}
+
+func (agent *ClusteredServiceAgent) onTimerEvent(
+	logPosition int64,
+	correlationId int64,
+	timestamp int64,
+) {
+	agent.logPosition = logPosition
+	agent.clusterTime = timestamp
+	agent.service.OnTimerEvent(correlationId, timestamp)
 }
 
 func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId int64) (int64, error) {
@@ -638,9 +641,7 @@ func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, b
 
 func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
 	if _, ok := agent.sessions[id]; ok {
-		if err := agent.proxy.CloseSessionRequest(id); err != nil {
-			fmt.Printf("WARNING: failed to send CloseSessionRequest (id=%d): %s\n", id, err)
-		}
+		agent.proxy.closeSessionRequest(id)
 	} else {
 		fmt.Printf("unknown session id: %d, ignored\n", id)
 	}
@@ -694,6 +695,14 @@ func (agent *ClusteredServiceAgent) Time() int64 {
 
 func (agent *ClusteredServiceAgent) IdleStrategy() idlestrategy.Idler {
 	return agent
+}
+
+func (agent *ClusteredServiceAgent) ScheduleTimer(correlationId int64, deadline int64) bool {
+	return agent.proxy.scheduleTimer(correlationId, deadline)
+}
+
+func (agent *ClusteredServiceAgent) CancelTimer(correlationId int64) bool {
+	return agent.proxy.cancelTimer(correlationId)
 }
 
 // END CLUSTER IMPLEMENTATION

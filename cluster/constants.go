@@ -15,6 +15,7 @@ const (
 
 const (
 	clusterSchemaId                 = 111
+	clusterSchemaVersion            = 8
 	sessionMessageHeaderTemplateId  = 1
 	timerEventTemplateId            = 20
 	sessionOpenTemplateId           = 21
@@ -22,6 +23,8 @@ const (
 	clusterActionReqTemplateId      = 23
 	newLeadershipTermTemplateId     = 24
 	membershipChangeTemplateId      = 25
+	scheduleTimerTemplateId         = 31
+	cancelTimerTemplateId           = 32
 	joinLogTemplateId               = 40
 	serviceTerminationPosTemplateId = 42
 	snapshotMarkerTemplateId        = 100
