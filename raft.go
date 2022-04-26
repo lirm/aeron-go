@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/corymonroe-coinbase/aeron-go/aeron"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
 	"github.com/corymonroe-coinbase/aeron-go/cluster"
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
@@ -72,8 +74,18 @@ func (s *Service) OnNewLeadershipTermEvent(
 
 func main() {
 	ctx := aeron.NewContext()
+	if _, err := os.Stat("/dev/shm"); err == nil {
+		path := fmt.Sprintf("/dev/shm/aeron-%s", aeron.UserName)
+		ctx.AeronDir(path)
+		fmt.Println("using path: ", path)
+	}
+
 	opts := cluster.NewOptions()
-	opts.ClusterDir = "/tmp/aeron-go-poc/cluster"
+	opts.IdleStrategy = &idlestrategy.Busy{}
+	if opts.ClusterDir = os.Getenv("CLUSTER_DIR"); opts.ClusterDir == "" {
+		opts.ClusterDir = "/tmp/aeron-go-poc/cluster"
+	}
+
 	service := &Service{}
 	agent, err := cluster.NewClusteredServiceAgent(ctx, opts, service)
 	if err != nil {
