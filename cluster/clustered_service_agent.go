@@ -150,61 +150,37 @@ func (agent *ClusteredServiceAgent) OnStart() error {
 }
 
 func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
-	id := int32(NullValue)
-	agent.reader.Scan(func(counter counters.Counter) {
-		if counter.TypeId == CommitPosCounterTypeId {
-			clusterId, err := agent.reader.GetKeyPartInt32(counter.Id, 0)
-			if err != nil {
-				fmt.Println("WARNING: failed to get commit pos clusterId: ", err)
-			} else if clusterId == agent.opts.ClusterId {
-				id = counter.Id
-			}
+	for {
+		id := agent.reader.FindCounter(CommitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+			return keyBuffer.GetInt32(0) == agent.opts.ClusterId
+		})
+		if id != counters.NullCounterId {
+			commitPos, err := counters.NewReadableCounter(agent.reader, id)
+			fmt.Printf("found commit position counter - id=%d value=%d\n", id, commitPos.Get())
+			agent.commitPosition = commitPos
+			return err
 		}
-	})
-	if id == NullValue {
-		return fmt.Errorf("commit position not found for clusterId: %d", agent.opts.ClusterId)
+		agent.Idle(0)
 	}
-	commitPos, err := counters.NewReadableCounter(agent.reader, id)
-	fmt.Printf("found commit position counter - id=%d value=%d\n", id, commitPos.Get())
-	agent.commitPosition = commitPos
-	return err
 }
 
 func (agent *ClusteredServiceAgent) recoverState() error {
-	id, label := agent.awaitRecoveryCounter()
-	if id == NullValue {
-		return fmt.Errorf("recovery counter not found for clusterId: %d", agent.opts.ClusterId)
-	}
-	logPosition, err := agent.reader.GetKeyPartInt64(id, 8)
-	if err != nil {
-		return err
-	}
-	clusterTime, err := agent.reader.GetKeyPartInt64(id, 16)
-	if err != nil {
-		return err
-	}
-	leadershipTermId, err := agent.reader.GetKeyPartInt64(id, 0)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("found recovery counter - id=%d leadershipTermId=%d logPos=%d clusterTime=%d (%s)\n",
-		id, leadershipTermId, logPosition, clusterTime, label)
-	agent.logPosition = logPosition
-	agent.clusterTime = clusterTime
+	counterId, leadershipTermId := agent.awaitRecoveryCounter()
+	fmt.Printf("found recovery counter - id=%d leadershipTermId=%d logPos=%d clusterTime=%d\n",
+		counterId, leadershipTermId, agent.logPosition, agent.clusterTime)
 	agent.isServiceActive = true
 
 	if leadershipTermId == -1 {
 		agent.service.OnStart(agent, nil)
 	} else {
-		serviceCount, err := agent.reader.GetKeyPartInt32(id, 28)
+		serviceCount, err := agent.reader.GetKeyPartInt32(counterId, 28)
 		if err != nil {
 			return err
 		}
 		if serviceCount < 1 {
 			return fmt.Errorf("invalid service count: %d", serviceCount)
 		}
-		snapshotRecId, err := agent.reader.GetKeyPartInt64(id, 32+(serviceId*util.SizeOfInt64))
+		snapshotRecId, err := agent.reader.GetKeyPartInt64(counterId, 32+(serviceId*util.SizeOfInt64))
 		if err != nil {
 			return err
 		}
@@ -214,7 +190,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	}
 
 	return agent.proxy.ServiceAckRequest(
-		logPosition,
+		agent.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
 		agent.a.ClientID(),
@@ -222,19 +198,23 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	)
 }
 
-func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, string) {
-	id := int32(NullValue)
-	label := ""
-	agent.reader.Scan(func(counter counters.Counter) {
-		if counter.TypeId == RecoveryStateCounterTypeId {
-			clusterId, _ := agent.reader.GetKeyPartInt32(counter.Id, 24)
-			if clusterId == agent.opts.ClusterId {
-				id = counter.Id
-				label = counter.Label
+func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
+	for {
+		var leadershipTermId int64
+		id := agent.reader.FindCounter(RecoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+			if keyBuffer.GetInt32(24) == agent.opts.ClusterId {
+				leadershipTermId = keyBuffer.GetInt64(0)
+				agent.logPosition = keyBuffer.GetInt64(8)
+				agent.clusterTime = keyBuffer.GetInt64(16)
+				return true
 			}
+			return false
+		})
+		if id != counters.NullCounterId {
+			return id, leadershipTermId
 		}
-	})
-	return id, label
+		agent.Idle(0)
+	}
 }
 
 func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
@@ -591,29 +571,22 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 }
 
 func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, error) {
-	counterId := int32(NullValue)
-	var err error = nil
-	for err == nil && counterId == NullValue {
-		agent.reader.Scan(func(counter counters.Counter) {
-			if err == nil && counter.TypeId == RecordingPosCounterTypeId {
-				thisSessionId, thisErr := agent.reader.GetKeyPartInt32(counter.Id, 8)
-				if thisErr != nil {
-					err = thisErr
-				} else if thisSessionId == sessionId {
-					//fmt.Printf("*** awaitRecordingId - sessionId=%d counterId=%d type=%d value=%v label=%v\n",
-					//	sessionId, counter.Id, counter.TypeId, counter.Value, counter.Label)
-					counterId = counter.Id
-				}
+	start := time.Now()
+	for time.Since(start) < agent.opts.Timeout {
+		recId := int64(NullValue)
+		counterId := agent.reader.FindCounter(RecordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+			if keyBuffer.GetInt32(8) == sessionId {
+				recId = keyBuffer.GetInt64(0)
+				return true
 			}
+			return false
 		})
-		if counterId == NullValue {
-			agent.opts.IdleStrategy.Idle(0)
+		if counterId != NullValue {
+			return recId, nil
 		}
+		agent.Idle(0)
 	}
-	if err != nil {
-		return 0, err
-	}
-	return agent.reader.GetKeyPartInt64(counterId, 0)
+	return NullValue, fmt.Errorf("timed out waiting for recordingId for sessionId=%d", sessionId)
 }
 
 func (agent *ClusteredServiceAgent) onServiceTerminationPosition(position int64) {

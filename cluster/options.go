@@ -18,7 +18,7 @@ type Options struct {
 
 func NewOptions() *Options {
 	o := &Options{
-		Timeout:          time.Second,
+		Timeout:          time.Second * 5,
 		IdleStrategy:     idlestrategy.NewDefaultBackoffIdleStrategy(),
 		RangeChecking:    true,
 		LogFragmentLimit: 50,

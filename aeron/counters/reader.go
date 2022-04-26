@@ -18,6 +18,8 @@ package counters
 
 import (
 	"fmt"
+	"unsafe"
+
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 )
@@ -33,6 +35,8 @@ const MAX_KEY_LENGTH = (util.CacheLineLength * 2) - (util.SizeOfInt32 * 2) - uti
 const RECORD_UNUSED int32 = 0
 const RECORD_ALLOCATED int32 = 1
 const RECORD_RECLAIMED int32 = -1
+
+const NullCounterId = int32(-1)
 
 type Reader struct {
 	metaData *atomic.Buffer
@@ -79,6 +83,28 @@ func (reader *Reader) Scan(cb func(Counter)) {
 		}
 		id++
 	}
+}
+
+func (reader *Reader) FindCounter(typeId int32, keyFilter func(keyBuffer *atomic.Buffer) bool) int32 {
+	var keyBuf atomic.Buffer
+	for id := 0; id < reader.maxCounterID; id++ {
+		metaDataOffset := int32(id) * METADATA_LENGTH
+		recordStatus := reader.metaData.GetInt32Volatile(metaDataOffset)
+		if recordStatus == RECORD_UNUSED {
+			break
+		} else if RECORD_ALLOCATED == recordStatus {
+			thisTypeId := reader.metaData.GetInt32(metaDataOffset + 4)
+			if thisTypeId == typeId {
+				// requires Go 1.17: keyPtr := unsafe.Add(reader.metaData.Ptr(), metaDataOffset+KEY_OFFSET)
+				keyPtr := unsafe.Pointer(uintptr(reader.metaData.Ptr()) + uintptr(metaDataOffset+KEY_OFFSET))
+				keyBuf.Wrap(keyPtr, MAX_KEY_LENGTH)
+				if keyFilter == nil || keyFilter(&keyBuf) {
+					return int32(id)
+				}
+			}
+		}
+	}
+	return NullCounterId
 }
 
 // GetKeyPartInt32 returns an int32 portion of the key at the specified offset
