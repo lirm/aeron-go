@@ -114,10 +114,13 @@ func (s *Service) OnNewLeadershipTermEvent(
 
 func main() {
 	ctx := aeron.NewContext()
-	if _, err := os.Stat("/dev/shm"); err == nil {
+	if aeronDir := os.Getenv("AERON_DIR"); aeronDir != "" {
+		ctx.AeronDir(aeronDir)
+		fmt.Println("aeron dir: ", aeronDir)
+	} else if _, err := os.Stat("/dev/shm"); err == nil {
 		path := fmt.Sprintf("/dev/shm/aeron-%s", aeron.UserName)
 		ctx.AeronDir(path)
-		fmt.Println("using path: ", path)
+		fmt.Println("aeron dir: ", path)
 	}
 
 	opts := cluster.NewOptions()

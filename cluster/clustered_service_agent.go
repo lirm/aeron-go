@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/corymonroe-coinbase/aeron-go/aeron"
@@ -65,6 +66,13 @@ func NewClusteredServiceAgent(
 	options *Options,
 	service ClusteredService,
 ) (*ClusteredServiceAgent, error) {
+	if !strings.HasPrefix(options.ArchiveOptions.RequestChannel, "aeron:ipc") {
+		return nil, fmt.Errorf("archive request channel must be IPC: %s", options.ArchiveOptions.RequestStream)
+	}
+	if !strings.HasPrefix(options.ArchiveOptions.ResponseChannel, "aeron:ipc") {
+		return nil, fmt.Errorf("archive response channel must be IPC: %s", options.ArchiveOptions.ResponseChannel)
+	}
+
 	a, err := aeron.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -230,8 +238,7 @@ func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 }
 
 func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
-	archOps := archive.DefaultOptions()
-	arch, err := archive.NewArchive(archOps, agent.ctx)
+	arch, err := archive.NewArchive(agent.opts.ArchiveOptions, agent.ctx)
 	if err != nil {
 		return err
 	}
@@ -542,13 +549,7 @@ func (agent *ClusteredServiceAgent) onTimerEvent(
 }
 
 func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId int64) (int64, error) {
-	options := archive.DefaultOptions()
-	//options.RequestChannel = *examples.Config.RequestChannel
-	//options.RequestStream = int32(*examples.Config.RequestStream)
-	//options.ResponseChannel = *examples.Config.ResponseChannel
-	//options.ResponseStream = int32(*examples.Config.ResponseStream)
-
-	arch, err := archive.NewArchive(options, agent.ctx)
+	arch, err := archive.NewArchive(agent.opts.ArchiveOptions, agent.ctx)
 	if err != nil {
 		return NullValue, err
 	}
