@@ -19,6 +19,7 @@ const NullValue = -1
 const NullPosition = -1
 const serviceId = 0
 const MarkFileUpdateIntervalMs = 1000
+const sessionMessageHdrBlockLength = 24
 
 const (
 	ReplayStreamId          = 103
@@ -56,6 +57,7 @@ type ClusteredServiceAgent struct {
 	service                  ClusteredService
 	sessions                 map[int64]ClientSession
 	commitPosition           *counters.ReadableCounter
+	sessionMsgHdrBuffer      *atomic.Buffer
 }
 
 func NewClusteredServiceAgent(
@@ -101,6 +103,12 @@ func NewClusteredServiceAgent(
 		return nil, err
 	}
 
+	sessionMsgHdrBuf := atomic.MakeBuffer(make([]byte, SBEHeaderLength+sessionMessageHdrBlockLength))
+	sessionMsgHdrBuf.PutUInt16(0, sessionMessageHdrBlockLength)
+	sessionMsgHdrBuf.PutUInt16(2, sessionMessageHeaderTemplateId)
+	sessionMsgHdrBuf.PutUInt16(4, clusterSchemaId)
+	sessionMsgHdrBuf.PutUInt16(6, clusterSchemaVersion)
+
 	agent := &ClusteredServiceAgent{
 		a:                   a,
 		opts:                options,
@@ -115,6 +123,7 @@ func NewClusteredServiceAgent(
 		logPosition:         NullPosition,
 		terminationPosition: NullPosition,
 		sessions:            map[int64]ClientSession{},
+		sessionMsgHdrBuffer: sessionMsgHdrBuf,
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
@@ -169,6 +178,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	counterId, leadershipTermId := agent.awaitRecoveryCounter()
 	fmt.Printf("found recovery counter - id=%d leadershipTermId=%d logPos=%d clusterTime=%d\n",
 		counterId, leadershipTermId, agent.logPosition, agent.clusterTime)
+	agent.sessionMsgHdrBuffer.PutInt64(SBEHeaderLength, leadershipTermId)
 	agent.isServiceActive = true
 
 	if leadershipTermId == -1 {
@@ -418,7 +428,8 @@ func (agent *ClusteredServiceAgent) onSessionOpen(
 	agent.logPosition = logPosition
 	agent.clusterTime = timestamp
 	if _, ok := agent.sessions[clusterSessionId]; ok {
-		fmt.Printf("clashing session id: %d, ignored\n", clusterSessionId)
+		fmt.Printf("WARNING: onSessionOpen clashing - id=%d leaderTermId=%d logPos=%d\n",
+			clusterSessionId, leadershipTermId, logPosition)
 	} else {
 		session := NewContainerClientSession(
 			clusterSessionId,
@@ -448,7 +459,8 @@ func (agent *ClusteredServiceAgent) onSessionClose(
 		delete(agent.sessions, clusterSessionId)
 		agent.service.OnSessionClose(session, timestamp, closeReason)
 	} else {
-		fmt.Printf("unknown session id: %d, ignored\n", clusterSessionId)
+		fmt.Printf("WARNING: onSessionClose unknown - id=%d leaderTermId=%d logPos=%d\n",
+			clusterSessionId, leadershipTermId, logPosition)
 	}
 }
 
@@ -490,7 +502,7 @@ func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
 	//	" log=" + SemanticVersion.toString(appVersion)));
 	//	throw new AgentTerminationException();
 	//}
-	//sessionMessageHeaderEncoder.leadershipTermId(leadershipTermId)
+	agent.sessionMsgHdrBuffer.PutInt64(SBEHeaderLength, leadershipTermId)
 	agent.logPosition = logPosition
 	agent.clusterTime = timestamp
 	agent.timeUnit = timeUnit
@@ -601,7 +613,7 @@ func (agent *ClusteredServiceAgent) getAndIncrementNextAckId() int64 {
 	return ackId
 }
 
-func (agent *ClusteredServiceAgent) Offer(
+func (agent *ClusteredServiceAgent) offerToSession(
 	clusterSessionId int64,
 	publication *aeron.Publication,
 	buffer *atomic.Buffer,
@@ -613,25 +625,10 @@ func (agent *ClusteredServiceAgent) Offer(
 		return ClientSessionMockedOffer
 	}
 
-	bytes, err := codecs.SessionMessageHeaderPacket(
-		codecs.NewSbeGoMarshaller(),
-		agent.opts.RangeChecking,
-		/* leaderTermId??? */ 0,
-		clusterSessionId,
-		agent.clusterTime,
-	)
-	if err != nil {
-		fmt.Printf("error on ClusteredServiceAgent.Offer: %v\n", err)
-		return 0
-	}
-
-	combined := append(bytes, buffer.GetBytesArray(offset, length)...)
-
-	return publication.Offer(
-		atomic.MakeBuffer(combined),
-		0, int32(len(combined)),
-		reservedValueSupplier,
-	)
+	hdrBuf := agent.sessionMsgHdrBuffer
+	hdrBuf.PutInt64(SBEHeaderLength+8, clusterSessionId)
+	hdrBuf.PutInt64(SBEHeaderLength+16, agent.clusterTime)
+	return publication.Offer2(hdrBuf, 0, hdrBuf.Capacity(), buffer, offset, length, reservedValueSupplier)
 }
 
 func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, bool) {

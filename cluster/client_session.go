@@ -74,7 +74,7 @@ func (s *ContainerClientSession) Offer(
 	length int32,
 	reservedValueSupplier term.ReservedValueSupplier,
 ) int64 {
-	return s.agent.Offer(
+	return s.agent.offerToSession(
 		s.id,
 		s.response,
 		buffer,
