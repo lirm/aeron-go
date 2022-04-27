@@ -12,12 +12,12 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
 )
 
-type Service struct {
+type EchoService struct {
 	cluster      cluster.Cluster
 	messageCount int32
 }
 
-func (s *Service) OnStart(cluster cluster.Cluster, image *aeron.Image) {
+func (s *EchoService) OnStart(cluster cluster.Cluster, image *aeron.Image) {
 	s.cluster = cluster
 	if image == nil {
 		fmt.Printf("OnStart with no image\n")
@@ -34,11 +34,11 @@ func (s *Service) OnStart(cluster cluster.Cluster, image *aeron.Image) {
 	}
 }
 
-func (s *Service) OnSessionOpen(session cluster.ClientSession, timestamp int64) {
+func (s *EchoService) OnSessionOpen(session cluster.ClientSession, timestamp int64) {
 	fmt.Printf("OnSessionOpen - sessionId=%d timestamp=%v\n", session.Id(), timestamp)
 }
 
-func (s *Service) OnSessionClose(
+func (s *EchoService) OnSessionClose(
 	session cluster.ClientSession,
 	timestamp int64,
 	reason codecs.CloseReasonEnum,
@@ -46,7 +46,7 @@ func (s *Service) OnSessionClose(
 	fmt.Printf("OnSessionClose - sessionId=%d timestamp=%v reason=%v\n", session.Id(), timestamp, reason)
 }
 
-func (s *Service) OnSessionMessage(
+func (s *EchoService) OnSessionMessage(
 	session cluster.ClientSession,
 	timestamp int64,
 	buffer *atomic.Buffer,
@@ -69,11 +69,11 @@ func (s *Service) OnSessionMessage(
 	}
 }
 
-func (s *Service) OnTimerEvent(correlationId, timestamp int64) {
+func (s *EchoService) OnTimerEvent(correlationId, timestamp int64) {
 	fmt.Printf("OnTimerEvent - correlationId=%d timestamp=%v\n", correlationId, timestamp)
 }
 
-func (s *Service) OnTakeSnapshot(publication *aeron.Publication) {
+func (s *EchoService) OnTakeSnapshot(publication *aeron.Publication) {
 	fmt.Printf("OnTakeSnapshot - streamId=%d sessionId=%d messageCount=%d\n",
 		publication.StreamID(), publication.SessionID(), s.messageCount)
 	buf := atomic.MakeBuffer(make([]byte, 4))
@@ -90,15 +90,15 @@ func (s *Service) OnTakeSnapshot(publication *aeron.Publication) {
 	}
 }
 
-func (s *Service) OnRoleChange(role cluster.Role) {
+func (s *EchoService) OnRoleChange(role cluster.Role) {
 	fmt.Printf("OnRoleChange - role=%v\n", role)
 }
 
-func (s *Service) OnTerminate(cluster cluster.Cluster) {
+func (s *EchoService) OnTerminate(cluster cluster.Cluster) {
 	fmt.Printf("OnTerminate - role=%v logPos=%d\n", cluster.Role(), cluster.LogPosition())
 }
 
-func (s *Service) OnNewLeadershipTermEvent(
+func (s *EchoService) OnNewLeadershipTermEvent(
 	leadershipTermId int64,
 	logPosition int64,
 	timestamp int64,
@@ -131,7 +131,7 @@ func main() {
 		opts.ClusterDir = "/tmp/aeron-go-poc/cluster"
 	}
 
-	service := &Service{}
+	service := &EchoService{}
 	agent, err := cluster.NewClusteredServiceAgent(ctx, opts, service)
 	if err != nil {
 		panic(err)
