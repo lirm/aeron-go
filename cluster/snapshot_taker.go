@@ -11,24 +11,24 @@ import (
 
 const snapshotTypeId = 2
 
-type SnapshotTaker struct {
+type snapshotTaker struct {
 	marshaller  *codecs.SbeGoMarshaller // currently shared as we're not reentrant (but could be here)
 	options     *Options
 	publication *aeron.Publication
 }
 
-func NewSnapshotTaker(
+func newSnapshotTaker(
 	options *Options,
 	publication *aeron.Publication,
-) *SnapshotTaker {
-	return &SnapshotTaker{
+) *snapshotTaker {
+	return &snapshotTaker{
 		marshaller:  codecs.NewSbeGoMarshaller(),
 		options:     options,
 		publication: publication,
 	}
 }
 
-func (st *SnapshotTaker) MarkBegin(
+func (st *snapshotTaker) markBegin(
 	logPosition int64,
 	leadershipTermId int64,
 	timeUnit codecs.ClusterTimeUnitEnum,
@@ -37,7 +37,7 @@ func (st *SnapshotTaker) MarkBegin(
 	return st.markSnapshot(logPosition, leadershipTermId, codecs.SnapshotMark.BEGIN, timeUnit, appVersion)
 }
 
-func (st *SnapshotTaker) MarkEnd(
+func (st *snapshotTaker) markEnd(
 	logPosition int64,
 	leadershipTermId int64,
 	timeUnit codecs.ClusterTimeUnitEnum,
@@ -46,7 +46,7 @@ func (st *SnapshotTaker) MarkEnd(
 	return st.markSnapshot(logPosition, leadershipTermId, codecs.SnapshotMark.END, timeUnit, appVersion)
 }
 
-func (st *SnapshotTaker) markSnapshot(
+func (st *snapshotTaker) markSnapshot(
 	logPosition int64,
 	leadershipTermId int64,
 	mark codecs.SnapshotMarkEnum,
@@ -68,25 +68,25 @@ func (st *SnapshotTaker) markSnapshot(
 		return err
 	}
 	if ret := st.offer(bytes); ret < 0 {
-		return fmt.Errorf("SnapshotTaker.offer failed: %d", ret)
+		return fmt.Errorf("snapshotTaker.offer failed: %d", ret)
 	}
 	return nil
 }
 
-func (st *SnapshotTaker) SnapshotSession(session ClientSession) error {
+func (st *snapshotTaker) snapshotSession(session ClientSession) error {
 	bytes, err := codecs.ClientSessionPacket(st.marshaller, st.options.RangeChecking,
-		session.Id(), session.ResponseStreamId(), []byte(session.ResponseChannel()), []byte(""))
+		session.Id(), session.ResponseStreamId(), []byte(session.ResponseChannel()), session.EncodedPrincipal())
 	if err != nil {
 		return err
 	}
 	if ret := st.offer(bytes); ret < 0 {
-		return fmt.Errorf("SnapshotTaker.offer failed: %d", ret)
+		return fmt.Errorf("snapshotTaker.offer failed: %d", ret)
 	}
 	return nil
 }
 
 // Offer to our request publication
-func (st *SnapshotTaker) offer(bytes []byte) int64 {
+func (st *snapshotTaker) offer(bytes []byte) int64 {
 	buffer := atomic.MakeBuffer(bytes)
 	length := int32(len(bytes))
 	start := time.Now()

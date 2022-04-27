@@ -14,7 +14,7 @@ type ClientSession interface {
 	Id() int64
 	ResponseStreamId() int32
 	ResponseChannel() string
-	// EncodedPrinciple() []byte
+	EncodedPrincipal() []byte
 	Close()
 	// TODO: the other close methods are not part of interface.
 	// I don't understand the closing bool implementation and why it is needed
@@ -24,51 +24,55 @@ type ClientSession interface {
 	// TryClaim(...)
 }
 
-type ContainerClientSession struct {
+type containerClientSession struct {
 	id               int64
 	responseStreamId int32
 	responseChannel  string
+	encodedPrincipal []byte
 	agent            *ClusteredServiceAgent
 	response         *aeron.Publication
 }
 
-func NewContainerClientSession(
+func newContainerClientSession(
 	id int64,
 	responseStreamId int32,
 	responseChannel string,
+	encodedPrincipal []byte,
 	agent *ClusteredServiceAgent,
-) *ContainerClientSession {
-	return &ContainerClientSession{
+) *containerClientSession {
+	return &containerClientSession{
 		id:               id,
 		responseStreamId: responseStreamId,
 		responseChannel:  responseChannel,
+		encodedPrincipal: encodedPrincipal,
 		agent:            agent,
-		response: <-agent.a.AddPublication(
-			responseChannel,
-			responseStreamId,
-		),
+		response:         <-agent.a.AddPublication(responseChannel, responseStreamId),
 	}
 }
 
-func (s *ContainerClientSession) Id() int64 {
+func (s *containerClientSession) Id() int64 {
 	return s.id
 }
 
-func (s *ContainerClientSession) ResponseStreamId() int32 {
+func (s *containerClientSession) ResponseStreamId() int32 {
 	return s.responseStreamId
 }
 
-func (s *ContainerClientSession) ResponseChannel() string {
+func (s *containerClientSession) ResponseChannel() string {
 	return s.responseChannel
 }
 
-func (s *ContainerClientSession) Close() {
+func (s *containerClientSession) EncodedPrincipal() []byte {
+	return s.encodedPrincipal
+}
+
+func (s *containerClientSession) Close() {
 	if _, ok := s.agent.getClientSession(s.id); ok {
 		s.agent.closeClientSession(s.id)
 	}
 }
 
-func (s *ContainerClientSession) Offer(
+func (s *containerClientSession) Offer(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,

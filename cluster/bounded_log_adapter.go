@@ -15,7 +15,7 @@ const (
 	unfragmented uint8 = 0x80 | 0x40
 )
 
-type BoundedLogAdapter struct {
+type boundedLogAdapter struct {
 	marshaller     *codecs.SbeGoMarshaller
 	options        *Options
 	agent          *ClusteredServiceAgent
@@ -24,17 +24,17 @@ type BoundedLogAdapter struct {
 	maxLogPosition int64
 }
 
-func (adapter *BoundedLogAdapter) IsDone() bool {
+func (adapter *boundedLogAdapter) isDone() bool {
 	return adapter.image.Position() >= adapter.maxLogPosition ||
 		adapter.image.IsEndOfStream() ||
 		adapter.image.IsClosed()
 }
 
-func (adapter *BoundedLogAdapter) Poll(limitPos int64) int {
+func (adapter *boundedLogAdapter) poll(limitPos int64) int {
 	return adapter.image.BoundedPoll(adapter.onFragment, limitPos, adapter.options.LogFragmentLimit)
 }
 
-func (adapter *BoundedLogAdapter) onFragment(
+func (adapter *boundedLogAdapter) onFragment(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
@@ -63,7 +63,7 @@ func (adapter *BoundedLogAdapter) onFragment(
 	}
 }
 
-func (adapter *BoundedLogAdapter) onMessage(
+func (adapter *boundedLogAdapter) onMessage(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
@@ -98,7 +98,7 @@ func (adapter *BoundedLogAdapter) onMessage(
 			blockLength,
 			adapter.options.RangeChecking,
 		); err != nil {
-			logger.Errorf("BoundedLogAdapter: session open decode error: %v", err)
+			logger.Errorf("boundedLogAdapter: session open decode error: %v", err)
 			return
 		}
 
@@ -121,7 +121,7 @@ func (adapter *BoundedLogAdapter) onMessage(
 		e := &codecs.ClusterActionRequest{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
-			logger.Errorf("BoundedLogAdapter: cluster action request decode error: %v", err)
+			logger.Errorf("boundedLogAdapter: cluster action request decode error: %v", err)
 		} else {
 			adapter.agent.onServiceAction(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.Action)
 		}
@@ -129,7 +129,7 @@ func (adapter *BoundedLogAdapter) onMessage(
 		e := &codecs.NewLeadershipTermEvent{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
-			logger.Errorf("BoundedLogAdapter: new leadership term decode error: %v", err)
+			logger.Errorf("boundedLogAdapter: new leadership term decode error: %v", err)
 		} else {
 			adapter.agent.onNewLeadershipTermEvent(e.LeadershipTermId, e.LogPosition, e.Timestamp,
 				e.TermBaseLogPosition, e.LeaderMemberId, e.LogSessionId, e.TimeUnit, e.AppVersion)
@@ -138,7 +138,7 @@ func (adapter *BoundedLogAdapter) onMessage(
 		e := &codecs.MembershipChangeEvent{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
-			logger.Errorf("BoundedLogAdapter: membership change event decode error: %v", err)
+			logger.Errorf("boundedLogAdapter: membership change event decode error: %v", err)
 		} else {
 			adapter.agent.onMembershipChange(e.LogPosition, e.Timestamp, e.ChangeType, e.MemberId)
 		}
@@ -169,7 +169,7 @@ func toByteBuffer(buffer *atomic.Buffer, offset int32, length int32) *bytes.Buff
 	return buf
 }
 
-func (adapter *BoundedLogAdapter) Close() error {
+func (adapter *boundedLogAdapter) Close() error {
 	var err error
 	if adapter.image != nil {
 		err = adapter.image.Close()

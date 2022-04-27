@@ -91,8 +91,8 @@ func (loader *snapshotLoader) onFragment(
 			loader.err = err
 			loader.isDone = true
 		} else {
-			loader.agent.addSessionFromSnapshot(NewContainerClientSession(s.ClusterSessionId,
-				s.ResponseStreamId, string(s.ResponseChannel), loader.agent))
+			loader.agent.addSessionFromSnapshot(newContainerClientSession(s.ClusterSessionId,
+				s.ResponseStreamId, string(s.ResponseChannel), s.EncodedPrincipal, loader.agent))
 		}
 	default:
 		logger.Debugf("SnapshotLoader: unknown templateId=%d at pos=%d", templateId, header.Position())

@@ -44,8 +44,8 @@ type ClusteredServiceAgent struct {
 	opts                     *Options
 	proxy                    *consensusModuleProxy
 	reader                   *counters.Reader
-	serviceAdapter           *ServiceAdapter
-	logAdapter               *BoundedLogAdapter
+	serviceAdapter           *serviceAdapter
+	logAdapter               *boundedLogAdapter
 	markFile                 *ClusterMarkFile
 	activeLogEvent           *activeLogEvent
 	cachedTimeMs             int64
@@ -95,11 +95,11 @@ func NewClusteredServiceAgent(
 		"aeron:ipc?term-length=128k|alias=consensus-control",
 		int32(ServiceStreamId),
 	)
-	serviceAdapter := &ServiceAdapter{
+	serviceAdapter := &serviceAdapter{
 		marshaller:   codecs.NewSbeGoMarshaller(),
 		subscription: sub,
 	}
-	logAdapter := &BoundedLogAdapter{
+	logAdapter := &boundedLogAdapter{
 		marshaller: codecs.NewSbeGoMarshaller(),
 		options:    options,
 	}
@@ -273,7 +273,7 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	return nil
 }
 
-func (agent *ClusteredServiceAgent) addSessionFromSnapshot(session *ContainerClientSession) {
+func (agent *ClusteredServiceAgent) addSessionFromSnapshot(session *containerClientSession) {
 	agent.sessions[session.id] = session
 }
 
@@ -291,7 +291,7 @@ func (agent *ClusteredServiceAgent) checkForClockTick() bool {
 }
 
 func (agent *ClusteredServiceAgent) pollServiceAdapter() {
-	agent.serviceAdapter.Poll()
+	agent.serviceAdapter.poll()
 
 	if agent.activeLogEvent != nil && agent.logAdapter.image == nil {
 		event := agent.activeLogEvent
@@ -328,9 +328,9 @@ func (agent *ClusteredServiceAgent) DoWork() int {
 	}
 
 	if agent.logAdapter.image != nil {
-		polled := agent.logAdapter.Poll(agent.commitPosition.Get())
+		polled := agent.logAdapter.poll(agent.commitPosition.Get())
 		work += polled
-		if polled == 0 && agent.logAdapter.IsDone() {
+		if polled == 0 && agent.logAdapter.isDone() {
 			agent.closeLog()
 		}
 	}
@@ -445,10 +445,11 @@ func (agent *ClusteredServiceAgent) onSessionOpen(
 		logger.Errorf("clashing open session - id=%d leaderTermId=%d logPos=%d",
 			clusterSessionId, leadershipTermId, logPosition)
 	} else {
-		session := NewContainerClientSession(
+		session := newContainerClientSession(
 			clusterSessionId,
 			responseStreamId,
 			responseChannel,
+			encodedPrincipal,
 			agent,
 		)
 		// TODO: looks like we only want to connect if this is the leader
@@ -593,16 +594,16 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	}
 
 	logger.Debugf("takeSnapshot - got recordingId: %d", recordingId)
-	snapshotTaker := NewSnapshotTaker(agent.opts, pub)
-	if err := snapshotTaker.MarkBegin(logPos, leadershipTermId, agent.timeUnit, agent.opts.AppVersion); err != nil {
+	snapshotTaker := newSnapshotTaker(agent.opts, pub)
+	if err := snapshotTaker.markBegin(logPos, leadershipTermId, agent.timeUnit, agent.opts.AppVersion); err != nil {
 		return 0, err
 	}
 	for _, session := range agent.sessions {
-		if err := snapshotTaker.SnapshotSession(session); err != nil {
+		if err := snapshotTaker.snapshotSession(session); err != nil {
 			return 0, err
 		}
 	}
-	if err := snapshotTaker.MarkEnd(logPos, leadershipTermId, agent.timeUnit, agent.opts.AppVersion); err != nil {
+	if err := snapshotTaker.markEnd(logPos, leadershipTermId, agent.timeUnit, agent.opts.AppVersion); err != nil {
 		return 0, err
 	}
 	agent.checkForClockTick()

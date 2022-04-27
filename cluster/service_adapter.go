@@ -9,20 +9,20 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
 )
 
-type ServiceAdapter struct {
+type serviceAdapter struct {
 	marshaller   *codecs.SbeGoMarshaller
 	agent        *ClusteredServiceAgent
 	subscription *aeron.Subscription
 }
 
-func (adapter *ServiceAdapter) Poll() int {
+func (adapter *serviceAdapter) poll() int {
 	if adapter.subscription.IsClosed() {
 		panic("subscription closed")
 	}
 	return adapter.subscription.Poll(adapter.onFragment, 10)
 }
 
-func (adapter *ServiceAdapter) onFragment(
+func (adapter *serviceAdapter) onFragment(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
@@ -36,7 +36,7 @@ func (adapter *ServiceAdapter) onFragment(
 	schemaId := buffer.GetUInt16(offset + 4)
 	version := buffer.GetUInt16(offset + 6)
 	if schemaId != clusterSchemaId {
-		logger.Errorf("ServiceAdapter: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
+		logger.Errorf("serviceAdapter: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
 		return
 	}
@@ -49,7 +49,7 @@ func (adapter *ServiceAdapter) onFragment(
 		buffer.WriteBytes(buf, offset, length)
 		joinLog := &codecs.JoinLog{}
 		if err := joinLog.Decode(adapter.marshaller, buf, version, blockLength, true); err != nil {
-			logger.Errorf("ServiceAdapter: join log decode error: %v", err)
+			logger.Errorf("serviceAdapter: join log decode error: %v", err)
 		} else {
 			adapter.agent.onJoinLog(
 				joinLog.LogPosition,
@@ -66,6 +66,6 @@ func (adapter *ServiceAdapter) onFragment(
 		logPos := buffer.GetInt64(offset)
 		adapter.agent.onServiceTerminationPosition(logPos)
 	default:
-		logger.Debugf("ServiceAdapter: unexpected templateId=%d at pos=%d", templateId, header.Position())
+		logger.Debugf("serviceAdapter: unexpected templateId=%d at pos=%d", templateId, header.Position())
 	}
 }
