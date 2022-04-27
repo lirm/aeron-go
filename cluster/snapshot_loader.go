@@ -3,6 +3,7 @@ package cluster
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/corymonroe-coinbase/aeron-go/aeron"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
@@ -37,23 +38,28 @@ func (loader *snapshotLoader) onFragment(
 	length int32,
 	header *logbuffer.Header,
 ) {
-	var hdr codecs.SbeGoMessageHeader
+	if length < SBEHeaderLength {
+		return
+	}
+	blockLength := buffer.GetUInt16(offset)
+	templateId := buffer.GetUInt16(offset + 2)
+	schemaId := buffer.GetUInt16(offset + 4)
+	version := buffer.GetUInt16(offset + 6)
+	if schemaId != clusterSchemaId {
+		logger.Errorf("SnapshotLoader: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
+			schemaId, templateId, blockLength, version)
+		return
+	}
+	offset += SBEHeaderLength
+	length -= SBEHeaderLength
+
 	buf := &bytes.Buffer{}
 	buffer.WriteBytes(buf, offset, length)
 
-	if err := hdr.Decode(loader.marshaller, buf); err != nil {
-		fmt.Println("header decode error: ", err)
-		return
-	}
-
-	if hdr.SchemaId != clusterSchemaId {
-		return
-	}
-
-	switch hdr.TemplateId {
+	switch templateId {
 	case snapshotMarkerTemplateId:
 		marker := &codecs.SnapshotMarker{}
-		if err := marker.Decode(loader.marshaller, buf, hdr.Version, hdr.BlockLength, true); err != nil {
+		if err := marker.Decode(loader.marshaller, buf, version, blockLength, true); err != nil {
 			loader.err = err
 			loader.isDone = true
 		} else if marker.TypeId != snapshotTypeId {
@@ -81,7 +87,7 @@ func (loader *snapshotLoader) onFragment(
 		}
 	case clientSessionTemplateId:
 		s := codecs.ClientSession{}
-		if err := s.Decode(loader.marshaller, buf, hdr.Version, hdr.BlockLength, true); err != nil {
+		if err := s.Decode(loader.marshaller, buf, version, blockLength, true); err != nil {
 			loader.err = err
 			loader.isDone = true
 		} else {
@@ -89,6 +95,6 @@ func (loader *snapshotLoader) onFragment(
 				s.ResponseStreamId, string(s.ResponseChannel), loader.agent))
 		}
 	default:
-		//fmt.Println("SnapshotLoader: unknown template id: ", hdr.TemplateId)
+		logger.Debugf("SnapshotLoader: unknown templateId=%d at pos=%d", templateId, header.Position())
 	}
 }

@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/corymonroe-coinbase/aeron-go/aeron"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
@@ -12,50 +11,45 @@ import (
 
 type ServiceAdapter struct {
 	marshaller   *codecs.SbeGoMarshaller
-	options      *Options
 	agent        *ClusteredServiceAgent
 	subscription *aeron.Subscription
 }
-
-// type FragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
 
 func (adapter *ServiceAdapter) Poll() int {
 	if adapter.subscription.IsClosed() {
 		panic("subscription closed")
 	}
-	return adapter.subscription.Poll(adapter.fragmentAssembler, 10)
+	return adapter.subscription.Poll(adapter.onFragment, 10)
 }
 
-func (adapter *ServiceAdapter) fragmentAssembler(
+func (adapter *ServiceAdapter) onFragment(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
 	header *logbuffer.Header,
 ) {
-	var hdr codecs.SbeGoMessageHeader
-	buf := &bytes.Buffer{}
-	buffer.WriteBytes(buf, offset, length)
-
-	if err := hdr.Decode(adapter.marshaller, buf); err != nil {
-		fmt.Println("header decode error: ", err)
+	if length < SBEHeaderLength {
 		return
 	}
-
-	if hdr.SchemaId != clusterSchemaId {
+	blockLength := buffer.GetUInt16(offset)
+	templateId := buffer.GetUInt16(offset + 2)
+	schemaId := buffer.GetUInt16(offset + 4)
+	version := buffer.GetUInt16(offset + 6)
+	if schemaId != clusterSchemaId {
+		logger.Errorf("ServiceAdapter: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
+			schemaId, templateId, blockLength, version)
 		return
 	}
+	offset += SBEHeaderLength
+	length -= SBEHeaderLength
 
-	switch hdr.TemplateId {
+	switch templateId {
 	case joinLogTemplateId:
+		buf := &bytes.Buffer{}
+		buffer.WriteBytes(buf, offset, length)
 		joinLog := &codecs.JoinLog{}
-		if err := joinLog.Decode(
-			adapter.marshaller,
-			buf,
-			hdr.Version,
-			hdr.BlockLength,
-			adapter.options.RangeChecking,
-		); err != nil {
-			fmt.Println("ServiceAdaptor: join log decode error: ", err)
+		if err := joinLog.Decode(adapter.marshaller, buf, version, blockLength, true); err != nil {
+			logger.Errorf("ServiceAdapter: join log decode error: %v", err)
 		} else {
 			adapter.agent.onJoinLog(
 				joinLog.LogPosition,
@@ -69,13 +63,9 @@ func (adapter *ServiceAdapter) fragmentAssembler(
 			)
 		}
 	case serviceTerminationPosTemplateId:
-		e := codecs.ServiceTerminationPosition{}
-		if err := e.Decode(adapter.marshaller, buf, hdr.Version, hdr.BlockLength, adapter.options.RangeChecking); err != nil {
-			fmt.Println("ServiceAdaptor: service termination pos decode error: ", err)
-		} else {
-			adapter.agent.onServiceTerminationPosition(e.LogPosition)
-		}
+		logPos := buffer.GetInt64(offset)
+		adapter.agent.onServiceTerminationPosition(logPos)
 	default:
-		//fmt.Println("ServiceAdaptor: unexpected template id: ", hdr.TemplateId)
+		logger.Debugf("ServiceAdapter: unexpected templateId=%d at pos=%d", templateId, header.Position())
 	}
 }

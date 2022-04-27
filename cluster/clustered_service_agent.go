@@ -11,6 +11,7 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer/term"
+	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 	"github.com/corymonroe-coinbase/aeron-go/archive"
 	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
@@ -19,7 +20,7 @@ import (
 const NullValue = -1
 const NullPosition = -1
 const serviceId = 0
-const MarkFileUpdateIntervalMs = 1000
+const markFileUpdateIntervalMs = 1000
 const sessionMessageHdrBlockLength = 24
 
 const (
@@ -30,10 +31,12 @@ const (
 )
 
 const (
-	RecordingPosCounterTypeId  = 100
-	CommitPosCounterTypeId     = 203
-	RecoveryStateCounterTypeId = 204
+	recordingPosCounterTypeId  = 100
+	commitPosCounterTypeId     = 203
+	recoveryStateCounterTypeId = 204
 )
+
+var logger = logging.MustGetLogger("cluster")
 
 type ClusteredServiceAgent struct {
 	a                        *aeron.Aeron
@@ -73,6 +76,8 @@ func NewClusteredServiceAgent(
 		return nil, fmt.Errorf("archive response channel must be IPC: %s", options.ArchiveOptions.ResponseChannel)
 	}
 
+	logging.SetLevel(options.Loglevel, "cluster")
+
 	a, err := aeron.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -92,7 +97,6 @@ func NewClusteredServiceAgent(
 	)
 	serviceAdapter := &ServiceAdapter{
 		marshaller:   codecs.NewSbeGoMarshaller(),
-		options:      options,
 		subscription: sub,
 	}
 	logAdapter := &BoundedLogAdapter{
@@ -169,12 +173,12 @@ func (agent *ClusteredServiceAgent) OnStart() error {
 
 func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
 	for {
-		id := agent.reader.FindCounter(CommitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id := agent.reader.FindCounter(commitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			return keyBuffer.GetInt32(0) == agent.opts.ClusterId
 		})
 		if id != counters.NullCounterId {
 			commitPos, err := counters.NewReadableCounter(agent.reader, id)
-			fmt.Printf("found commit position counter - id=%d value=%d\n", id, commitPos.Get())
+			logger.Debugf("found commit position counter - id=%d value=%d", id, commitPos.Get())
 			agent.commitPosition = commitPos
 			return err
 		}
@@ -184,7 +188,7 @@ func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
 
 func (agent *ClusteredServiceAgent) recoverState() error {
 	counterId, leadershipTermId := agent.awaitRecoveryCounter()
-	fmt.Printf("found recovery counter - id=%d leadershipTermId=%d logPos=%d clusterTime=%d\n",
+	logger.Debugf("found recovery counter - id=%d leadershipTermId=%d logPos=%d clusterTime=%d",
 		counterId, leadershipTermId, agent.logPosition, agent.clusterTime)
 	agent.sessionMsgHdrBuffer.PutInt64(SBEHeaderLength, leadershipTermId)
 	agent.isServiceActive = true
@@ -221,7 +225,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 	for {
 		var leadershipTermId int64
-		id := agent.reader.FindCounter(RecoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id := agent.reader.FindCounter(recoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(24) == agent.opts.ClusterId {
 				leadershipTermId = keyBuffer.GetInt64(0)
 				agent.logPosition = keyBuffer.GetInt64(8)
@@ -254,7 +258,8 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 		return err
 	}
 
-	fmt.Printf("replaying snapshot - recId=%d sessionId=%d streamId=%d\n", recordingId, replaySessionId, ReplayStreamId)
+	logger.Debugf("replaying snapshot - recId=%d sessionId=%d streamId=%d",
+		recordingId, replaySessionId, ReplayStreamId)
 	subscription := <-arch.AddSubscription(subChannel, ReplayStreamId)
 	defer closeSubscription(subscription)
 
@@ -277,7 +282,7 @@ func (agent *ClusteredServiceAgent) checkForClockTick() bool {
 	if agent.cachedTimeMs != nowMs {
 		agent.cachedTimeMs = nowMs
 		if nowMs > agent.markFileUpdateDeadlineMs {
-			agent.markFileUpdateDeadlineMs = nowMs + MarkFileUpdateIntervalMs
+			agent.markFileUpdateDeadlineMs = nowMs + markFileUpdateIntervalMs
 			agent.markFile.UpdateActivityTimestamp(nowMs)
 		}
 		return true
@@ -296,7 +301,7 @@ func (agent *ClusteredServiceAgent) pollServiceAdapter() {
 
 	if agent.terminationPosition != NullPosition && agent.logPosition >= agent.terminationPosition {
 		if agent.logPosition > agent.terminationPosition {
-			fmt.Printf("WARNING: service terminate: logPos=%d > terminationPos=%d\n", agent.logPosition, agent.terminationPosition)
+			logger.Errorf("service terminate: logPos=%d > terminationPos=%d", agent.logPosition, agent.terminationPosition)
 		}
 		agent.terminate()
 	}
@@ -343,7 +348,7 @@ func (agent *ClusteredServiceAgent) onJoinLog(
 	role Role,
 	logChannel string,
 ) {
-	fmt.Println("join log called: ", logPosition, isStartup, role, logChannel)
+	logger.Debugf("onJoinLog - logPos=%d isStartup=%v role=%v logChannel=%s", logPosition, isStartup, role, logChannel)
 	agent.logAdapter.maxLogPosition = logPosition
 	event := &activeLogEvent{
 		logPosition:    logPosition,
@@ -373,8 +378,10 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
 	logSub := <-agent.a.AddSubscription(event.logChannel, event.logStreamId)
 	img := agent.awaitImage(event.logSessionId, logSub)
 	if img.Position() != agent.logPosition {
-		fmt.Printf("joinActiveLog - image.position: %v expected: %v\n", img.Position(), agent.logPosition)
-		// TODO: close logSub and return error
+		panic(fmt.Errorf("joinActiveLog - image.position=%v expected=%v", img.Position(), agent.logPosition))
+	}
+	if event.logPosition != agent.logPosition {
+		panic(fmt.Errorf("joinActiveLog - event.logPos=%v expected=%v", event.logPosition, agent.logPosition))
 	}
 	agent.logAdapter.image = img
 	agent.logAdapter.maxLogPosition = event.maxLogPosition
@@ -399,7 +406,7 @@ func (agent *ClusteredServiceAgent) closeLog() {
 		agent.logPosition = imageLogPos
 	}
 	if err := agent.logAdapter.Close(); err != nil {
-		fmt.Println("error closing log image: ", err)
+		logger.Errorf("error closing log image: %v", err)
 	}
 	agent.setRole(Follower)
 }
@@ -435,7 +442,7 @@ func (agent *ClusteredServiceAgent) onSessionOpen(
 	agent.logPosition = logPosition
 	agent.clusterTime = timestamp
 	if _, ok := agent.sessions[clusterSessionId]; ok {
-		fmt.Printf("WARNING: onSessionOpen clashing - id=%d leaderTermId=%d logPos=%d\n",
+		logger.Errorf("clashing open session - id=%d leaderTermId=%d logPos=%d",
 			clusterSessionId, leadershipTermId, logPosition)
 	} else {
 		session := NewContainerClientSession(
@@ -466,8 +473,8 @@ func (agent *ClusteredServiceAgent) onSessionClose(
 		delete(agent.sessions, clusterSessionId)
 		agent.service.OnSessionClose(session, timestamp, closeReason)
 	} else {
-		fmt.Printf("WARNING: onSessionClose unknown - id=%d leaderTermId=%d logPos=%d\n",
-			clusterSessionId, leadershipTermId, logPosition)
+		logger.Errorf("onSessionClose: unknown session - id=%d leaderTermId=%d logPos=%d reason=%v",
+			clusterSessionId, leadershipTermId, logPosition, closeReason)
 	}
 }
 
@@ -501,9 +508,10 @@ func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
 	leaderMemberId int32,
 	logSessionId int32,
 	timeUnit codecs.ClusterTimeUnitEnum,
-	appVersion int32) {
-	//if (util.SemanticVersionMajor(ctx.appVersion()) != SemanticVersion.major(appVersion))
-	//{
+	appVersion int32,
+) {
+	// TODO:
+	//if (util.SemanticVersionMajor(ctx.appVersion()) != SemanticVersion.major(appVersion)) {
 	//	ctx.errorHandler().onError(new ClusterException(
 	//	"incompatible version: " + SemanticVersion.toString(ctx.appVersion()) +
 	//	" log=" + SemanticVersion.toString(appVersion)));
@@ -525,16 +533,21 @@ func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
 		appVersion)
 }
 
-func (agent *ClusteredServiceAgent) onServiceAction(leadershipTermId int64, logPos int64, timestamp int64, action codecs.ClusterActionEnum) {
+func (agent *ClusteredServiceAgent) onServiceAction(
+	leadershipTermId int64,
+	logPos int64,
+	timestamp int64,
+	action codecs.ClusterActionEnum,
+) {
 	agent.logPosition = logPos
 	agent.clusterTime = timestamp
 	if action == codecs.ClusterAction.SNAPSHOT {
 		recordingId, err := agent.takeSnapshot(logPos, leadershipTermId)
 		if err != nil {
-			fmt.Println("ERROR: take snapshot failed: ", err)
-			return
+			logger.Errorf("take snapshot failed: ", err)
+		} else {
+			agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, serviceId)
 		}
-		agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, serviceId)
 	}
 }
 
@@ -546,6 +559,19 @@ func (agent *ClusteredServiceAgent) onTimerEvent(
 	agent.logPosition = logPosition
 	agent.clusterTime = timestamp
 	agent.service.OnTimerEvent(correlationId, timestamp)
+}
+
+func (agent *ClusteredServiceAgent) onMembershipChange(
+	logPos int64,
+	timestamp int64,
+	changeType codecs.ChangeTypeEnum,
+	memberId int32,
+) {
+	agent.logPosition = logPos
+	agent.clusterTime = timestamp
+	if memberId == agent.memberId && changeType == codecs.ChangeType.QUIT {
+		agent.terminate()
+	}
 }
 
 func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId int64) (int64, error) {
@@ -566,7 +592,7 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 		return 0, err
 	}
 
-	fmt.Printf("takeSnapshot - got recordingId: %d\n", recordingId)
+	logger.Debugf("takeSnapshot - got recordingId: %d", recordingId)
 	snapshotTaker := NewSnapshotTaker(agent.opts, pub)
 	if err := snapshotTaker.MarkBegin(logPos, leadershipTermId, agent.timeUnit, agent.opts.AppVersion); err != nil {
 		return 0, err
@@ -589,7 +615,7 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 	start := time.Now()
 	for time.Since(start) < agent.opts.Timeout {
 		recId := int64(NullValue)
-		counterId := agent.reader.FindCounter(RecordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		counterId := agent.reader.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(8) == sessionId {
 				recId = keyBuffer.GetInt64(0)
 				return true
@@ -639,30 +665,31 @@ func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, b
 
 func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
 	if _, ok := agent.sessions[id]; ok {
+		// TODO: check if session already closed
 		agent.proxy.closeSessionRequest(id)
 	} else {
-		fmt.Printf("unknown session id: %d, ignored\n", id)
+		logger.Errorf("closeClientSession: unknown session id=%d", id)
 	}
 }
 
 func closeArchive(arch *archive.Archive) {
 	err := arch.Close()
 	if err != nil {
-		fmt.Println("error closing archive connection: ", err)
+		logger.Errorf("error closing archive connection: %v", err)
 	}
 }
 
 func closeSubscription(sub *aeron.Subscription) {
 	err := sub.Close()
 	if err != nil {
-		fmt.Printf("error closing subscription, streamId=%d channel=%s: %s\n", sub.StreamID(), sub.Channel(), err)
+		logger.Errorf("error closing subscription, streamId=%d channel=%s: %v", sub.StreamID(), sub.Channel(), err)
 	}
 }
 
 func closePublication(pub *aeron.Publication) {
 	err := pub.Close()
 	if err != nil {
-		fmt.Printf("error closing publication, streamId=%d channel=%s: %s\n", pub.StreamID(), pub.Channel(), err)
+		logger.Errorf("error closing publication, streamId=%d channel=%s: %v", pub.StreamID(), pub.Channel(), err)
 	}
 }
 

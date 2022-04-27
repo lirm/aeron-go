@@ -5,12 +5,14 @@ import (
 
 	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
 	"github.com/corymonroe-coinbase/aeron-go/archive"
+	"go.uber.org/zap/zapcore"
 )
 
 type Options struct {
 	Timeout          time.Duration      // [runtime] How long to try sending/receiving control messages
 	IdleStrategy     idlestrategy.Idler // [runtime] Idlestrategy for sending/receiving control messagesA
 	RangeChecking    bool               // [runtime] archive protocol marshalling checks
+	Loglevel         zapcore.Level      // [runtime] via logging.SetLevel()
 	LogFragmentLimit int
 	ClusterDir       string
 	ClusterId        int32
@@ -26,6 +28,7 @@ func NewOptions() *Options {
 		Timeout:          time.Second * 5,
 		IdleStrategy:     idlestrategy.NewDefaultBackoffIdleStrategy(),
 		RangeChecking:    true,
+		Loglevel:         zapcore.WarnLevel,
 		LogFragmentLimit: 50,
 		ClusterDir:       "/tmp/aeron-cluster",
 		ArchiveOptions:   archiveOpts,

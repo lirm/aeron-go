@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/corymonroe-coinbase/aeron-go/aeron"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
@@ -78,7 +77,7 @@ func (adapter *BoundedLogAdapter) onMessage(
 	schemaId := buffer.GetUInt16(offset + 4)
 	version := buffer.GetUInt16(offset + 6)
 	if schemaId != clusterSchemaId {
-		fmt.Printf("BoundedLogAdaptor - unexpected schemaId=%d templateId=%d blockLen=%d version=%d\n",
+		logger.Errorf("BoundedLogAdaptor - unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
 		return
 	}
@@ -99,7 +98,7 @@ func (adapter *BoundedLogAdapter) onMessage(
 			blockLength,
 			adapter.options.RangeChecking,
 		); err != nil {
-			fmt.Println("session open decode error: ", err)
+			logger.Errorf("BoundedLogAdapter: session open decode error: %v", err)
 			return
 		}
 
@@ -113,30 +112,16 @@ func (adapter *BoundedLogAdapter) onMessage(
 			event.EncodedPrincipal,
 		)
 	case sessionCloseTemplateId:
-		event := &codecs.SessionCloseEvent{}
-		if err := event.Decode(
-			adapter.marshaller,
-			toByteBuffer(buffer, offset, length),
-			version,
-			blockLength,
-			adapter.options.RangeChecking,
-		); err != nil {
-			fmt.Println("session close decode error: ", err)
-			return
-		}
-
-		adapter.agent.onSessionClose(
-			event.LeadershipTermId,
-			header.Position(),
-			event.ClusterSessionId,
-			event.Timestamp,
-			event.CloseReason,
-		)
+		leadershipTermId := buffer.GetInt64(offset)
+		clusterSessionId := buffer.GetInt64(offset + 8)
+		timestamp := buffer.GetInt64(offset + 16)
+		closeReason := codecs.CloseReasonEnum(buffer.GetInt32(offset + 24))
+		adapter.agent.onSessionClose(leadershipTermId, header.Position(), clusterSessionId, timestamp, closeReason)
 	case clusterActionReqTemplateId:
 		e := &codecs.ClusterActionRequest{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
-			fmt.Println("cluster action request decode error: ", err)
+			logger.Errorf("BoundedLogAdapter: cluster action request decode error: %v", err)
 		} else {
 			adapter.agent.onServiceAction(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.Action)
 		}
@@ -144,23 +129,22 @@ func (adapter *BoundedLogAdapter) onMessage(
 		e := &codecs.NewLeadershipTermEvent{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
-			fmt.Println("new leadership term decode error: ", err)
+			logger.Errorf("BoundedLogAdapter: new leadership term decode error: %v", err)
 		} else {
-			//fmt.Println("BoundedLogAdaptor - got new leadership term: ", e)
-			adapter.agent.onNewLeadershipTermEvent(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.TermBaseLogPosition,
-				e.LeaderMemberId, e.LogSessionId, e.TimeUnit, e.AppVersion)
+			adapter.agent.onNewLeadershipTermEvent(e.LeadershipTermId, e.LogPosition, e.Timestamp,
+				e.TermBaseLogPosition, e.LeaderMemberId, e.LogSessionId, e.TimeUnit, e.AppVersion)
 		}
 	case membershipChangeTemplateId:
 		e := &codecs.MembershipChangeEvent{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
-			fmt.Println("membership change event decode error: ", err)
+			logger.Errorf("BoundedLogAdapter: membership change event decode error: %v", err)
 		} else {
-			fmt.Println("BoundedLogAdaptor - got membership change event: ", e)
+			adapter.agent.onMembershipChange(e.LogPosition, e.Timestamp, e.ChangeType, e.MemberId)
 		}
 	case sessionMessageHeaderTemplateId:
 		if length < SessionMessageHeaderLength {
-			fmt.Println("received invalid session message - length: ", length)
+			logger.Errorf("received invalid session message - length: %d", length)
 			return
 		}
 		clusterSessionId := buffer.GetInt64(offset + 8)
@@ -175,7 +159,7 @@ func (adapter *BoundedLogAdapter) onMessage(
 			header,
 		)
 	default:
-		fmt.Println("BoundedLogAdaptor: unexpected template id: ", templateId)
+		logger.Debugf("BoundedLogAdaptor: unexpected templateId=%d at pos=%d", templateId, header.Position())
 	}
 }
 
