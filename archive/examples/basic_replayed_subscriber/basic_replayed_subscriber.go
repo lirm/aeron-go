@@ -18,15 +18,16 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
-	"github.com/corymonroe-coinbase/aeron-go/archive"
-	"github.com/corymonroe-coinbase/aeron-go/archive/examples"
 	"math"
 	"time"
+
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/lirm/aeron-go/archive"
+	"github.com/lirm/aeron-go/archive/examples"
 )
 
 var logID = "basic_recording_subscriber"

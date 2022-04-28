@@ -17,10 +17,11 @@ limitations under the License.
 package flyweight
 
 import (
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
 	syncatomic "sync/atomic"
 	"unsafe"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 // Field is the interface for a field in a flyweight wrapper. It expects a preallocated buffer and offset into it, as

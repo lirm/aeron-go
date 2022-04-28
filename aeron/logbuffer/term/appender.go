@@ -17,10 +17,10 @@ limitations under the License.
 package term
 
 import (
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/flyweight"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/flyweight"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 const (

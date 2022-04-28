@@ -17,12 +17,13 @@ package archive
 import (
 	"bytes"
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer/term"
-	"github.com/corymonroe-coinbase/aeron-go/archive/codecs"
 	"time"
+
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logbuffer/term"
+	"github.com/lirm/aeron-go/archive/codecs"
 )
 
 // Control contains everything required for the archive subscription/response side

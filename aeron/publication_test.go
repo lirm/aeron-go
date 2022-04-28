@@ -17,18 +17,19 @@ limitations under the License.
 package aeron
 
 import (
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/counters"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/driver"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/ringbuffer"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util/memmap"
 	"os"
 	"testing"
 	"time"
 	"unsafe"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/lirm/aeron-go/aeron/driver"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/lirm/aeron-go/aeron/ringbuffer"
+	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/lirm/aeron-go/aeron/util/memmap"
 )
 
 func prepareFile(t *testing.T) (string, *logbuffer.LogBuffers) {

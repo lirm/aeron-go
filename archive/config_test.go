@@ -16,7 +16,8 @@ package archive
 
 import (
 	"flag"
-	"github.com/corymonroe-coinbase/aeron-go/aeron"
+
+	"github.com/lirm/aeron-go/aeron"
 )
 
 // TestConfig defaults

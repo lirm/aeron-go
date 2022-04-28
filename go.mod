@@ -1,4 +1,4 @@
-module github.com/corymonroe-coinbase/aeron-go
+module github.com/lirm/aeron-go
 
 go 1.12
 

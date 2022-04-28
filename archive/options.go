@@ -15,9 +15,10 @@
 package archive
 
 import (
-	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
-	"go.uber.org/zap/zapcore"
 	"time"
+
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"go.uber.org/zap/zapcore"
 )
 
 // Options are set by NewArchive() with the default options specified below

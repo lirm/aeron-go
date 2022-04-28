@@ -18,8 +18,9 @@ package rb
 
 import (
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 const insufficientCapacity int32 = -2

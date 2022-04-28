@@ -1,6 +1,6 @@
 package cluster
 
-import "github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
+import "github.com/lirm/aeron-go/aeron/idlestrategy"
 
 type Cluster interface {
 	LogPosition() int64

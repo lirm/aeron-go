@@ -18,9 +18,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/counters"
 	"time"
+
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/counters"
 )
 
 var ansiCls = "\u001b[2J"

@@ -18,7 +18,8 @@ package broadcast
 
 import (
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 type Handler func(int32, *atomic.Buffer, int32, int32)

@@ -17,10 +17,11 @@ limitations under the License.
 package logbuffer
 
 import (
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util/memmap"
 	"unsafe"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/lirm/aeron-go/aeron/util/memmap"
 )
 
 var logger = logging.MustGetLogger("logbuffers")

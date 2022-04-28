@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 const COUNTER_LENGTH = util.CacheLineLength * 2

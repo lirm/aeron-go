@@ -18,12 +18,13 @@ package logbuffer
 
 import (
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/util/memmap"
 	"testing"
 	"unsafe"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/lirm/aeron-go/aeron/util"
+	"github.com/lirm/aeron-go/aeron/util/memmap"
 )
 
 func prepareFile(t *testing.T) *LogBuffers {

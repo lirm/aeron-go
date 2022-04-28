@@ -3,10 +3,10 @@ package cluster
 import (
 	"fmt"
 
-	"github.com/corymonroe-coinbase/aeron-go/aeron"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
-	"github.com/corymonroe-coinbase/aeron-go/cluster/codecs"
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/lirm/aeron-go/cluster/codecs"
 )
 
 const (

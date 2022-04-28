@@ -17,8 +17,9 @@ limitations under the License.
 package flyweight
 
 import (
-	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
 	"testing"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 type StringFly struct {

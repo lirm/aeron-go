@@ -19,12 +19,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/corymonroe-coinbase/aeron-go/aeron"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
-	"github.com/corymonroe-coinbase/aeron-go/examples"
 	"log"
 	"time"
+
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/lirm/aeron-go/examples"
 )
 
 var logger = logging.MustGetLogger("basic_publisher_claim")

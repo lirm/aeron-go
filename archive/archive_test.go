@@ -16,16 +16,17 @@ package archive
 
 import (
 	"flag"
-	"github.com/corymonroe-coinbase/aeron-go/aeron"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
-	"github.com/corymonroe-coinbase/aeron-go/aeron/logging"
-	"github.com/corymonroe-coinbase/aeron-go/archive/codecs"
 	"log"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/lirm/aeron-go/aeron/logging"
+	"github.com/lirm/aeron-go/archive/codecs"
 )
 
 // Rather than mock or spawn an archive-media-driver we're just seeing

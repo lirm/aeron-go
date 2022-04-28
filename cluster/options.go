@@ -3,8 +3,8 @@ package cluster
 import (
 	"time"
 
-	"github.com/corymonroe-coinbase/aeron-go/aeron/idlestrategy"
-	"github.com/corymonroe-coinbase/aeron-go/archive"
+	"github.com/lirm/aeron-go/aeron/idlestrategy"
+	"github.com/lirm/aeron-go/archive"
 	"go.uber.org/zap/zapcore"
 )
 
