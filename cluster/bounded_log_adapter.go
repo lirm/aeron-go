@@ -86,8 +86,8 @@ func (adapter *boundedLogAdapter) onMessage(
 
 	switch templateId {
 	case timerEventTemplateId:
-		correlationId := buffer.GetInt64(offset)
-		timestamp := buffer.GetInt64(offset + 8)
+		correlationId := buffer.GetInt64(offset + 8)
+		timestamp := buffer.GetInt64(offset + 16)
 		adapter.agent.onTimerEvent(header.Position(), correlationId, timestamp)
 	case sessionOpenTemplateId:
 		event := &codecs.SessionOpenEvent{}
