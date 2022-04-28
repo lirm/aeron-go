@@ -256,6 +256,11 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	for !loader.isDone {
 		agent.opts.IdleStrategy.Idle(loader.poll())
 	}
+	if util.SemanticVersionMajor(uint32(agent.opts.AppVersion)) != util.SemanticVersionMajor(uint32(loader.appVersion)) {
+		panic(fmt.Errorf("incompatible app version: %v snapshot=%v",
+			util.SemanticVersionToString(uint32(agent.opts.AppVersion)),
+			util.SemanticVersionToString(uint32(loader.appVersion))))
+	}
 	agent.timeUnit = loader.timeUnit
 	agent.service.OnStart(agent, img)
 	return nil
@@ -499,13 +504,11 @@ func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
 	timeUnit codecs.ClusterTimeUnitEnum,
 	appVersion int32,
 ) {
-	// TODO:
-	//if (util.SemanticVersionMajor(ctx.appVersion()) != SemanticVersion.major(appVersion)) {
-	//	ctx.errorHandler().onError(new ClusterException(
-	//	"incompatible version: " + SemanticVersion.toString(ctx.appVersion()) +
-	//	" log=" + SemanticVersion.toString(appVersion)));
-	//	throw new AgentTerminationException();
-	//}
+	if util.SemanticVersionMajor(uint32(agent.opts.AppVersion)) != util.SemanticVersionMajor(uint32(appVersion)) {
+		panic(fmt.Errorf("incompatible app version: %v log=%v",
+			util.SemanticVersionToString(uint32(agent.opts.AppVersion)),
+			util.SemanticVersionToString(uint32(appVersion))))
+	}
 	agent.sessionMsgHdrBuffer.PutInt64(SBEHeaderLength, leadershipTermId)
 	agent.logPosition = logPosition
 	agent.clusterTime = timestamp
