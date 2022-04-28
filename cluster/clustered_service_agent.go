@@ -19,16 +19,8 @@ import (
 
 const NullValue = -1
 const NullPosition = -1
-const serviceId = 0
 const markFileUpdateIntervalMs = 1000
 const sessionMessageHdrBlockLength = 24
-
-const (
-	ReplayStreamId          = 103
-	ServiceStreamId         = 104
-	ConsensusModuleStreamId = 105
-	SnapshotStreamId        = 106
-)
 
 const (
 	recordingPosCounterTypeId  = 100
@@ -70,10 +62,13 @@ func NewClusteredServiceAgent(
 	service ClusteredService,
 ) (*ClusteredServiceAgent, error) {
 	if !strings.HasPrefix(options.ArchiveOptions.RequestChannel, "aeron:ipc") {
-		return nil, fmt.Errorf("archive request channel must be IPC: %s", options.ArchiveOptions.RequestStream)
+		return nil, fmt.Errorf("archive request channel must be IPC: %s", options.ArchiveOptions.RequestChannel)
 	}
 	if !strings.HasPrefix(options.ArchiveOptions.ResponseChannel, "aeron:ipc") {
 		return nil, fmt.Errorf("archive response channel must be IPC: %s", options.ArchiveOptions.ResponseChannel)
+	}
+	if options.ServiceId < 0 || options.ServiceId > 127 {
+		return nil, fmt.Errorf("serviceId is outside allowed range (0-127): %d", options.ServiceId)
 	}
 
 	logging.SetLevel(options.Loglevel, "cluster")
@@ -83,18 +78,10 @@ func NewClusteredServiceAgent(
 		return nil, err
 	}
 
-	pub := <-a.AddPublication(
-		// TODO: constify?
-		"aeron:ipc?term-length=128k|alias=consensus-control",
-		int32(ConsensusModuleStreamId),
-	)
+	pub := <-a.AddPublication(options.ControlChannel, options.ConsensusModuleStreamId)
 	proxy := newConsensusModuleProxy(options, pub)
 
-	sub := <-a.AddSubscription(
-		// TODO: constify?
-		"aeron:ipc?term-length=128k|alias=consensus-control",
-		int32(ServiceStreamId),
-	)
+	sub := <-a.AddSubscription(options.ControlChannel, options.ServiceStreamId)
 	serviceAdapter := &serviceAdapter{
 		marshaller:   codecs.NewSbeGoMarshaller(),
 		subscription: sub,
@@ -141,13 +128,13 @@ func NewClusteredServiceAgent(
 	logAdapter.agent = agent
 	proxy.idleStrategy = agent
 
-	cmf.flyweight.ArchiveStreamId.Set(10)
-	cmf.flyweight.ServiceStreamId.Set(ServiceStreamId)
-	cmf.flyweight.ConsensusModuleStreamId.Set(ConsensusModuleStreamId)
+	cmf.flyweight.ArchiveStreamId.Set(options.ArchiveOptions.RequestStream)
+	cmf.flyweight.ServiceStreamId.Set(options.ServiceStreamId)
+	cmf.flyweight.ConsensusModuleStreamId.Set(options.ConsensusModuleStreamId)
 	cmf.flyweight.IngressStreamId.Set(-1)
 	cmf.flyweight.MemberId.Set(-1)
-	cmf.flyweight.ServiceId.Set(serviceId)
-	cmf.flyweight.ClusterId.Set(0)
+	cmf.flyweight.ServiceId.Set(options.ServiceId)
+	cmf.flyweight.ClusterId.Set(options.ClusterId)
 
 	cmf.UpdateActivityTimestamp(time.Now().UnixMilli())
 	cmf.SignalReady()
@@ -203,7 +190,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		if serviceCount < 1 {
 			return fmt.Errorf("invalid service count: %d", serviceCount)
 		}
-		snapshotRecId, err := agent.reader.GetKeyPartInt64(counterId, 32+(serviceId*util.SizeOfInt64))
+		snapshotRecId, err := agent.reader.GetKeyPartInt64(counterId, 32+(agent.opts.ServiceId*util.SizeOfInt64))
 		if err != nil {
 			return err
 		}
@@ -217,7 +204,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
 		agent.a.ClientID(),
-		serviceId,
+		agent.opts.ServiceId,
 	)
 	return nil
 }
@@ -248,8 +235,9 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	}
 	defer closeArchive(arch)
 
-	channel := "aeron:ipc?alias=snapshot-replay"
-	replaySessionId, err := arch.StartReplay(recordingId, 0, NullValue, channel, ReplayStreamId)
+	channel := agent.opts.ReplayChannel
+	streamId := agent.opts.ReplayStreamId
+	replaySessionId, err := arch.StartReplay(recordingId, 0, NullValue, channel, streamId)
 	if err != nil {
 		return err
 	}
@@ -259,8 +247,8 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	}
 
 	logger.Debugf("replaying snapshot - recId=%d sessionId=%d streamId=%d",
-		recordingId, replaySessionId, ReplayStreamId)
-	subscription := <-arch.AddSubscription(subChannel, ReplayStreamId)
+		recordingId, replaySessionId, streamId)
+	subscription := <-arch.AddSubscription(subChannel, streamId)
 	defer closeSubscription(subscription)
 
 	img := agent.awaitImage(int32(replaySessionId), subscription)
@@ -315,7 +303,7 @@ func (agent *ClusteredServiceAgent) terminate() {
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
 		NullValue,
-		serviceId,
+		agent.opts.ServiceId,
 	)
 	agent.terminationPosition = NullPosition
 }
@@ -391,7 +379,7 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
 		NullValue,
-		serviceId,
+		agent.opts.ServiceId,
 	)
 
 	agent.memberId = event.memberId
@@ -547,7 +535,7 @@ func (agent *ClusteredServiceAgent) onServiceAction(
 		if err != nil {
 			logger.Errorf("take snapshot failed: ", err)
 		} else {
-			agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, serviceId)
+			agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, agent.opts.ServiceId)
 		}
 	}
 }
@@ -582,7 +570,7 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	}
 	defer closeArchive(arch)
 
-	pub, err := arch.AddRecordedPublication("aeron:ipc?alias=snapshot", SnapshotStreamId)
+	pub, err := arch.AddRecordedPublication(agent.opts.SnapshotChannel, agent.opts.SnapshotStreamId)
 	if err != nil {
 		return NullValue, err
 	}
