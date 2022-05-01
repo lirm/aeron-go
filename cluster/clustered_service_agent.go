@@ -31,11 +31,11 @@ const (
 var logger = logging.MustGetLogger("cluster")
 
 type ClusteredServiceAgent struct {
-	a                        *aeron.Aeron
-	ctx                      *aeron.Context
+	aeronClient              *aeron.Aeron
+	aeronCtx                 *aeron.Context
 	opts                     *Options
 	proxy                    *consensusModuleProxy
-	reader                   *counters.Reader
+	counters                 *counters.Reader
 	serviceAdapter           *serviceAdapter
 	logAdapter               *boundedLogAdapter
 	markFile                 *ClusterMarkFile
@@ -57,7 +57,7 @@ type ClusteredServiceAgent struct {
 }
 
 func NewClusteredServiceAgent(
-	ctx *aeron.Context,
+	aeronCtx *aeron.Context,
 	options *Options,
 	service ClusteredService,
 ) (*ClusteredServiceAgent, error) {
@@ -73,15 +73,15 @@ func NewClusteredServiceAgent(
 
 	logging.SetLevel(options.Loglevel, "cluster")
 
-	a, err := aeron.Connect(ctx)
+	aeronClient, err := aeron.Connect(aeronCtx)
 	if err != nil {
 		return nil, err
 	}
 
-	pub := <-a.AddPublication(options.ControlChannel, options.ConsensusModuleStreamId)
+	pub := <-aeronClient.AddPublication(options.ControlChannel, options.ConsensusModuleStreamId)
 	proxy := newConsensusModuleProxy(options, pub)
 
-	sub := <-a.AddSubscription(options.ControlChannel, options.ServiceStreamId)
+	sub := <-aeronClient.AddSubscription(options.ControlChannel, options.ServiceStreamId)
 	serviceAdapter := &serviceAdapter{
 		marshaller:   codecs.NewSbeGoMarshaller(),
 		subscription: sub,
@@ -91,8 +91,8 @@ func NewClusteredServiceAgent(
 		options:    options,
 	}
 
-	counterFile, _, _ := counters.MapFile(ctx.CncFileName())
-	reader := counters.NewReader(
+	counterFile, _, _ := counters.MapFile(aeronCtx.CncFileName())
+	countersReader := counters.NewReader(
 		counterFile.ValuesBuf.Get(),
 		counterFile.MetaDataBuf.Get(),
 	)
@@ -109,13 +109,13 @@ func NewClusteredServiceAgent(
 	sessionMsgHdrBuf.PutUInt16(6, clusterSchemaVersion)
 
 	agent := &ClusteredServiceAgent{
-		a:                   a,
+		aeronClient:         aeronClient,
 		opts:                options,
 		serviceAdapter:      serviceAdapter,
 		logAdapter:          logAdapter,
-		ctx:                 ctx,
+		aeronCtx:            aeronCtx,
 		proxy:               proxy,
-		reader:              reader,
+		counters:            countersReader,
 		markFile:            cmf,
 		role:                Follower,
 		service:             service,
@@ -160,11 +160,11 @@ func (agent *ClusteredServiceAgent) OnStart() error {
 
 func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
 	for {
-		id := agent.reader.FindCounter(commitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id := agent.counters.FindCounter(commitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			return keyBuffer.GetInt32(0) == agent.opts.ClusterId
 		})
 		if id != counters.NullCounterId {
-			commitPos, err := counters.NewReadableCounter(agent.reader, id)
+			commitPos, err := counters.NewReadableCounter(agent.counters, id)
 			logger.Debugf("found commit position counter - id=%d value=%d", id, commitPos.Get())
 			agent.commitPosition = commitPos
 			return err
@@ -183,14 +183,14 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	if leadershipTermId == -1 {
 		agent.service.OnStart(agent, nil)
 	} else {
-		serviceCount, err := agent.reader.GetKeyPartInt32(counterId, 28)
+		serviceCount, err := agent.counters.GetKeyPartInt32(counterId, 28)
 		if err != nil {
 			return err
 		}
 		if serviceCount < 1 {
 			return fmt.Errorf("invalid service count: %d", serviceCount)
 		}
-		snapshotRecId, err := agent.reader.GetKeyPartInt64(counterId, 32+(agent.opts.ServiceId*util.SizeOfInt64))
+		snapshotRecId, err := agent.counters.GetKeyPartInt64(counterId, 32+(agent.opts.ServiceId*util.SizeOfInt64))
 		if err != nil {
 			return err
 		}
@@ -203,7 +203,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		agent.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
-		agent.a.ClientID(),
+		agent.aeronClient.ClientID(),
 		agent.opts.ServiceId,
 	)
 	return nil
@@ -212,7 +212,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 	for {
 		var leadershipTermId int64
-		id := agent.reader.FindCounter(recoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id := agent.counters.FindCounter(recoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(24) == agent.opts.ClusterId {
 				leadershipTermId = keyBuffer.GetInt64(0)
 				agent.logPosition = keyBuffer.GetInt64(8)
@@ -229,7 +229,7 @@ func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 }
 
 func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
-	arch, err := archive.NewArchive(agent.opts.ArchiveOptions, agent.ctx)
+	arch, err := archive.NewArchive(agent.opts.ArchiveOptions, agent.aeronCtx)
 	if err != nil {
 		return err
 	}
@@ -368,7 +368,7 @@ type activeLogEvent struct {
 }
 
 func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
-	logSub := <-agent.a.AddSubscription(event.logChannel, event.logStreamId)
+	logSub := <-agent.aeronClient.AddSubscription(event.logChannel, event.logStreamId)
 	img := agent.awaitImage(event.logSessionId, logSub)
 	if img.Position() != agent.logPosition {
 		panic(fmt.Errorf("joinActiveLog - image.position=%v expected=%v", img.Position(), agent.logPosition))
@@ -567,7 +567,7 @@ func (agent *ClusteredServiceAgent) onMembershipChange(
 }
 
 func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId int64) (int64, error) {
-	arch, err := archive.NewArchive(agent.opts.ArchiveOptions, agent.ctx)
+	arch, err := archive.NewArchive(agent.opts.ArchiveOptions, agent.aeronCtx)
 	if err != nil {
 		return NullValue, err
 	}
@@ -607,7 +607,7 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 	start := time.Now()
 	for time.Since(start) < agent.opts.Timeout {
 		recId := int64(NullValue)
-		counterId := agent.reader.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		counterId := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(8) == sessionId {
 				recId = keyBuffer.GetInt64(0)
 				return true
