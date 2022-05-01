@@ -46,7 +46,7 @@ func newContainerClientSession(
 		responseChannel:  responseChannel,
 		encodedPrincipal: encodedPrincipal,
 		agent:            agent,
-		response:         <-agent.a.AddPublication(responseChannel, responseStreamId),
+		response:         <-agent.aeronClient.AddPublication(responseChannel, responseStreamId),
 	}
 }
 
