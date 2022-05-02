@@ -29,6 +29,9 @@ const SpyQualifier = "aeron-spy"
 // IpcMedia is the media for IPC.
 const IpcMedia = "ipc"
 
+// UdpMedia is the media for UDP.
+const UdpMedia = "udp"
+
 const spyPrefix = SpyQualifier + ":"
 const aeronPrefix = AeronScheme + ":"
 
@@ -132,6 +135,14 @@ func (uri *ChannelUri) SetPrefix(prefix string) {
 
 func (uri ChannelUri) SetMedia(media string) {
 	uri.media = media
+}
+
+func (uri ChannelUri) IsIpc() bool {
+	return uri.media == IpcMedia
+}
+
+func (uri ChannelUri) IsUdp() bool {
+	return uri.media == UdpMedia
 }
 
 func (uri ChannelUri) Get(key string) string {

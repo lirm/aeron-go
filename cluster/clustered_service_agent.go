@@ -20,7 +20,6 @@ import (
 const NullValue = -1
 const NullPosition = -1
 const markFileUpdateIntervalMs = 1000
-const sessionMessageHdrBlockLength = 24
 
 const (
 	recordingPosCounterTypeId  = 100
@@ -102,12 +101,6 @@ func NewClusteredServiceAgent(
 		return nil, err
 	}
 
-	sessionMsgHdrBuf := atomic.MakeBuffer(make([]byte, SBEHeaderLength+sessionMessageHdrBlockLength))
-	sessionMsgHdrBuf.PutUInt16(0, sessionMessageHdrBlockLength)
-	sessionMsgHdrBuf.PutUInt16(2, sessionMessageHeaderTemplateId)
-	sessionMsgHdrBuf.PutUInt16(4, clusterSchemaId)
-	sessionMsgHdrBuf.PutUInt16(6, clusterSchemaVersion)
-
 	agent := &ClusteredServiceAgent{
 		aeronClient:         aeronClient,
 		opts:                options,
@@ -122,7 +115,7 @@ func NewClusteredServiceAgent(
 		logPosition:         NullPosition,
 		terminationPosition: NullPosition,
 		sessions:            map[int64]ClientSession{},
-		sessionMsgHdrBuffer: sessionMsgHdrBuf,
+		sessionMsgHdrBuffer: codecs.MakeClusterMessageBuffer(SessionMessageHeaderTemplateId, SessionMessageHdrBlockLength),
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
@@ -484,14 +477,7 @@ func (agent *ClusteredServiceAgent) onSessionMessage(
 	agent.logPosition = logPosition
 	agent.clusterTime = timestamp
 	clientSession := agent.sessions[clusterSessionId]
-	agent.service.OnSessionMessage(
-		clientSession,
-		timestamp,
-		buffer,
-		offset,
-		length,
-		header,
-	)
+	agent.service.OnSessionMessage(clientSession, timestamp, buffer, offset, length, header)
 }
 
 func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
@@ -521,7 +507,7 @@ func (agent *ClusteredServiceAgent) onNewLeadershipTermEvent(
 		termBaseLogPosition,
 		leaderMemberId,
 		logSessionId,
-		codecs.ClusterTimeUnit.MILLIS,
+		timeUnit,
 		appVersion)
 }
 

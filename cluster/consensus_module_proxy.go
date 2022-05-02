@@ -94,8 +94,8 @@ func (proxy *consensusModuleProxy) initBuffer(templateId uint16, blockLength uin
 	buf := proxy.buffer
 	buf.PutUInt16(0, blockLength)
 	buf.PutUInt16(2, templateId)
-	buf.PutUInt16(4, clusterSchemaId)
-	buf.PutUInt16(6, clusterSchemaVersion)
+	buf.PutUInt16(4, ClusterSchemaId)
+	buf.PutUInt16(6, ClusterSchemaVersion)
 	return buf
 }
 

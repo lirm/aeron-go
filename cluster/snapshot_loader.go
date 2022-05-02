@@ -45,7 +45,7 @@ func (loader *snapshotLoader) onFragment(
 	templateId := buffer.GetUInt16(offset + 2)
 	schemaId := buffer.GetUInt16(offset + 4)
 	version := buffer.GetUInt16(offset + 6)
-	if schemaId != clusterSchemaId {
+	if schemaId != ClusterSchemaId {
 		logger.Errorf("SnapshotLoader: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
 		return

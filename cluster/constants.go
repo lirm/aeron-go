@@ -14,9 +14,14 @@ const (
 )
 
 const (
-	clusterSchemaId                 = 111
-	clusterSchemaVersion            = 8
-	sessionMessageHeaderTemplateId  = 1
+	ClusterSchemaId                 = 111
+	ClusterSchemaVersion            = 8
+	SessionMessageHeaderTemplateId  = 1
+	SessionEventTemplateId          = 2
+	SessionCloseRequestTemplateId   = 4
+	SessionKeepAliveTemplateId      = 5
+	NewLeaderEventTemlateId         = 6
+	ChallengeTemplateId             = 7
 	timerEventTemplateId            = 20
 	sessionOpenTemplateId           = 21
 	sessionCloseTemplateId          = 22
@@ -30,3 +35,5 @@ const (
 	snapshotMarkerTemplateId        = 100
 	clientSessionTemplateId         = 102
 )
+
+const SessionMessageHdrBlockLength = 24
