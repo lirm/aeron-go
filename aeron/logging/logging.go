@@ -59,7 +59,7 @@ func MustGetLogger(name string) *ZapLogger {
 	if err != nil {
 		panic("Failed to make logger")
 	}
-	z.logger = logger.Named(name)
+	z.logger = logger.Named(name).WithOptions(zap.AddCallerSkip(1))
 	z.sugar = z.logger.Sugar()
 
 	// Keep a reference
