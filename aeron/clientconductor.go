@@ -553,7 +553,7 @@ func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatu
 		if sub.regID == correlationID {
 			sub.status = RegistrationStatus.RegisteredMediaDriver
 
-			sub.subscription = NewSubscription(cc, sub.channel, correlationID, sub.streamID)
+			sub.subscription = NewSubscription(cc, sub.channel, correlationID, sub.streamID, channelStatusIndicatorID)
 
 			if cc.onNewSubscriptionHandler != nil {
 				cc.onNewSubscriptionHandler(sub.channel, sub.streamID, correlationID)

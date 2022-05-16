@@ -17,9 +17,20 @@ limitations under the License.
 package aeron
 
 import (
+	"strings"
+
 	"github.com/corymonroe-coinbase/aeron-go/aeron/atomic"
 	"github.com/corymonroe-coinbase/aeron-go/aeron/logbuffer/term"
 )
+
+const (
+	ChannelStatusErrored      = -1 // Channel has errored. Check logs for information
+	ChannelStatusInitializing = 0  // Channel is being initialized
+	ChannelStatusActive       = 1  // Channel has finished initialization and is active
+	ChannelStatusClosing      = 2  // Channel is being closed
+)
+
+const CounterTypeDriverLocalSocketAddress = 14
 
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and
 // stream ID combination.
@@ -29,6 +40,7 @@ type Subscription struct {
 	roundRobinIndex int
 	registrationID  int64
 	streamID        int32
+	channelStatusID int32
 
 	images *ImageList
 
@@ -36,13 +48,14 @@ type Subscription struct {
 }
 
 // NewSubscription is a factory method to create new subscription to be added to the media driver
-func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32) *Subscription {
+func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID, channelStatusID int32) *Subscription {
 	sub := new(Subscription)
 	sub.images = NewImageList()
 	sub.conductor = conductor
 	sub.channel = channel
 	sub.registrationID = registrationID
 	sub.streamID = streamID
+	sub.channelStatusID = channelStatusID
 	sub.roundRobinIndex = 0
 	sub.isClosed.Set(false)
 
@@ -62,6 +75,20 @@ func (sub *Subscription) StreamID() int32 {
 // IsClosed returns whether this subscription has been closed.
 func (sub *Subscription) IsClosed() bool {
 	return sub.isClosed.Get()
+}
+
+// ChannelStatus returns the status of the media channel for this Subscription.
+// The status will be ChannelStatusErrored if a socket exception on setup or ChannelStatusActive if all is well.
+func (sub *Subscription) ChannelStatus() int {
+	if sub.IsClosed() {
+		return -2
+	}
+	return int(sub.conductor.counterReader.GetCounterValue(sub.channelStatusID))
+}
+
+// ChannelStatusId returns the counter ID used to represent the channel status of this Subscription.
+func (sub *Subscription) ChannelStatusId() int32 {
+	return sub.channelStatusID
 }
 
 // Close will release all images in this subscription, send command to the driver and block waiting for response from
@@ -204,6 +231,50 @@ func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 	return nil
 }
 
+// TryResolveChannelEndpointPort resolves the channel endpoint and replaces it with the port from the
+// ephemeral range when 0 was provided. If there are no addresses, or if there is more than one, returned from
+// LocalSocketAddresses() then the original channel is returned.
+// If the channel is not ACTIVE, then empty string will be returned.
+func (sub *Subscription) TryResolveChannelEndpointPort() string {
+	if sub.ChannelStatus() != ChannelStatusActive {
+		return ""
+	}
+	localSocketAddresses := sub.LocalSocketAddresses()
+	if len(localSocketAddresses) != 1 {
+		return sub.channel
+	}
+	uri, err := ParseChannelUri(sub.channel)
+	if err != nil {
+		logger.Warningf("error parsing channel (%s): %v", sub.channel, err)
+		return sub.channel
+	}
+	endpoint := uri.Get("endpoint")
+	if strings.HasSuffix(endpoint, ":0") {
+		resolvedEndpoint := localSocketAddresses[0]
+		i := strings.LastIndex(resolvedEndpoint, ":")
+		uri.Set("endpoint", endpoint[:(len(endpoint)-2)]+resolvedEndpoint[i:])
+		return uri.String()
+	}
+	return sub.channel
+}
+
+// LocalSocketAddresses fetches the local socket addresses for this subscription.
+func (sub *Subscription) LocalSocketAddresses() []string {
+	if sub.ChannelStatus() != ChannelStatusActive {
+		return nil
+	}
+	var bindings []string
+	reader := sub.conductor.counterReader
+	reader.ScanForType(CounterTypeDriverLocalSocketAddress, func(counterId int32, keyBuffer *atomic.Buffer) {
+		channelStatusId := keyBuffer.GetInt32(0)
+		length := keyBuffer.GetInt32(4)
+		if channelStatusId == sub.channelStatusID && length > 0 && reader.GetCounterValue(counterId) == ChannelStatusActive {
+			bindings = append(bindings, string(keyBuffer.GetBytesArray(8, length)))
+		}
+	})
+	return bindings
+}
+
 // IsConnectedTo is a helper function used primarily by tests, which is used within the same process to verify that
 // subscription is connected to a specific publication.
 func IsConnectedTo(sub *Subscription, pub *Publication) bool {
@@ -217,4 +288,20 @@ func IsConnectedTo(sub *Subscription, pub *Publication) bool {
 	}
 
 	return false
+}
+
+// ChannelStatusString provides a convenience method for logging and error handling
+func ChannelStatusString(channelStatus int) string {
+	switch channelStatus {
+	case ChannelStatusErrored:
+		return "ChannelStatusErrored"
+	case ChannelStatusInitializing:
+		return "ChannelStatusInitializing"
+	case ChannelStatusActive:
+		return "ChannelStatusActive"
+	case ChannelStatusClosing:
+		return "ChannelStatusClosing"
+	default:
+		return "Unknown"
+	}
 }

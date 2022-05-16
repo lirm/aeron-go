@@ -275,6 +275,10 @@ func (ac *AeronCluster) createIngressPublication(endpoint string) *aeron.Publica
 }
 
 func (ac *AeronCluster) awaitPublicationConnected() int {
+	responseChannel := ac.egressSub.TryResolveChannelEndpointPort()
+	if responseChannel == "" {
+		return 0
+	}
 	now := time.Now().UnixMilli()
 	if now > ac.awaitTimeoutTime {
 		logger.Warningf("timed out waiting for connected publication")
@@ -287,7 +291,7 @@ func (ac *AeronCluster) awaitPublicationConnected() int {
 			if member.publication != nil && member.publication.IsConnected() {
 				ac.ingressPub = member.publication
 				ac.fragmentAssembler.Clear()
-				if ac.sendConnectRequest() {
+				if ac.sendConnectRequest(responseChannel) {
 					logger.Debugf("sent connect request to memberId=%d correlationId=%d channel=%s",
 						member.memberId, ac.correlationId, member.publication.Channel())
 					ac.state = clientAwaitConnectReply
@@ -296,20 +300,20 @@ func (ac *AeronCluster) awaitPublicationConnected() int {
 				}
 			}
 		}
-	} else if ac.ingressPub.IsConnected() && ac.sendConnectRequest() {
+	} else if ac.ingressPub.IsConnected() && ac.sendConnectRequest(responseChannel) {
 		ac.state = clientAwaitConnectReply
 		ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 	}
 	return 0
 }
 
-func (ac *AeronCluster) sendConnectRequest() bool {
+func (ac *AeronCluster) sendConnectRequest(responseChannel string) bool {
 	ac.correlationId = ac.aeronClient.NextCorrelationID()
 	req := codecs.SessionConnectRequest{
 		CorrelationId:    ac.correlationId,
 		ResponseStreamId: ac.opts.EgressStreamId,
 		Version:          int32(protocolSemanticVersion),
-		ResponseChannel:  []byte(ac.opts.EgressChannel),
+		ResponseChannel:  []byte(responseChannel),
 	}
 	header := codecs.MessageHeader{
 		BlockLength: req.SbeBlockLength(),

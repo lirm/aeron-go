@@ -85,6 +85,26 @@ func (reader *Reader) Scan(cb func(Counter)) {
 	}
 }
 
+func (reader *Reader) ScanForType(typeId int32, callback func(counterId int32, keyBuffer *atomic.Buffer)) {
+	var keyBuf atomic.Buffer
+	for id := 0; id < reader.maxCounterID; id++ {
+		counterId := int32(id)
+		metaDataOffset := counterId * METADATA_LENGTH
+		recordStatus := reader.metaData.GetInt32Volatile(metaDataOffset)
+		if recordStatus == RECORD_UNUSED {
+			break
+		} else if RECORD_ALLOCATED == recordStatus {
+			thisTypeId := reader.metaData.GetInt32(metaDataOffset + 4)
+			if thisTypeId == typeId {
+				// requires Go 1.17: keyPtr := unsafe.Add(reader.metaData.Ptr(), metaDataOffset+KEY_OFFSET)
+				keyPtr := unsafe.Pointer(uintptr(reader.metaData.Ptr()) + uintptr(metaDataOffset+KEY_OFFSET))
+				keyBuf.Wrap(keyPtr, MAX_KEY_LENGTH)
+				callback(counterId, &keyBuf)
+			}
+		}
+	}
+}
+
 func (reader *Reader) FindCounter(typeId int32, keyFilter func(keyBuffer *atomic.Buffer) bool) int32 {
 	var keyBuf atomic.Buffer
 	for id := 0; id < reader.maxCounterID; id++ {
@@ -131,6 +151,14 @@ func (reader *Reader) GetKeyPartInt64(counterId int32, offset int32) (int64, err
 		return 0, fmt.Errorf("counterId=%d recordStatus=%d", counterId, recordStatus)
 	}
 	return reader.metaData.GetInt64(metaDataOffset + KEY_OFFSET + offset), nil
+}
+
+// GetCounterValue returns the value of the given counter id (as a volatile read).
+func (reader *Reader) GetCounterValue(counterId int32) int64 {
+	if counterId < 0 || counterId >= int32(reader.maxCounterID) {
+		return 0
+	}
+	return reader.values.GetInt64Volatile(counterId * COUNTER_LENGTH)
 }
 
 func (reader *Reader) validateCounterIdAndOffset(counterId int32, offset int32) error {

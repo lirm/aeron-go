@@ -79,7 +79,7 @@ func main() {
 	}
 	opts.IngressChannel = "aeron:udp?alias=cluster-client-ingress|endpoint=localhost:20000"
 	opts.IngressEndpoints = "0=localhost:20000,1=localhost:21000,2=localhost:22000"
-	opts.EgressChannel = "aeron:udp?alias=cluster-egress|endpoint=localhost:11111"
+	//opts.EgressChannel = "aeron:udp?alias=cluster-egress|endpoint=localhost:11111"
 
 	listener := &TestContext{
 		latencies: make([]int64, 1000),
