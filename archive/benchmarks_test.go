@@ -16,9 +16,10 @@ package archive
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/archive/codecs"
-	"testing"
 )
 
 // check to see if this is worth avoiding in the fragment handlers

@@ -19,12 +19,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/examples"
-	"log"
-	"time"
 )
 
 var logger = logging.MustGetLogger("basic_publisher_claim")

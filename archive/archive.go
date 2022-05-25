@@ -19,13 +19,14 @@ package archive
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/archive/codecs"
-	"sync"
-	"time"
 )
 
 // Archive is the primary interface to the media driver for managing archiving

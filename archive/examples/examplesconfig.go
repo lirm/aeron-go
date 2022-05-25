@@ -16,6 +16,7 @@ package examples
 
 import (
 	"flag"
+
 	"github.com/lirm/aeron-go/aeron"
 )
 

@@ -17,6 +17,11 @@ limitations under the License.
 package aeron
 
 import (
+	"os"
+	"testing"
+	"time"
+	"unsafe"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/driver"
@@ -25,10 +30,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"os"
-	"testing"
-	"time"
-	"unsafe"
 )
 
 func prepareFile(t *testing.T) (string, *logbuffer.LogBuffers) {

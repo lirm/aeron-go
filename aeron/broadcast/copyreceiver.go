@@ -18,6 +18,7 @@ package broadcast
 
 import (
 	"fmt"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 )
 

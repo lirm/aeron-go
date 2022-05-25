@@ -16,11 +16,12 @@ package archive
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/archive/codecs"
-	"time"
 )
 
 // Proxy class for encapsulating encoding and sending of control protocol messages to an archive

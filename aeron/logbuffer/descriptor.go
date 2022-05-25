@@ -18,6 +18,7 @@ package logbuffer
 
 import (
 	"fmt"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/flyweight"
 	"github.com/lirm/aeron-go/aeron/util"

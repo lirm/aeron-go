@@ -16,6 +16,7 @@ package archive
 
 import (
 	"flag"
+
 	"github.com/lirm/aeron-go/aeron"
 )
 

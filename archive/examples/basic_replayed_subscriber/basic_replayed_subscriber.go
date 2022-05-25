@@ -18,6 +18,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
@@ -25,8 +28,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/archive"
 	"github.com/lirm/aeron-go/archive/examples"
-	"math"
-	"time"
 )
 
 var logID = "basic_recording_subscriber"

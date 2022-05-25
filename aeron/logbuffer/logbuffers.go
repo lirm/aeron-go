@@ -17,10 +17,11 @@ limitations under the License.
 package logbuffer
 
 import (
+	"unsafe"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
-	"unsafe"
 )
 
 var logger = logging.MustGetLogger("logbuffers")
