@@ -177,7 +177,7 @@ func (cc *ClientConductor) Close() error {
 	var err error
 	if cc.running.CompareAndSet(true, false) {
 		for _, pub := range cc.pubs {
-			if pub.publication != nil {
+			if pub != nil && pub.publication != nil {
 				err = pub.publication.Close()
 				if err != nil {
 					cc.errorHandler(err)
@@ -186,7 +186,7 @@ func (cc *ClientConductor) Close() error {
 		}
 
 		for _, sub := range cc.subs {
-			if sub.subscription != nil {
+			if sub != nil && sub.subscription != nil {
 				err = sub.subscription.Close()
 				if err != nil {
 					cc.errorHandler(err)
@@ -319,6 +319,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 					publication.sessionID = pub.sessionID
 					publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
 					publication.channelStatusIndicatorID = pub.channelStatusIndicatorID
+					pub.publication = publication
 
 				case RegistrationStatus.ErroredMediaDriver:
 					log.Fatalf("Error on %d: %d: %s", regID, pub.errorCode, pub.errorMessage)

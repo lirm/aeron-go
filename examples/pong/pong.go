@@ -19,17 +19,18 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"runtime/pprof"
+	"syscall"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/examples"
-	"os"
-	"os/signal"
-	"runtime/pprof"
-	"syscall"
-	"time"
 )
 
 var logger = logging.MustGetLogger("examples")

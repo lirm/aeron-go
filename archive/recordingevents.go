@@ -17,6 +17,7 @@ package archive
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"

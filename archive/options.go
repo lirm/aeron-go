@@ -15,9 +15,10 @@
 package archive
 
 import (
+	"time"
+
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"go.uber.org/zap/zapcore"
-	"time"
 )
 
 // Options are set by NewArchive() with the default options specified below

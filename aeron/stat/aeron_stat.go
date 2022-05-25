@@ -18,9 +18,10 @@ package main
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/counters"
-	"time"
 )
 
 var ansiCls = "\u001b[2J"

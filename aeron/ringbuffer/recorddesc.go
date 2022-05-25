@@ -18,6 +18,7 @@ package rb
 
 import (
 	"fmt"
+
 	"github.com/lirm/aeron-go/aeron/util"
 )
 

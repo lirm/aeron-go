@@ -97,13 +97,15 @@ limitations under the License.
 package counters
 
 import (
+	"fmt"
+	"time"
+	"unsafe"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/command"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/util"
 
-	"fmt"
-	"time"
 )
 
 const COUNTER_LENGTH = util.CacheLineLength * 2
@@ -111,6 +113,7 @@ const COUNTER_LENGTH = util.CacheLineLength * 2
 const FULL_LABEL_LENGTH = util.CacheLineLength * 6
 const LABEL_OFFSET = util.CacheLineLength * 2
 const METADATA_LENGTH = LABEL_OFFSET + FULL_LABEL_LENGTH
+const MAX_KEY_LENGTH = (util.CacheLineLength * 2) - (util.SizeOfInt32 * 2) - util.SizeOfInt64
 
 const TYPE_ID_OFFSET = 4
 const FREE_FOR_REUSE_DEADLINE_OFFSET = TYPE_ID_OFFSET + 4
@@ -120,13 +123,14 @@ const RECORD_RECLAIMED int32 = -1
 const RECORD_UNUSED int32 = 0
 const RECORD_ALLOCATED int32 = 1
 
+const NullCounterId = int32(-1)
+
 const RECORDING_ID_OFFSET = 0
 const SESSION_ID_OFFSET = RECORDING_ID_OFFSET + 8
 const SOURCE_IDENTITY_LENGTH_OFFSET = SESSION_ID_OFFSET + 4
 const SOURCE_IDENTITY_OFFSET = SOURCE_IDENTITY_LENGTH_OFFSET + 4
 
 const NULL_RECORDING_ID = -1
-const NULL_COUNTER_ID = -1
 
 // From LocalSocketAddressStatus.Java
 const CHANNEL_STATUS_ID_OFFSET = 0
@@ -192,8 +196,7 @@ func (reader *Reader) Scan(cb func(Counter)) {
 			break
 		} else if RECORD_ALLOCATED == recordStatus {
 			typeId := reader.metaData.GetInt32(i + TYPE_ID_OFFSET)
-			labelSize := reader.metaData.GetInt32(i + LABEL_OFFSET)
-			label := string(reader.metaData.GetBytesArray(i+4+LABEL_OFFSET, labelSize))
+			label := reader.labelValue(i)
 
 			// TODO Get the key buffer
 
@@ -202,10 +205,72 @@ func (reader *Reader) Scan(cb func(Counter)) {
 			//fmt.Printf("Reading at offset %d; counterState=%d; typeId=%d\n", i, recordStatus, typeId)
 
 			cb(Counter{id, typeId, value, label})
+		}
+		id++
+	}
+}
 
-			id++
+func (reader *Reader) FindCounter(typeId int32, keyFilter func(keyBuffer *atomic.Buffer) bool) int32 {
+	var keyBuf atomic.Buffer
+	for id := 0; id < reader.maxCounterID; id++ {
+		metaDataOffset := int32(id) * METADATA_LENGTH
+		recordStatus := reader.metaData.GetInt32Volatile(metaDataOffset)
+		if recordStatus == RECORD_UNUSED {
+			break
+		} else if RECORD_ALLOCATED == recordStatus {
+			thisTypeId := reader.metaData.GetInt32(metaDataOffset + 4)
+			if thisTypeId == typeId {
+				// requires Go 1.17: keyPtr := unsafe.Add(reader.metaData.Ptr(), metaDataOffset+KEY_OFFSET)
+				keyPtr := unsafe.Pointer(uintptr(reader.metaData.Ptr()) + uintptr(metaDataOffset+KEY_OFFSET))
+				keyBuf.Wrap(keyPtr, MAX_KEY_LENGTH)
+				if keyFilter == nil || keyFilter(&keyBuf) {
+					return int32(id)
+				}
+			}
 		}
 	}
+	return NullCounterId
+}
+
+// GetKeyPartInt32 returns an int32 portion of the key at the specified offset
+func (reader *Reader) GetKeyPartInt32(counterId int32, offset int32) (int32, error) {
+	if err := reader.validateCounterIdAndOffset(counterId, offset+util.SizeOfInt32); err != nil {
+		return 0, err
+	}
+	metaDataOffset := counterId * METADATA_LENGTH
+	recordStatus := reader.metaData.GetInt32Volatile(metaDataOffset)
+	if recordStatus != RECORD_ALLOCATED {
+		return 0, fmt.Errorf("counterId=%d recordStatus=%d", counterId, recordStatus)
+	}
+	return reader.metaData.GetInt32(metaDataOffset + KEY_OFFSET + offset), nil
+}
+
+// GetKeyPartInt64 returns an int64 portion of the key at the specified offset
+func (reader *Reader) GetKeyPartInt64(counterId int32, offset int32) (int64, error) {
+	if err := reader.validateCounterIdAndOffset(counterId, offset+util.SizeOfInt64); err != nil {
+		return 0, err
+	}
+	metaDataOffset := counterId * METADATA_LENGTH
+	recordStatus := reader.metaData.GetInt32Volatile(metaDataOffset)
+	if recordStatus != RECORD_ALLOCATED {
+		return 0, fmt.Errorf("counterId=%d recordStatus=%d", counterId, recordStatus)
+	}
+	return reader.metaData.GetInt64(metaDataOffset + KEY_OFFSET + offset), nil
+}
+
+func (reader *Reader) validateCounterIdAndOffset(counterId int32, offset int32) error {
+	if counterId < 0 || counterId >= int32(reader.maxCounterID) {
+		return fmt.Errorf("counterId=%d maxCounterId=%d", counterId, reader.maxCounterID)
+	}
+	if offset < 0 || offset >= MAX_KEY_LENGTH {
+		return fmt.Errorf("counterId=%d offset=%d maxKeyLength=%d", counterId, offset, MAX_KEY_LENGTH)
+	}
+	return nil
+}
+
+func (reader *Reader) labelValue(metaDataOffset int32) string {
+	labelSize := reader.metaData.GetInt32(metaDataOffset + LABEL_OFFSET)
+	return string(reader.metaData.GetBytesArray(metaDataOffset+LABEL_OFFSET+4, labelSize))
 }
 
 // MaxCounterID returns the reader's maximum CounterID
@@ -230,7 +295,7 @@ func (reader *Reader) CounterTypeID(counterID int32) int32 {
 
 // FindCounterIDByRecording finds the active counter id for a stream
 // based on the recording id
-// Returns the counterID if found otherwise NULL_COUNTER_ID
+// Returns the counterID if found otherwise NullCounterId
 func (reader *Reader) FindCounterIDByRecording(recordingID int64) int32 {
 	buffer := reader.MetaData()
 
@@ -245,11 +310,11 @@ func (reader *Reader) FindCounterIDByRecording(recordingID int64) int32 {
 			break
 		}
 	}
-	return NULL_COUNTER_ID
+	return NullCounterId
 }
 
 // FindCounterIDBySession finds the active counterID for a stream based on the sessionID
-// Returns the counterID if found otherwise NULL_COUNTER_ID
+// Returns the counterID if found otherwise NullCounterId
 func (reader *Reader) FindCounterIDBySession(sessionID int32) int32 {
 	buffer := reader.MetaData()
 	for i, size := int32(0), reader.MaxCounterID(); i < int32(size); i++ {
@@ -264,7 +329,7 @@ func (reader *Reader) FindCounterIDBySession(sessionID int32) int32 {
 			break
 		}
 	}
-	return NULL_COUNTER_ID
+	return NullCounterId
 }
 
 // RecordingID finds the active counterID for a stream based on the sessionID
@@ -304,7 +369,7 @@ func (reader *Reader) CounterValue(counterID int32) int64 {
 }
 
 // AwaitRecordingCounterID waits for a specific counterID to appear and return it
-// On timeout return (NULL_COUNTER_ID, error)
+// On timeout return (NullCounterId, error)
 func (reader *Reader) AwaitRecordingCounterID(sessionID int32) (int32, error) {
 	start := time.Now()
 	idler := idlestrategy.Sleeping{SleepFor: time.Millisecond * 50} // FIXME: tune, // FIXME: parameterize?
@@ -312,13 +377,13 @@ func (reader *Reader) AwaitRecordingCounterID(sessionID int32) (int32, error) {
 	for {
 		counterID := reader.FindCounterIDBySession(sessionID)
 		//fmt.Printf("counterID:%d, sessionID:%d\n", counterID, sessionID)
-		if counterID != NULL_COUNTER_ID {
+		if counterID != NullCounterId {
 			return counterID, nil
 		} else {
 			// Idle and check timeout
 			idler.Idle(0)
 			if time.Since(start) > time.Second*15 { // FIXME: tune, // FIXME: parameterize?
-				return NULL_COUNTER_ID, fmt.Errorf("Timeout waiting for counter:%d", counterID)
+				return NullCounterId, fmt.Errorf("Timeout waiting for counter:%d", counterID)
 			}
 		}
 	}

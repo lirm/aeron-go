@@ -212,6 +212,71 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 	return newPosition
 }
 
+// Offer2 attempts to publish a message composed of two parts, e.g. a header and encapsulated payload.
+func (pub *Publication) Offer2(
+	bufferOne *atomic.Buffer, offsetOne int32, lengthOne int32,
+	bufferTwo *atomic.Buffer, offsetTwo int32, lengthTwo int32,
+	reservedValueSupplier term.ReservedValueSupplier,
+) int64 {
+	if lengthOne < 0 {
+		logger.Debugf("Offered negative length (lengthOne: %d)", lengthOne)
+		return 0
+	} else if lengthTwo < 0 {
+		logger.Debugf("Offered negative length (lengthTwo: %d)", lengthTwo)
+		return 0
+	}
+	length := lengthOne + lengthTwo
+	if length < 0 {
+		panic(fmt.Sprintf("Length overflow (lengthOne: %d lengthTwo: %d)", lengthOne, lengthTwo))
+	}
+	newPosition := PublicationClosed
+
+	if reservedValueSupplier == nil {
+		reservedValueSupplier = term.DefaultReservedValueSupplier
+	}
+
+	if !pub.IsClosed() {
+
+		limit := pub.pubLimit.get()
+		termCount := pub.metaData.ActiveTermCountOff.Get()
+		termIndex := termCount % logbuffer.PartitionCount
+		termAppender := pub.appenders[termIndex]
+		rawTail := termAppender.RawTail()
+		termOffset := rawTail & 0xFFFFFFFF
+		termId := logbuffer.TermID(rawTail)
+		position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
+
+		if termCount != (termId - pub.metaData.InitTermID.Get()) {
+			return AdminAction
+		}
+
+		if logger.IsEnabledFor(logging.DEBUG) {
+			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
+		}
+		if position < limit {
+			var termOffsetA int64
+			var termId int32
+			if length <= pub.maxPayloadLength {
+				termOffsetA, termId = termAppender.AppendUnfragmentedMessage2(
+					bufferOne, offsetOne, lengthOne,
+					bufferTwo, offsetTwo, lengthTwo,
+					reservedValueSupplier)
+			} else {
+				pub.checkForMaxMessageLength(length)
+				termOffsetA, termId = termAppender.AppendFragmentedMessage2(
+					bufferOne, offsetOne, lengthOne,
+					bufferTwo, offsetTwo, lengthTwo,
+					pub.maxPayloadLength, reservedValueSupplier)
+			}
+			newPosition = pub.newPosition(termCount, termOffset, termId, position, termOffsetA)
+		} else {
+			newPosition = pub.backPressureStatus(position, length)
+		}
+	}
+
+	return newPosition
+}
+
 func (pub *Publication) newPosition(termCount int32, termOffset int64, termId int32, position int64, resultingOffset int64) int64 {
 	if resultingOffset > 0 {
 		return (position - termOffset) + resultingOffset
