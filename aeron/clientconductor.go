@@ -316,6 +316,7 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 					publication.sessionID = pub.sessionID
 					publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
 					publication.channelStatusIndicatorID = pub.channelStatusIndicatorID
+					pub.publication = publication
 
 				case RegistrationStatus.ErroredMediaDriver:
 					log.Fatalf("Error on %d: %d: %s", regID, pub.errorCode, pub.errorMessage)
