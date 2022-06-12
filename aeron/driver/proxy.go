@@ -182,19 +182,24 @@ func (driver *Proxy) RemovePublication(registrationID int64) {
 	driver.writeCommandToDriver(filler)
 }
 
-// SendClientKeepalive send keep alive message to the driver
-func (driver *Proxy) SendClientKeepalive() {
+// ClientClose sends a client close to the driver.
+func (driver *Proxy) ClientClose() {
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.ClientClose: clientId=%d correlationId=%d",
+		driver.clientID, correlationID)
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {
 
 		var message command.CorrelatedMessage
 		message.Wrap(buffer, 0)
+
 		message.ClientID.Set(driver.clientID)
-		message.CorrelationID.Set(0)
+		message.CorrelationID.Set(correlationID)
 
 		*length = message.Size()
 
-		return command.ClientKeepalive
+		return command.ClientClose
 	}
 
 	driver.writeCommandToDriver(filler)

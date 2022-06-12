@@ -20,6 +20,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/lirm/aeron-go/aeron"
@@ -29,6 +32,13 @@ import (
 )
 
 var logger = logging.MustGetLogger("basic_publisher")
+
+var interrupt = make(chan os.Signal, 1)
+
+func init() {
+	signal.Notify(interrupt, os.Interrupt)
+	signal.Notify(interrupt, syscall.SIGTERM)
+}
 
 func main() {
 	flag.Parse()
@@ -43,8 +53,11 @@ func main() {
 		logging.SetLevel(logging.INFO, "rb")
 	}
 
+	errorHandler := func(err error) {
+		logger.Warning(err)
+	}
 	to := time.Duration(time.Millisecond.Nanoseconds() * *examples.ExamplesConfig.DriverTo)
-	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to)
+	ctx := aeron.NewContext().AeronDir(*examples.ExamplesConfig.AeronPrefix).MediaDriverTimeout(to).ErrorHandler(errorHandler)
 
 	a, err := aeron.Connect(ctx)
 	if err != nil {
@@ -76,6 +89,11 @@ func main() {
 		if !publication.IsConnected() {
 			log.Printf("no subscribers detected")
 		}
-		time.Sleep(time.Second)
+		select {
+		case <-interrupt:
+			return
+		default:
+			time.Sleep(time.Second)
+		}
 	}
 }

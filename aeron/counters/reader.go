@@ -130,7 +130,7 @@ func (reader *Reader) Scan(cb func(Counter)) {
 
 			value := reader.values.GetInt64Volatile(id * COUNTER_LENGTH)
 
-			//fmt.Printf("Reading at offset %d; counterState=%d; typeId=%d\n", i, recordStatus, typeId)
+			// fmt.Printf("Reading at offset %d; counterState=%d; typeId=%d\n", i, recordStatus, typeId)
 
 			cb(Counter{id, typeId, value, label})
 		}
