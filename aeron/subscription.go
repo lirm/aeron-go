@@ -49,11 +49,11 @@ func ChannelStatusString(channelStatus int) string {
 
 // From LocalSocketAddressStatus.Java
 const (
-	CHANNEL_STATUS_ID_OFFSET           = 0
-	LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET = CHANNEL_STATUS_ID_OFFSET + 4
-	LOCAL_SOCKET_ADDRESS_STRING_OFFSET = LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET + 4
+	ChannelStatusIdOffset          = 0
+	LocalSocketAddressLengthOffset = ChannelStatusIdOffset + 4
+	LocalSocketAddressStringOffset = LocalSocketAddressLengthOffset + 4
 )
-const LOCAL_SOCKET_ADDRESS_STATUS_COUNTER_TYPE_ID = 14
+const LocalSocketAddressStatusCounterTypeId = 14
 
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and
 // stream ID combination.
@@ -243,7 +243,7 @@ func (sub *Subscription) ImageCount() int {
 	return len(images)
 }
 
-// ImageBySessionId returns the associated with the given sessionId.
+// ImageBySessionID returns the associated with the given sessionId.
 func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 	img := sub.images.Get()
 	for _, image := range img {
@@ -254,20 +254,21 @@ func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 	return nil
 }
 
-// ResolvedEndpoint finds the resolved endpoint for the channel.
-// This may be empty if MDS is used and no destination is yet added.
-// The result is simply the first in the list of addresses found if multiple addresses exist.
+// ResolvedEndpoint finds the resolved endpoint for the channel. This
+// may be nil if MDS is used and no destination is yet added.
+// The result is simply the first in the list of addresses found if
+// multiple addresses exist
 func (sub *Subscription) ResolvedEndpoint() string {
 	reader := sub.conductor.CounterReader()
 	if sub.ChannelStatus() != ChannelStatusActive {
 		return ""
 	}
 	var endpoint string
-	reader.ScanForType(LOCAL_SOCKET_ADDRESS_STATUS_COUNTER_TYPE_ID, func(counterId int32, keyBuffer *atomic.Buffer) bool {
-		channelStatusId := keyBuffer.GetInt32(CHANNEL_STATUS_ID_OFFSET)
-		length := keyBuffer.GetInt32(LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET)
+	reader.ScanForType(LocalSocketAddressStatusCounterTypeId, func(counterId int32, keyBuffer *atomic.Buffer) bool {
+		channelStatusId := keyBuffer.GetInt32(ChannelStatusIdOffset)
+		length := keyBuffer.GetInt32(LocalSocketAddressLengthOffset)
 		if channelStatusId == sub.channelStatusID && length > 0 && reader.GetCounterValue(counterId) == ChannelStatusActive {
-			endpoint = string(keyBuffer.GetBytesArray(LOCAL_SOCKET_ADDRESS_STRING_OFFSET, length))
+			endpoint = string(keyBuffer.GetBytesArray(LocalSocketAddressStringOffset, length))
 			return false
 		}
 		return true
@@ -309,19 +310,18 @@ func (sub *Subscription) LocalSocketAddresses() []string {
 	}
 	var bindings []string
 	reader := sub.conductor.counterReader
-	reader.ScanForType(LOCAL_SOCKET_ADDRESS_STATUS_COUNTER_TYPE_ID, func(counterId int32, keyBuffer *atomic.Buffer) bool {
-		channelStatusId := keyBuffer.GetInt32(CHANNEL_STATUS_ID_OFFSET)
-		length := keyBuffer.GetInt32(LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET)
+	reader.ScanForType(LocalSocketAddressStatusCounterTypeId, func(counterId int32, keyBuffer *atomic.Buffer) bool {
+		channelStatusId := keyBuffer.GetInt32(ChannelStatusIdOffset)
+		length := keyBuffer.GetInt32(LocalSocketAddressLengthOffset)
 		if channelStatusId == sub.channelStatusID && length > 0 && reader.GetCounterValue(counterId) == ChannelStatusActive {
-			bindings = append(bindings, string(keyBuffer.GetBytesArray(LOCAL_SOCKET_ADDRESS_STRING_OFFSET, length)))
+			bindings = append(bindings, string(keyBuffer.GetBytesArray(LocalSocketAddressStringOffset, length)))
 		}
 		return true
 	})
 	return bindings
 }
 
-// Add a destination manually to a multi-destination Subscription.
-// Multi-destination routing is used for ReplayMerge but is generally available
+// AddDestination adds a destination manually to a multi-destination Subscription.
 func (sub *Subscription) AddDestination(endpointChannel string) bool {
 	if sub.IsClosed() {
 		return false
@@ -331,8 +331,7 @@ func (sub *Subscription) AddDestination(endpointChannel string) bool {
 	return true
 }
 
-// Add a destination manually to a multi-destination Subscription.
-// Multi-destination routing is used for ReplayMerge but is generally available
+// RemoveDestination resmoves a destination manually from a multi-destination Subscription.
 func (sub *Subscription) RemoveDestination(endpointChannel string) bool {
 	if sub.IsClosed() {
 		return false
