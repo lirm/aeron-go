@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright (C) 2022 Talos, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +24,7 @@ const (
 	AddPublication int32 = 0x01
 	// RemovePublication command from client
 	RemovePublication int32 = 0x02
-	// Add Exclusive Publication
+	// AddExclusivePublication from client
 	AddExclusivePublication int32 = 0x03
 	// AddSubscription command from client
 	AddSubscription int32 = 0x04
@@ -31,14 +32,16 @@ const (
 	RemoveSubscription int32 = 0x05
 	// ClientKeepalive message from client */
 	ClientKeepalive int32 = 0x06
-
+	// AddDestination to add an MDC
 	AddDestination = 0x07
-	// Remove Destination
+	// RemoveDestination to remove an MDC
 	RemoveDestination = 0x08
-	// Add Counter
+	// AddCounter command from client
 	AddCounter = 0x09
-	// Remove Counter
+	// RemoveCounter command from client
 	RemoveCounter = 0x0A
-	// Client Close
+	// ClientClose command from client
 	ClientClose = 0x0B
+	// RecordingPosition is rhe position a recording has reached when being archived
+	RecordingPosition = 0x64 // 100
 )

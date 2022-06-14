@@ -33,7 +33,7 @@ const (
 	BackPressured int64 = -2
 	// AdminAction indicates that terms needs to be rotated. User should retry the Offer
 	AdminAction int64 = -3
-	// PublicationClosed indicates that this Publication is closed an no further Offers shall succeed
+	// PublicationClosed indicates that this Publication is closed and no further Offers shall succeed
 	PublicationClosed int64 = -4
 	// MaxPositionExceeded indicates that ...
 	MaxPositionExceeded int64 = -5
@@ -145,6 +145,24 @@ func (pub *Publication) Close() error {
 	}
 
 	return nil
+}
+
+// Returns the current position to which the publication has advanced
+// for this stream or PublicationClosed if closed.
+func (pub *Publication) Position() int64 {
+	if pub.IsClosed() {
+		return PublicationClosed
+	}
+
+	// Spelled out for clarity, the compiler will optimize
+	termCount := pub.metaData.ActiveTermCountOff.Get()
+	termIndex := termCount % logbuffer.PartitionCount
+	termAppender := pub.appenders[termIndex]
+	rawTail := termAppender.RawTail()
+	termOffset := rawTail & 0xFFFFFFFF
+	termId := logbuffer.TermID(rawTail)
+
+	return computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
 }
 
 // Offer is the primary send mechanism on Publication

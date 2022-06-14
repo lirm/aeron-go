@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright (C) 2022 Talos, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,6 +63,16 @@ func (sub *Subscription) StreamID() int32 {
 // IsClosed returns whether this subscription has been closed.
 func (sub *Subscription) IsClosed() bool {
 	return sub.isClosed.Get()
+}
+
+// Status returns the Registration Status
+func (sub *Subscription) Status() (int, error) {
+	return sub.conductor.FindSubscriptionStatus(sub.registrationID)
+}
+
+// ChannelStatusID returns the ChannelStatusID
+func (sub *Subscription) ChannelStatusID() (int, error) {
+	return sub.conductor.FindSubscriptionChannelStatusID(sub.registrationID)
 }
 
 // Close will release all images in this subscription, send command to the driver and block waiting for response from
@@ -202,6 +213,46 @@ func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 		}
 	}
 	return nil
+}
+
+// ResolvedEndpoint finds the resolved endpoint for the channel. This
+// may be nil if MDS is used and no destination is yet added.
+// The result is simply the first in the list of addresses found if
+// multiple addresses exist
+func (sub *Subscription) ResolvedEndpoint() []byte {
+	reader := sub.conductor.CounterReader()
+	channelStatus, err := sub.Status()
+	if err != nil {
+		return nil
+	}
+	channelStatusID, err := sub.ChannelStatusID()
+	if err != nil {
+		return nil
+	}
+	// logger.Debugf("ResolvedEndpoint: statusID:%d, status:%d\n", channelStatus, channelStatusID)
+	return reader.FindAddress(channelStatus, channelStatusID)
+}
+
+// Add a destination manually to a multi-destination Subscription.
+// Multi-destination routing is used for ReplayMerge but is generally available
+func (sub *Subscription) AddDestination(endpointChannel string) bool {
+	if sub.IsClosed() {
+		return false
+	}
+
+	sub.conductor.AddDestination(sub.registrationID, endpointChannel)
+	return true
+}
+
+// Add a destination manually to a multi-destination Subscription.
+// Multi-destination routing is used for ReplayMerge but is generally available
+func (sub *Subscription) RemoveDestination(endpointChannel string) bool {
+	if sub.IsClosed() {
+		return false
+	}
+
+	sub.conductor.RemoveDestination(sub.registrationID, endpointChannel)
+	return true
 }
 
 // IsConnectedTo is a helper function used primarily by tests, which is used within the same process to verify that

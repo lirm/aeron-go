@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright (C) 2022 Talos, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -112,6 +113,26 @@ func (m *RemoveMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight
 	pos += m.ClientID.Wrap(buf, pos)
 	pos += m.CorrelationID.Wrap(buf, pos)
 	pos += m.RegistrationID.Wrap(buf, pos)
+
+	m.SetSize(pos - offset)
+	return m
+}
+
+type DestinationMessage struct {
+	flyweight.FWBase
+
+	ClientID                  flyweight.Int64Field
+	CorrelationID             flyweight.Int64Field
+	RegistrationCorrelationID flyweight.Int64Field
+	Channel                   flyweight.StringField
+}
+
+func (m *DestinationMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.ClientID.Wrap(buf, pos)
+	pos += m.CorrelationID.Wrap(buf, pos)
+	pos += m.RegistrationCorrelationID.Wrap(buf, pos)
+	pos += m.Channel.Wrap(buf, pos, m, true)
 
 	m.SetSize(pos - offset)
 	return m

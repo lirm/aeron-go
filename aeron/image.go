@@ -192,6 +192,19 @@ func (image *Image) SubscriptionRegistrationID() int64 {
 	return image.subscriptionRegistrationID
 }
 
+// TermBufferLength returns the length in bytes for each term partition in the log buffer.
+func (image *Image) TermBufferLength() int32 {
+	return image.termLengthMask + 1
+}
+
+// ActiveTransportCount returns the number of observed active
+// transports within the image liveness timeout.
+//
+// Returns 0 if the image is closed, if no datagrams have arrived or the image is IPC
+func (image *Image) ActiveTransportCount() int32 {
+	return image.logBuffers.Meta().ActiveTransportCount()
+}
+
 // Close the image and mappings. The image becomes unusable after closing.
 func (image *Image) Close() error {
 	var err error
