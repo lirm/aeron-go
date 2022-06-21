@@ -182,8 +182,12 @@ func (cc *ClientConductor) Close() (err error) {
 
 	now := time.Now().UnixNano()
 
+	running := cc.running.Get()
+
 	cc.closeAllResources(now)
-	cc.driverProxy.ClientClose()
+	if running {
+		cc.driverProxy.ClientClose()
+	}
 
 	timeoutDuration := 5 * time.Second
 	timeout := time.Now().Add(timeoutDuration)
