@@ -89,21 +89,22 @@ const (
 type LogBufferMetaData struct {
 	flyweight.FWBase
 
-	TailCounter        []flyweight.Int64Field // 0, 8, 16
-	ActiveTermCountOff flyweight.Int32Field   // 24
-	padding0           flyweight.Padding      // 28
-	EndOfStreamPosOff  flyweight.Int64Field   // 128
-	IsConnected        flyweight.Int32Field   // 136
-	padding1           flyweight.Padding      // 140
-	CorrelationId      flyweight.Int64Field   // 256
-	InitTermID         flyweight.Int32Field   // 264
-	DefaultFrameHdrLen flyweight.Int32Field   // 270
-	MTULen             flyweight.Int32Field   // 274
-	TermLen            flyweight.Int32Field   // 278
-	PageSize           flyweight.Int32Field   // 282
-	padding2           flyweight.Padding      // 286
-	DefaultFrameHeader flyweight.RawDataField // 384
-	padding3           flyweight.Padding
+	TailCounter             []flyweight.Int64Field // 0, 8, 16
+	ActiveTermCountOff      flyweight.Int32Field   // 24
+	padding0                flyweight.Padding      // 28
+	EndOfStreamPosOff       flyweight.Int64Field   // 128
+	IsConnected             flyweight.Int32Field   // 136
+	ActiveTransportCountOff flyweight.Int32Field   // 140
+	padding1                flyweight.Padding      // 144
+	CorrelationId           flyweight.Int64Field   // 256
+	InitTermID              flyweight.Int32Field   // 264
+	DefaultFrameHdrLen      flyweight.Int32Field   // 270
+	MTULen                  flyweight.Int32Field   // 274
+	TermLen                 flyweight.Int32Field   // 278
+	PageSize                flyweight.Int32Field   // 282
+	padding2                flyweight.Padding      // 286
+	DefaultFrameHeader      flyweight.RawDataField // 384
+	padding3                flyweight.Padding
 }
 
 func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
@@ -116,6 +117,7 @@ func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	pos += m.padding0.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
 	pos += m.EndOfStreamPosOff.Wrap(buf, pos)
 	pos += m.IsConnected.Wrap(buf, pos)
+	pos += m.ActiveTransportCountOff.Wrap(buf, pos)
 	pos += m.padding1.Wrap(buf, pos, util.CacheLineLength*2, util.CacheLineLength)
 	pos += m.CorrelationId.Wrap(buf, pos)
 	pos += m.InitTermID.Wrap(buf, pos)
@@ -131,9 +133,9 @@ func (m *LogBufferMetaData) Wrap(buf *atomic.Buffer, offset int) flyweight.Flywe
 	return m
 }
 
-// Returns the count of active transports for the Image
+// ActiveTransportCount returns the count of active transports for the Image.
 func (m *LogBufferMetaData) ActiveTransportCount() int32 {
-	return m.ActiveTermCountOff.Get()
+	return m.ActiveTransportCountOff.Get()
 }
 
 func checkTermLength(termLength int32) {

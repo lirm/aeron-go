@@ -22,47 +22,16 @@ import (
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-// FragmentHandler is the main callback interface for received data
-type FragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
-
 // Read will attempt to read the next frame from the term and invoke the callback if successful.
 // Method will return a tuple of new term offset and number of fragments read
-func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, fragmentsLimit int,
+//go:norace
+func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, fragmentLimit int,
 	header *logbuffer.Header) (int32, int) {
 
 	capacity := termBuffer.Capacity()
 
 	var fragmentsRead int
-	for fragmentsRead < fragmentsLimit && termOffset < capacity {
-		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
-		if frameLength <= 0 {
-			break
-		}
-
-		fragmentOffset := termOffset
-		termOffset += util.AlignInt32(frameLength, logbuffer.FrameAlignment)
-
-		if !logbuffer.IsPaddingFrame(termBuffer, fragmentOffset) {
-			header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
-			header.SetOffset(fragmentOffset)
-			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
-				frameLength-logbuffer.DataFrameHeader.Length, header)
-
-			fragmentsRead++
-		}
-	}
-
-	return termOffset, fragmentsRead
-}
-
-// ReadWithContext as for Read() but woth a contextual argument
-func ReadWithContext(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, fragmentsLimit int,
-	header *logbuffer.Header) (int32, int) {
-
-	capacity := termBuffer.Capacity()
-
-	var fragmentsRead int
-	for fragmentsRead < fragmentsLimit && termOffset < capacity {
+	for fragmentsRead < fragmentLimit && termOffset < capacity {
 		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
 		if frameLength <= 0 {
 			break
@@ -87,10 +56,10 @@ func ReadWithContext(termBuffer *atomic.Buffer, termOffset int32, handler Fragme
 // BoundedRead will attempt to read frames from the term up to the specified offsetLimit.
 // Method will return a tuple of new term offset and number of fragments read
 func BoundedRead(termBuffer *atomic.Buffer, termOffset int32, offsetLimit int32, handler FragmentHandler,
-	fragmentsLimit int, header *logbuffer.Header) (int32, int) {
+	fragmentLimit int, header *logbuffer.Header) (int32, int) {
 
 	var fragmentsRead int
-	for fragmentsRead < fragmentsLimit && termOffset < offsetLimit {
+	for fragmentsRead < fragmentLimit && termOffset < offsetLimit {
 		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
 		if frameLength <= 0 {
 			break

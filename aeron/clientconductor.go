@@ -468,6 +468,30 @@ func (cc *ClientConductor) RemoveDestination(registrationID int64, endpointChann
 	cc.driverProxy.RemoveDestination(registrationID, endpointChannel)
 }
 
+// AddRcvDestination sends the add rcv destination command through the driver proxy
+func (cc *ClientConductor) AddRcvDestination(registrationID int64, endpointChannel string) {
+	logger.Debugf("AddRcvDestination: regID=%d endpointChannel=%s", registrationID, endpointChannel)
+
+	cc.verifyDriverIsActive()
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	cc.driverProxy.AddRcvDestination(registrationID, endpointChannel)
+}
+
+// RemoveRcvDestination sends the remove rcv destination command through the driver proxy
+func (cc *ClientConductor) RemoveRcvDestination(registrationID int64, endpointChannel string) {
+	logger.Debugf("RemoveRcvDestination: regID=%d endpointChannel=%s", registrationID, endpointChannel)
+
+	cc.verifyDriverIsActive()
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	cc.driverProxy.RemoveRcvDestination(registrationID, endpointChannel)
+}
+
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
 	channelStatusIndicatorID int32, logFileName string, regID int64, origRegID int64) {
 

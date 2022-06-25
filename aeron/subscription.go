@@ -152,8 +152,14 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 	return fragmentsRead
 }
 
-// PollWithContext as for Poll() but provides an integer argument for passing contextual information
-func (sub *Subscription) PollWithContext(handler term.FragmentHandler, fragmentLimit int) int {
+// ControlledPoll polls in a controlled manner the Image s under the subscription for available message fragments.
+// Control is applied to fragments in the stream. If more fragments can be read on another stream
+// they will even if BREAK or ABORT is returned from the fragment handler.
+//
+// Each fragment read will be a whole message if it is under MTU length. If larger than MTU then it will come
+// as a series of fragments ordered within a session.
+// Returns the number of fragments received.
+func (sub *Subscription) ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) int {
 
 	img := sub.images.Get()
 	length := len(img)
@@ -168,11 +174,11 @@ func (sub *Subscription) PollWithContext(handler term.FragmentHandler, fragmentL
 		}
 
 		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].PollWithContext(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
 		}
 
 		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].PollWithContext(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
 		}
 	}
 
@@ -327,17 +333,17 @@ func (sub *Subscription) AddDestination(endpointChannel string) bool {
 		return false
 	}
 
-	sub.conductor.AddDestination(sub.registrationID, endpointChannel)
+	sub.conductor.AddRcvDestination(sub.registrationID, endpointChannel)
 	return true
 }
 
-// RemoveDestination resmoves a destination manually from a multi-destination Subscription.
+// RemoveDestination removes a destination manually from a multi-destination Subscription.
 func (sub *Subscription) RemoveDestination(endpointChannel string) bool {
 	if sub.IsClosed() {
 		return false
 	}
 
-	sub.conductor.RemoveDestination(sub.registrationID, endpointChannel)
+	sub.conductor.RemoveRcvDestination(sub.registrationID, endpointChannel)
 	return true
 }
 

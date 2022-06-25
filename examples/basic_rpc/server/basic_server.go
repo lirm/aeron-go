@@ -49,7 +49,7 @@ type client struct {
 func main() {
 	flag.Parse()
 
-	if !*examples.ExamplesConfig.LoggingOn {
+	if *examples.ExamplesConfig.LoggingOn {
 		logging.SetLevel(logging.INFO, "aeron")
 		logging.SetLevel(logging.INFO, "memmap")
 		logging.SetLevel(logging.DEBUG, "driver")

@@ -147,7 +147,7 @@ func (pub *Publication) Close() error {
 	return nil
 }
 
-// Returns the current position to which the publication has advanced
+// Position returns the current position to which the publication has advanced
 // for this stream or PublicationClosed if closed.
 func (pub *Publication) Position() int64 {
 	if pub.IsClosed() {

@@ -46,7 +46,7 @@ func init() {
 func main() {
 	flag.Parse()
 
-	if !*examples.ExamplesConfig.LoggingOn {
+	if *examples.ExamplesConfig.LoggingOn {
 		logging.SetLevel(logging.INFO, "aeron")
 		logging.SetLevel(logging.INFO, "memmap")
 		logging.SetLevel(logging.INFO, "driver")
@@ -83,7 +83,7 @@ func main() {
 	}
 
 	subChannel = "aeron:udp?endpoint=" + subChannel
-	fmt.Printf("got addr %s", subChannel)
+	log.Printf("Using resolved subscription address %s", subChannel)
 
 	publication := <-a.AddExclusivePublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
 	defer publication.Close()

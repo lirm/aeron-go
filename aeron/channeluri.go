@@ -3,6 +3,7 @@ package aeron
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -20,14 +21,47 @@ type ChannelUri struct {
 	params map[string]string
 }
 
-// AeronScheme is a URI Scheme for Aeron channels and destinations.
-const AeronScheme = "aeron"
-
-// SpyQualifier is a qualifier for spy subscriptions which spy on outgoing network destined traffic efficiently.
 const SpyQualifier = "aeron-spy"
+const AeronScheme = "aeron"
+const AeronPrefix = "aeron:"
 
-// IpcMedia is the media for IPC.
 const IpcMedia = "ipc"
+const UdpMedia = "udp"
+const IpcChannel = "aeron:ipc"
+const SpyPrefix = "aeron-spy:"
+const EndpointParamName = "endpoint"
+const InterfaceParamName = "interface"
+const InitialTermIdParamName = "init-term-id"
+const TermIdParamName = "term-id"
+const TermOffsetParamName = "term-offset"
+const TermLengthParamName = "term-length"
+const MtuLengthParamName = "mtu"
+const TtlParamName = "ttl"
+const MdcControlParamName = "control"
+const MdcControlModeParamName = "control-mode"
+const MdcControlModeManual = "manual"
+const MdcControlModeDynamic = "dynamic"
+const SessionIdParamName = "session-id"
+const LingerParamName = "linger"
+const ReliableStreamParamName = "reliable"
+const TagsParamName = "tags"
+const TagPrefix = "tag:"
+const SparseParamName = "sparse"
+const AliasParamName = "alias"
+const EosParamName = "eos"
+const TetherParamName = "tether"
+const GroupParamName = "group"
+const RejoinParamName = "rejoin"
+const CongestionControlParamName = "cc"
+const FlowControlParamName = "fc"
+const GroupTagParamName = "gtag"
+const SpiesSimulateConnectionParamName = "ssc"
+const SocketSndbufParamName = "so-sndbuf"
+const SocketRcvbufParamName = "so-rcvbuf"
+const ReceiverWindowLengthParamName = "rcv-wnd"
+const MediaRcvTimestampOffsetParamName = "media-rcv-ts-offset"
+const ChannelRcvTimestampOffsetParamName = "channel-rcv-ts-offset"
+const ChannelSndTimestampOffsetParamName = "channel-snd-ts-offset"
 
 const spyPrefix = SpyQualifier + ":"
 const aeronPrefix = AeronScheme + ":"
@@ -130,8 +164,16 @@ func (uri *ChannelUri) SetPrefix(prefix string) {
 	uri.prefix = prefix
 }
 
-func (uri ChannelUri) SetMedia(media string) {
+func (uri *ChannelUri) SetMedia(media string) {
 	uri.media = media
+}
+
+func (uri *ChannelUri) SetControlMode(controlMode string) {
+	uri.Set(MdcControlModeParamName, controlMode)
+}
+
+func (uri *ChannelUri) SetSessionID(sessionID int32) {
+	uri.Set(SessionIdParamName, strconv.Itoa(int(sessionID)))
 }
 
 func (uri ChannelUri) Get(key string) string {

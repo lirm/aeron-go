@@ -23,15 +23,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 )
 
-const (
-	DefaultFragmentAssemblyBufferLength = int32(4096)
-
-	beginFrag    uint8 = 0x80
-	endFrag      uint8 = 0x40
-	unfragmented uint8 = 0x80 | 0x40
-)
-
-// FragmentAssembler that sits in a chain-of-responsibility pattern that reassembles fragmented messages
+// ControlledFragmentAssembler that sits in a chain-of-responsibility pattern that reassembles fragmented messages
 // so that the next handler in the chain only sees whole messages.
 //
 // Unfragmented messages are delegated without copy. Fragmented messages are copied to a temporary
@@ -40,15 +32,15 @@ const (
 // The Header passed to the delegate on assembling a message will be that of the last fragment.
 //
 // Session based buffers will be allocated and grown as necessary based on the length of messages to be assembled.
-type FragmentAssembler struct {
-	delegate              term.FragmentHandler
+type ControlledFragmentAssembler struct {
+	delegate              term.ControlledFragmentHandler
 	initialBufferLength   int32
 	builderBySessionIdMap map[int32]*bytes.Buffer
 }
 
-// NewFragmentAssembler constructs an adapter to reassemble message fragments and delegate on whole messages.
-func NewFragmentAssembler(delegate term.FragmentHandler, initialBufferLength int32) *FragmentAssembler {
-	return &FragmentAssembler{
+// NewControlledFragmentAssembler constructs an adapter to reassemble message fragments and delegate on whole messages.
+func NewControlledFragmentAssembler(delegate term.ControlledFragmentHandler, initialBufferLength int32) *ControlledFragmentAssembler {
+	return &ControlledFragmentAssembler{
 		delegate:              delegate,
 		initialBufferLength:   initialBufferLength,
 		builderBySessionIdMap: make(map[int32]*bytes.Buffer),
@@ -56,14 +48,16 @@ func NewFragmentAssembler(delegate term.FragmentHandler, initialBufferLength int
 }
 
 // OnFragment reassembles and forwards whole messages to the delegate.
-func (f *FragmentAssembler) OnFragment(
+func (f *ControlledFragmentAssembler) OnFragment(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
-	header *logbuffer.Header) {
+	header *logbuffer.Header) (action term.ControlledPollAction) {
 	flags := header.Flags()
+	action = term.ControlledPollActionContinue
+
 	if (flags & unfragmented) == unfragmented {
-		f.delegate(buffer, offset, length, header)
+		action = f.delegate(buffer, offset, length, header)
 	} else {
 		if (flags & beginFrag) == beginFrag {
 			builder, ok := f.builderBySessionIdMap[header.SessionId()]
@@ -75,18 +69,25 @@ func (f *FragmentAssembler) OnFragment(
 			buffer.WriteBytes(builder, offset, length)
 		} else {
 			builder, ok := f.builderBySessionIdMap[header.SessionId()]
-			if ok && builder.Len() != 0 {
-				buffer.WriteBytes(builder, offset, length)
-				if (flags & endFrag) == endFrag {
-					msgLength := builder.Len()
-					f.delegate(
-						atomic.MakeBuffer(builder.Bytes(), msgLength),
-						int32(0),
-						int32(msgLength),
-						header)
-					builder.Reset()
+			if ok {
+				if limit := builder.Len(); limit > 0 {
+					buffer.WriteBytes(builder, offset, length)
+					if (flags & endFrag) == endFrag {
+						msgLength := builder.Len()
+						action := f.delegate(
+							atomic.MakeBuffer(builder.Bytes(), msgLength),
+							int32(0),
+							int32(msgLength),
+							header)
+						if action == term.ControlledPollActionAbort {
+							builder.Truncate(limit)
+						} else {
+							builder.Reset()
+						}
+					}
 				}
 			}
 		}
 	}
+	return
 }
