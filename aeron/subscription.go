@@ -18,9 +18,42 @@ limitations under the License.
 package aeron
 
 import (
+	"strings"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 )
+
+const (
+	ChannelStatusErrored      = -1 // Channel has errored. Check logs for information
+	ChannelStatusInitializing = 0  // Channel is being initialized
+	ChannelStatusActive       = 1  // Channel has finished initialization and is active
+	ChannelStatusClosing      = 2  // Channel is being closed
+)
+
+// ChannelStatusString provides a convenience method for logging and error handling
+func ChannelStatusString(channelStatus int) string {
+	switch channelStatus {
+	case ChannelStatusErrored:
+		return "ChannelStatusErrored"
+	case ChannelStatusInitializing:
+		return "ChannelStatusInitializing"
+	case ChannelStatusActive:
+		return "ChannelStatusActive"
+	case ChannelStatusClosing:
+		return "ChannelStatusClosing"
+	default:
+		return "Unknown"
+	}
+}
+
+// From LocalSocketAddressStatus.Java
+const (
+	CHANNEL_STATUS_ID_OFFSET           = 0
+	LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET = CHANNEL_STATUS_ID_OFFSET + 4
+	LOCAL_SOCKET_ADDRESS_STRING_OFFSET = LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET + 4
+)
+const LOCAL_SOCKET_ADDRESS_STATUS_COUNTER_TYPE_ID = 14
 
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and
 // stream ID combination.
@@ -30,6 +63,7 @@ type Subscription struct {
 	roundRobinIndex int
 	registrationID  int64
 	streamID        int32
+	channelStatusID int32
 
 	images *ImageList
 
@@ -37,13 +71,14 @@ type Subscription struct {
 }
 
 // NewSubscription is a factory method to create new subscription to be added to the media driver
-func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32) *Subscription {
+func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32, channelStatusID int32) *Subscription {
 	sub := new(Subscription)
 	sub.images = NewImageList()
 	sub.conductor = conductor
 	sub.channel = channel
 	sub.registrationID = registrationID
 	sub.streamID = streamID
+	sub.channelStatusID = channelStatusID
 	sub.roundRobinIndex = 0
 	sub.isClosed.Set(false)
 
@@ -65,14 +100,18 @@ func (sub *Subscription) IsClosed() bool {
 	return sub.isClosed.Get()
 }
 
-// Status returns the Registration Status
-func (sub *Subscription) Status() (int, error) {
-	return sub.conductor.FindSubscriptionStatus(sub.registrationID)
+// ChannelStatus returns the status of the media channel for this Subscription.
+// The status will be ChannelStatusErrored if a socket exception on setup or ChannelStatusActive if all is well.
+func (sub *Subscription) ChannelStatus() int {
+	if sub.IsClosed() {
+		return -2
+	}
+	return int(sub.conductor.counterReader.GetCounterValue(sub.channelStatusID))
 }
 
-// ChannelStatusID returns the ChannelStatusID
-func (sub *Subscription) ChannelStatusID() (int, error) {
-	return sub.conductor.FindSubscriptionChannelStatusID(sub.registrationID)
+// ChannelStatusId returns the counter ID used to represent the channel status of this Subscription.
+func (sub *Subscription) ChannelStatusId() int32 {
+	return sub.channelStatusID
 }
 
 // Close will release all images in this subscription, send command to the driver and block waiting for response from
@@ -215,22 +254,70 @@ func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 	return nil
 }
 
-// ResolvedEndpoint finds the resolved endpoint for the channel. This
-// may be nil if MDS is used and no destination is yet added.
-// The result is simply the first in the list of addresses found if
-// multiple addresses exist
-func (sub *Subscription) ResolvedEndpoint() []byte {
+// ResolvedEndpoint finds the resolved endpoint for the channel.
+// This may be empty if MDS is used and no destination is yet added.
+// The result is simply the first in the list of addresses found if multiple addresses exist.
+func (sub *Subscription) ResolvedEndpoint() string {
 	reader := sub.conductor.CounterReader()
-	channelStatus, err := sub.Status()
+	if sub.ChannelStatus() != ChannelStatusActive {
+		return ""
+	}
+	var endpoint string
+	reader.ScanForType(LOCAL_SOCKET_ADDRESS_STATUS_COUNTER_TYPE_ID, func(counterId int32, keyBuffer *atomic.Buffer) bool {
+		channelStatusId := keyBuffer.GetInt32(CHANNEL_STATUS_ID_OFFSET)
+		length := keyBuffer.GetInt32(LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET)
+		if channelStatusId == sub.channelStatusID && length > 0 && reader.GetCounterValue(counterId) == ChannelStatusActive {
+			endpoint = string(keyBuffer.GetBytesArray(LOCAL_SOCKET_ADDRESS_STRING_OFFSET, length))
+			return false
+		}
+		return true
+	})
+	return endpoint
+}
+
+// TryResolveChannelEndpointPort resolves the channel endpoint and replaces it with the port from the
+// ephemeral range when 0 was provided. If there are no addresses, or if there is more than one, returned from
+// LocalSocketAddresses() then the original channel is returned.
+// If the channel is not ACTIVE, then empty string will be returned.
+func (sub *Subscription) TryResolveChannelEndpointPort() string {
+	if sub.ChannelStatus() != ChannelStatusActive {
+		return ""
+	}
+	localSocketAddresses := sub.LocalSocketAddresses()
+	if len(localSocketAddresses) != 1 {
+		return sub.channel
+	}
+	uri, err := ParseChannelUri(sub.channel)
 	if err != nil {
+		logger.Warningf("error parsing channel (%s): %v", sub.channel, err)
+		return sub.channel
+	}
+	endpoint := uri.Get("endpoint")
+	if strings.HasSuffix(endpoint, ":0") {
+		resolvedEndpoint := localSocketAddresses[0]
+		i := strings.LastIndex(resolvedEndpoint, ":")
+		uri.Set("endpoint", endpoint[:(len(endpoint)-2)]+resolvedEndpoint[i:])
+		return uri.String()
+	}
+	return sub.channel
+}
+
+// LocalSocketAddresses fetches the local socket addresses for this subscription.
+func (sub *Subscription) LocalSocketAddresses() []string {
+	if sub.ChannelStatus() != ChannelStatusActive {
 		return nil
 	}
-	channelStatusID, err := sub.ChannelStatusID()
-	if err != nil {
-		return nil
-	}
-	// logger.Debugf("ResolvedEndpoint: statusID:%d, status:%d\n", channelStatus, channelStatusID)
-	return reader.FindAddress(channelStatus, channelStatusID)
+	var bindings []string
+	reader := sub.conductor.counterReader
+	reader.ScanForType(LOCAL_SOCKET_ADDRESS_STATUS_COUNTER_TYPE_ID, func(counterId int32, keyBuffer *atomic.Buffer) bool {
+		channelStatusId := keyBuffer.GetInt32(CHANNEL_STATUS_ID_OFFSET)
+		length := keyBuffer.GetInt32(LOCAL_SOCKET_ADDRESS_LENGTH_OFFSET)
+		if channelStatusId == sub.channelStatusID && length > 0 && reader.GetCounterValue(counterId) == ChannelStatusActive {
+			bindings = append(bindings, string(keyBuffer.GetBytesArray(LOCAL_SOCKET_ADDRESS_STRING_OFFSET, length)))
+		}
+		return true
+	})
+	return bindings
 }
 
 // Add a destination manually to a multi-destination Subscription.
