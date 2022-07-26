@@ -556,7 +556,7 @@ func (cc *ClientConductor) OnAvailableCounter(correlationID int64, counterID int
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	logger.Warning("OnAvailableCounter: Not supported yet")
+	logger.Debug("OnAvailableCounter: Not supported yet")
 }
 
 func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID int32) {
@@ -566,7 +566,7 @@ func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID i
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	logger.Warning("OnUnavailableCounter: Not supported yet")
+	logger.Debug("OnUnavailableCounter: Not supported yet")
 }
 
 func (cc *ClientConductor) OnClientTimeout(clientID int64) {
