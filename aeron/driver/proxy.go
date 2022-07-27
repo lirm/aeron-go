@@ -182,25 +182,30 @@ func (driver *Proxy) RemovePublication(registrationID int64) {
 	driver.writeCommandToDriver(filler)
 }
 
-// SendClientKeepalive send keep alive message to the driver
-func (driver *Proxy) SendClientKeepalive() {
+// ClientClose sends a client close to the driver.
+func (driver *Proxy) ClientClose() {
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.ClientClose: clientId=%d correlationId=%d",
+		driver.clientID, correlationID)
 
 	filler := func(buffer *atomic.Buffer, length *int) int32 {
 
 		var message command.CorrelatedMessage
 		message.Wrap(buffer, 0)
+
 		message.ClientID.Set(driver.clientID)
-		message.CorrelationID.Set(0)
+		message.CorrelationID.Set(correlationID)
 
 		*length = message.Size()
 
-		return command.ClientKeepalive
+		return command.ClientClose
 	}
 
 	driver.writeCommandToDriver(filler)
 }
 
-// AddDestination sends driver command to add a new destination to an exsiting MDC Publication
+// AddDestination sends driver command to add a destination to an existing Publication.
 func (driver *Proxy) AddDestination(registrationID int64, channel string) int64 {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
@@ -227,7 +232,7 @@ func (driver *Proxy) AddDestination(registrationID int64, channel string) int64 
 	return correlationID
 }
 
-// RemoveDestination sends driver command to add a new destination to an exsiting MDC Publication
+// RemoveDestination sends driver command to remove a destination from an existing Publication.
 func (driver *Proxy) RemoveDestination(registrationID int64, channel string) int64 {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
@@ -247,6 +252,62 @@ func (driver *Proxy) RemoveDestination(registrationID int64, channel string) int
 		*length = message.Size()
 
 		return command.RemoveDestination
+	}
+
+	driver.writeCommandToDriver(filler)
+
+	return correlationID
+}
+
+// AddRcvDestination sends driver command to add a destination to the receive
+// channel of an existing MDS Subscription.
+func (driver *Proxy) AddRcvDestination(registrationID int64, channel string) int64 {
+
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.AddRcvDestination: clientID=%d registrationID=%d correlationID=%d channel=%s",
+		driver.clientID, registrationID, correlationID, channel)
+
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
+
+		var message command.DestinationMessage
+		message.Wrap(buffer, 0)
+		message.RegistrationCorrelationID.Set(registrationID)
+		message.Channel.Set(channel)
+		message.CorrelationID.Set(correlationID)
+		message.ClientID.Set(driver.clientID)
+
+		*length = message.Size()
+
+		return command.AddRcvDestination
+	}
+
+	driver.writeCommandToDriver(filler)
+
+	return correlationID
+}
+
+// RemoveRcvDestination sends driver command to remove a destination from the
+// receive channel of an existing MDS Subscription.
+func (driver *Proxy) RemoveRcvDestination(registrationID int64, channel string) int64 {
+
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.RemoveRcvDestination: clientID=%d registrationID=%d correlationID=%d",
+		driver.clientID, registrationID, correlationID)
+
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
+
+		var message command.DestinationMessage
+		message.Wrap(buffer, 0)
+		message.RegistrationCorrelationID.Set(registrationID)
+		message.Channel.Set(channel)
+		message.CorrelationID.Set(correlationID)
+		message.ClientID.Set(driver.clientID)
+
+		*length = message.Size()
+
+		return command.RemoveRcvDestination
 	}
 
 	driver.writeCommandToDriver(filler)

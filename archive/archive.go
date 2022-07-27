@@ -93,32 +93,32 @@ type ArchiveListeners struct {
 // LoggingErrorListener is set by default and will report internal failures when
 // returning an error is not possible
 func LoggingErrorListener(err error) {
-	logger.Errorf("Error: %s\n", err.Error())
+	logger.Errorf("Error: %s", err.Error())
 }
 
 // LoggingRecordingSignalListener (called by default only in DEBUG)
 func LoggingRecordingSignalListener(rse *codecs.RecordingSignalEvent) {
-	logger.Infof("RecordingSignalListener, signal event is %#v\n", rse)
+	logger.Infof("RecordingSignalListener, signal event is %#v", rse)
 }
 
 // LoggingRecordingEventStartedListener (called by default only in DEBUG)
 func LoggingRecordingEventStartedListener(rs *codecs.RecordingStarted) {
-	logger.Infof("RecordingEventStartedListener: %#v\n", rs)
+	logger.Infof("RecordingEventStartedListener: %#v", rs)
 }
 
 // LoggingRecordingEventProgressListener (called by default only in DEBUG)
 func LoggingRecordingEventProgressListener(rp *codecs.RecordingProgress) {
-	logger.Infof("RecordingEventProgressListener, event is %#v\n", rp)
+	logger.Infof("RecordingEventProgressListener, event is %#v", rp)
 }
 
 // LoggingRecordingEventStoppedListener (called by default only in DEBUG)
 func LoggingRecordingEventStoppedListener(rs *codecs.RecordingStopped) {
-	logger.Infof("RecordingEventStoppedListener, event is %#v\n", rs)
+	logger.Infof("RecordingEventStoppedListener, event is %#v", rs)
 }
 
 // LoggingNewSubscriptionListener from underlying aeron (called by default only in DEBUG)
 func LoggingNewSubscriptionListener(channel string, stream int32, correlationID int64) {
-	logger.Infof("NewSubscriptionListener(channel:%s stream:%d correlationID:%d)\n", channel, stream, correlationID)
+	logger.Infof("NewSubscriptionListener(channel:%s stream:%d correlationID:%d)", channel, stream, correlationID)
 }
 
 // LoggingNewPublicationListener from underlying aeron (called by default only in DEBUG)
@@ -128,12 +128,12 @@ func LoggingNewPublicationListener(channel string, stream int32, session int32, 
 
 // LoggingAvailableImageListener from underlying aeron (called by default only in DEBUG)
 func LoggingAvailableImageListener(image *aeron.Image) {
-	logger.Infof("NewAvailableImageListener, sessionId is %d\n", image.SessionID())
+	logger.Infof("NewAvailableImageListener, sessionId is %d", image.SessionID())
 }
 
 // LoggingUnavailableImageListener from underlying aeron (called by default only in DEBUG)
 func LoggingUnavailableImageListener(image *aeron.Image) {
-	logger.Infof("NewUnavalableImageListener, sessionId is %d\n", image.SessionID())
+	logger.Infof("NewUnavalableImageListener, sessionId is %d", image.SessionID())
 }
 
 // Also set globally (and set via the Options) is the protocol
@@ -216,6 +216,8 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	// Setup the Control (subscriber/response)
 	archive.Control = new(Control)
 	archive.Control.archive = archive
+	archive.Control.fragmentAssembler = aeron.NewControlledFragmentAssembler(
+		archive.Control.onFragment, aeron.DefaultFragmentAssemblyBufferLength)
 
 	// Setup the Proxy (publisher/request)
 	archive.Proxy = new(Proxy)
@@ -276,12 +278,12 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	// Use Auth if requested
 	if archive.Options.AuthEnabled {
 		if err := archive.Proxy.AuthConnectRequest(correlationID, archive.Options.ResponseStream, archive.Options.ResponseChannel, archive.Options.AuthCredentials); err != nil {
-			logger.Errorf("AuthConnectRequest failed: %s\n", err)
+			logger.Errorf("AuthConnectRequest failed: %s", err)
 			return nil, err
 		}
 	} else {
 		if err := archive.Proxy.ConnectRequest(correlationID, archive.Options.ResponseStream, archive.Options.ResponseChannel); err != nil {
-			logger.Errorf("ConnectRequest failed: %s\n", err)
+			logger.Errorf("ConnectRequest failed: %s", err)
 			return nil, err
 		}
 	}
@@ -290,12 +292,12 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	pollContext := PollContext{archive.Control, correlationID}
 
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
-		fragments := archive.Control.PollWithContext(
+		fragments := archive.Control.poll(
 			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 				ConnectionControlFragmentHandler(&pollContext, buf, offset, length, header)
 			}, 1)
 		if fragments > 0 {
-			logger.Debugf("Read %d fragment(s)\n", fragments)
+			logger.Debugf("Read %d fragment(s)", fragments)
 		}
 
 		// Check for timeout
@@ -309,11 +311,11 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	}
 
 	if archive.Control.State.err != nil {
-		logger.Errorf("Connect failed: %s\n", archive.Control.State.err)
+		logger.Errorf("Connect failed: %s", archive.Control.State.err)
 	} else if archive.Control.State.state != ControlStateConnected {
-		logger.Error("Connect failed\n")
+		logger.Error("Connect failed")
 	} else {
-		logger.Infof("Archive connection established for sessionId:%d\n", archive.SessionID)
+		logger.Infof("Archive connection established for sessionId:%d", archive.SessionID)
 	}
 
 	return archive, archive.Control.State.err
@@ -328,6 +330,11 @@ func (archive *Archive) Close() error {
 	archive.Proxy.Publication.Close()
 	archive.Control.Subscription.Close()
 	return archive.aeron.Close()
+}
+
+// Aeron returns the archive's aeron client.
+func (archive *Archive) Aeron() *aeron.Aeron {
+	return archive.aeron
 }
 
 // SetAeronErrorHandler sets the aeron error handler
@@ -456,7 +463,7 @@ func (archive *Archive) ClientId() int64 {
 // SubscriptionId can be used in StopRecordingBySubscription()
 func (archive *Archive) StartRecording(channel string, stream int32, isLocal bool, autoStop bool) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("StartRecording(%s:%d), correlationID:%d\n", channel, stream, correlationID)
+	logger.Debugf("StartRecording(%s:%d), correlationID:%d", channel, stream, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -478,7 +485,7 @@ func (archive *Archive) StartRecording(channel string, stream int32, isLocal boo
 // recordings that use the same channel and streamID.
 func (archive *Archive) StopRecording(channel string, stream int32) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("StopRecording(%s:%d, correlationID:%d)\n", channel, stream, correlationID)
+	logger.Debugf("StopRecording(%s:%d, correlationID:%d)", channel, stream, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -497,7 +504,7 @@ func (archive *Archive) StopRecording(channel string, stream int32) error {
 // and (false, error) if something went wrong
 func (archive *Archive) StopRecordingByIdentity(recordingID int64) (bool, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("StopRecordingByIdentity(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("StopRecordingByIdentity(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -508,7 +515,7 @@ func (archive *Archive) StopRecordingByIdentity(recordingID int64) (bool, error)
 	}
 	res, err := archive.Control.PollForResponse(correlationID, archive.SessionID)
 	if res < 0 {
-		logger.Debugf("StopRecordingByIdentity result was %d\n", res)
+		logger.Debugf("StopRecordingByIdentity result was %d", res)
 	}
 
 	if err != nil {
@@ -526,7 +533,7 @@ func (archive *Archive) StopRecordingByIdentity(recordingID int64) (bool, error)
 // Returns error on failure, nil on success
 func (archive *Archive) StopRecordingBySubscriptionId(subscriptionID int64) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("StopRecordingBySubscriptionId(%d), correlationID:%d\n", subscriptionID, correlationID)
+	logger.Debugf("StopRecordingBySubscriptionId(%d), correlationID:%d", subscriptionID, correlationID)
 
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
@@ -566,7 +573,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 	}
 
 	correlationID := nextCorrelationID()
-	logger.Debugf("AddRecordedPublication(), correlationID:%d\n", correlationID)
+	logger.Debugf("AddRecordedPublication(), correlationID:%d", correlationID)
 
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
@@ -595,7 +602,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 // ListRecordings up to recordCount recording descriptors
 func (archive *Archive) ListRecordings(fromRecordingID int64, recordCount int32) ([]*codecs.RecordingDescriptor, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("ListRecordings(%d, %d), correlationID:%d\n", fromRecordingID, recordCount, correlationID)
+	logger.Debugf("ListRecordings(%d, %d), correlationID:%d", fromRecordingID, recordCount, correlationID)
 
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
@@ -632,7 +639,7 @@ func (archive *Archive) ListRecordings(fromRecordingID int64, recordCount int32)
 // greater than the largest known we return 0.
 func (archive *Archive) ListRecordingsForUri(fromRecordingID int64, recordCount int32, channelFragment string, stream int32) ([]*codecs.RecordingDescriptor, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("ListRecordingsForUri(%d, %d, %s, %d), correlationID:%d\n", fromRecordingID, recordCount, channelFragment, stream, correlationID)
+	logger.Debugf("ListRecordingsForUri(%d, %d, %s, %d), correlationID:%d", fromRecordingID, recordCount, channelFragment, stream, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -667,7 +674,7 @@ func (archive *Archive) ListRecordingsForUri(fromRecordingID int64, recordCount 
 // Returns a single recording descriptor or nil if there was no match
 func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescriptor, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("ListRecording(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("ListRecording(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -716,7 +723,7 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 func (archive *Archive) StartReplay(recordingID int64, position int64, length int64, replayChannel string, replayStream int32) (int64, error) {
 
 	correlationID := nextCorrelationID()
-	// logger.Debugf("StartReplay(%d, %d, %d, %s, %d), correlationID:%d\n", recordingID, position, length, replayChannel, replayStream, correlationID)
+	// logger.Debugf("StartReplay(%d, %d, %d, %s, %d), correlationID:%d", recordingID, position, length, replayChannel, replayStream, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -749,7 +756,7 @@ func (archive *Archive) StartReplay(recordingID int64, position int64, length in
 // of the received replay for correlation with the matching channel and stream id in the lower 32 bits
 func (archive *Archive) BoundedReplay(recordingID int64, position int64, length int64, limitCounterID int32, replayStream int32, replayChannel string) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("BoundedReplay(%d, %d, %d, %d, %d, %s), correlationID:%d\n", recordingID, position, length, limitCounterID, replayStream, correlationID)
+	logger.Debugf("BoundedReplay(%d, %d, %d, %d, %d, %s), correlationID:%d", recordingID, position, length, limitCounterID, replayStream, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -767,7 +774,7 @@ func (archive *Archive) BoundedReplay(recordingID int64, position int64, length 
 // Returns error on failure, nil on success
 func (archive *Archive) StopReplay(replaySessionID int64) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("StopReplay(%d), correlationID:%d\n", replaySessionID, correlationID)
+	logger.Debugf("StopReplay(%d), correlationID:%d", replaySessionID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -786,7 +793,7 @@ func (archive *Archive) StopReplay(replaySessionID int64) error {
 // Returns error on failure, nil on success
 func (archive *Archive) StopAllReplays(recordingID int64) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("StopAllReplays(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("StopAllReplays(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -807,7 +814,7 @@ func (archive *Archive) StopAllReplays(recordingID int64) error {
 // Returns the subscriptionId of the recording that can be passed to StopRecording()
 func (archive *Archive) ExtendRecording(recordingID int64, stream int32, sourceLocation codecs.SourceLocationEnum, autoStop bool, channel string) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("ExtendRecording(%d, %d, %d, %t, %s), correlationID:%d\n", recordingID, stream, sourceLocation, autoStop, channel, correlationID)
+	logger.Debugf("ExtendRecording(%d, %d, %d, %t, %s), correlationID:%d", recordingID, stream, sourceLocation, autoStop, channel, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -826,7 +833,7 @@ func (archive *Archive) ExtendRecording(recordingID int64, stream int32, sourceL
 // recordings then RecordingPositionNull.
 func (archive *Archive) GetRecordingPosition(recordingID int64) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("GetRecordingPosition(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("getRecordingPosition(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -851,7 +858,7 @@ func (archive *Archive) GetRecordingPosition(recordingID int64) (int64, error) {
 // Returns nil on success, error on failre
 func (archive *Archive) TruncateRecording(recordingID int64, position int64) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("TruncateRecording(%d %d), correlationID:%d\n", recordingID, position, correlationID)
+	logger.Debugf("TruncateRecording(%d %d), correlationID:%d", recordingID, position, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -870,7 +877,7 @@ func (archive *Archive) TruncateRecording(recordingID int64, position int64) err
 // Return the start position of the recording or (0, error) on failure
 func (archive *Archive) GetStartPosition(recordingID int64) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("GetStartPosition(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("GetStartPosition(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -888,7 +895,7 @@ func (archive *Archive) GetStartPosition(recordingID int64) (int64, error) {
 // Return the stop position, or RecordingPositionNull if still active.
 func (archive *Archive) GetStopPosition(recordingID int64) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("GetStopPosition(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("GetStopPosition(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -906,7 +913,7 @@ func (archive *Archive) GetStopPosition(recordingID int64) (int64, error) {
 // Returns the RecordingID or RecordingIdNullValue if no match
 func (archive *Archive) FindLastMatchingRecording(minRecordingID int64, sessionID int32, stream int32, channel string) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("FindLastMatchingRecording(%d, %d, %d, %s), correlationID:%d\n", minRecordingID, sessionID, stream, correlationID)
+	logger.Debugf("FindLastMatchingRecording(%d, %d, %d, %s), correlationID:%d", minRecordingID, sessionID, stream, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -926,7 +933,7 @@ func (archive *Archive) FindLastMatchingRecording(minRecordingID int64, sessionI
 // Returns a (possibly empty) list of RecordingSubscriptionDescriptors
 func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscriptionCount int32, applyStreamID bool, stream int32, channelFragment string) ([]*codecs.RecordingSubscriptionDescriptor, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("ListRecordingSubscriptions(%, %d, %t, %d, %sd), correlationID:%d\n", pseudoIndex, subscriptionCount, applyStreamID, stream, channelFragment, correlationID)
+	logger.Debugf("ListRecordingSubscriptions(%, %d, %t, %d, %sd), correlationID:%d", pseudoIndex, subscriptionCount, applyStreamID, stream, channelFragment, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -966,7 +973,7 @@ func (archive *Archive) ListRecordingSubscriptions(pseudoIndex int32, subscripti
 // Returns error on failure, nil on success
 func (archive *Archive) DetachSegments(recordingID int64, newStartPosition int64) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("DetachSegments(%d, %d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("DetachSegments(%d, %d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -985,7 +992,7 @@ func (archive *Archive) DetachSegments(recordingID int64, newStartPosition int64
 // Returns the count of deleted segment files.
 func (archive *Archive) DeleteDetachedSegments(recordingID int64) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("DeleteDetachedSegments(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("DeleteDetachedSegments(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1007,7 +1014,7 @@ func (archive *Archive) DeleteDetachedSegments(recordingID int64) (int64, error)
 // Returns the count of deleted segment files.
 func (archive *Archive) PurgeSegments(recordingID int64, newStartPosition int64) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("PurgeSegments(%d, %d), correlationID:%d\n", recordingID, newStartPosition, correlationID)
+	logger.Debugf("PurgeSegments(%d, %d), correlationID:%d", recordingID, newStartPosition, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1028,7 +1035,7 @@ func (archive *Archive) PurgeSegments(recordingID int64, newStartPosition int64)
 // Returns the count of attached segment files.
 func (archive *Archive) AttachSegments(recordingID int64) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("AttachSegments(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("AttachSegments(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1056,7 +1063,7 @@ func (archive *Archive) AttachSegments(recordingID int64) (int64, error) {
 // Returns the count of attached segment files.
 func (archive *Archive) MigrateSegments(recordingID int64, position int64) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("MigrateSegments(%d, %d), correlationID:%d\n", recordingID, position, correlationID)
+	logger.Debugf("MigrateSegments(%d, %d), correlationID:%d", recordingID, position, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1074,7 +1081,7 @@ func (archive *Archive) MigrateSegments(recordingID int64, position int64) (int6
 // Returns error on failure, nil on success
 func (archive *Archive) KeepAlive() error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("KeepAlive(), correlationID:%d\n", correlationID)
+	logger.Debugf("KeepAlive(), correlationID:%d", correlationID)
 
 	return archive.Proxy.KeepAliveRequest(correlationID)
 }
@@ -1102,7 +1109,7 @@ func (archive *Archive) KeepAlive() error {
 // Returns the replication session id which can be passed StopReplication()
 func (archive *Archive) Replicate(srcRecordingID int64, dstRecordingID int64, srcControlStreamID int32, srcControlChannel string, liveDestination string) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("Replicate(%d, %d, %d, %s, %s), correlationID:%d\n", srcRecordingID, dstRecordingID, srcControlStreamID, srcControlChannel, liveDestination, correlationID)
+	logger.Debugf("Replicate(%d, %d, %d, %s, %s), correlationID:%d", srcRecordingID, dstRecordingID, srcControlStreamID, srcControlChannel, liveDestination, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1140,7 +1147,7 @@ func (archive *Archive) Replicate(srcRecordingID int64, dstRecordingID int64, sr
 // Returns the replication session id which can be passed StopReplication()
 func (archive *Archive) Replicate2(srcRecordingID int64, dstRecordingID int64, stopPosition int64, channelTagID int64, srcControlStreamID int32, srcControlChannel string, liveDestination string, replicationChannel string) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("Replicate2(%d, %d, %d, %d, %d, %s, %s, %s), correlationID:%d\n", srcRecordingID, dstRecordingID, stopPosition, channelTagID, srcControlStreamID, srcControlChannel, liveDestination, replicationChannel, correlationID)
+	logger.Debugf("Replicate2(%d, %d, %d, %d, %d, %s, %s, %s), correlationID:%d", srcRecordingID, dstRecordingID, stopPosition, channelTagID, srcControlStreamID, srcControlChannel, liveDestination, replicationChannel, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1179,7 +1186,7 @@ func (archive *Archive) Replicate2(srcRecordingID int64, dstRecordingID int64, s
 // Returns the replication session id which can be passed StopReplication()
 func (archive *Archive) TaggedReplicate(srcRecordingID int64, dstRecordingID int64, channelTagID int64, subscriptionTagID int64, srcControlStreamID int32, srcControlChannel string, liveDestination string) (int64, error) {
 	correlationID := nextCorrelationID()
-	logger.Debugf("TaggedReplicate(%d, %d, %d, %d, %d, %s, %s), correlationID:%d\n", srcRecordingID, dstRecordingID, channelTagID, subscriptionTagID, srcControlStreamID, srcControlChannel, liveDestination, correlationID)
+	logger.Debugf("TaggedReplicate(%d, %d, %d, %d, %d, %s, %s), correlationID:%d", srcRecordingID, dstRecordingID, channelTagID, subscriptionTagID, srcControlStreamID, srcControlChannel, liveDestination, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1197,7 +1204,7 @@ func (archive *Archive) TaggedReplicate(srcRecordingID int64, dstRecordingID int
 // Returns error on failure, nil on success
 func (archive *Archive) StopReplication(replicationID int64) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("StopReplication(%d), correlationID:%d\n", replicationID, correlationID)
+	logger.Debugf("StopReplication(%d), correlationID:%d", replicationID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 
@@ -1218,7 +1225,7 @@ func (archive *Archive) StopReplication(replicationID int64) error {
 // Returns error on failure, nil on success
 func (archive *Archive) PurgeRecording(recordingID int64) error {
 	correlationID := nextCorrelationID()
-	logger.Debugf("PurgeRecording(%d), correlationID:%d\n", recordingID, correlationID)
+	logger.Debugf("PurgeRecording(%d), correlationID:%d", recordingID, correlationID)
 	correlations.Store(correlationID, archive.Control) // For subsequent lookup in the fragment assemblers
 	defer correlations.Delete(correlationID)           // Clear the lookup
 

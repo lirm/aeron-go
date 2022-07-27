@@ -32,9 +32,9 @@ const (
 	RemoveSubscription int32 = 0x05
 	// ClientKeepalive message from client */
 	ClientKeepalive int32 = 0x06
-	// AddDestination to add an MDC
+	// AddDestination adds a destination to an existing Publication.
 	AddDestination = 0x07
-	// RemoveDestination to remove an MDC
+	// RemoveDestination removes a destination from an existing Publication.
 	RemoveDestination = 0x08
 	// AddCounter command from client
 	AddCounter = 0x09
@@ -42,6 +42,10 @@ const (
 	RemoveCounter = 0x0A
 	// ClientClose command from client
 	ClientClose = 0x0B
+	// AddRcvDestination adds a Destination for existing Subscription.
+	AddRcvDestination = 0x0c
+	// RemoveRcvDestination removes a Destination for existing Subscription.
+	RemoveRcvDestination = 0x0D
 	// RecordingPosition is rhe position a recording has reached when being archived
 	RecordingPosition = 0x64 // 100
 )

@@ -1,0 +1,45 @@
+// Copyright 2016 Stanislav Liberman
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package term
+
+import (
+	"github.com/lirm/aeron-go/aeron/atomic"
+	"github.com/lirm/aeron-go/aeron/logbuffer"
+)
+
+type ControlledFragmentHandler func(
+	buffer *atomic.Buffer,
+	offset int32,
+	length int32,
+	header *logbuffer.Header,
+) ControlledPollAction
+
+type ControlledPollAction int8
+
+const (
+	// ControlledPollActionAbort aborts the current polling operation and do not
+	// advance the position for this fragment.
+	ControlledPollActionAbort ControlledPollAction = 1
+	// ControlledPollActionBreak breaks from the current polling operation and
+	// commit the position as of the end of the current fragment being handled.
+	ControlledPollActionBreak = 2
+	// ControlledPollActionCommit continues processing but commit the position as of
+	// the end of the current fragment so that flow control is applied to this
+	// point.
+	ControlledPollActionCommit = 3
+	// ControlledPollActionContinue continues processing until fragment limit or no
+	// fragments with position commit at end of poll as in onFragment
+	ControlledPollActionContinue = 4
+)

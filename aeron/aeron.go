@@ -26,6 +26,9 @@ import (
 	"github.com/lirm/aeron-go/aeron/util/memmap"
 )
 
+// NullValue is used to represent a null value for when some value is not yet set.
+const NullValue = -1
+
 // NewPublicationHandler is the handler type for new publication notification from the media driver
 type NewPublicationHandler func(string, int32, int32, int64)
 
@@ -187,4 +190,9 @@ func (aeron *Aeron) ClientID() int64 {
 // CounterReader returns Aeron's clientconductor's counterReader
 func (aeron *Aeron) CounterReader() *counters.Reader {
 	return aeron.conductor.CounterReader()
+}
+
+// IsClosed returns true if this connection is closed.
+func (aeron *Aeron) IsClosed() bool {
+	return !aeron.conductor.running.Get()
 }

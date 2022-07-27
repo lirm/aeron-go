@@ -26,6 +26,8 @@ import (
 	"github.com/lirm/aeron-go/archive/codecs"
 )
 
+const controlFragmentLimit = 10
+
 // Control contains everything required for the archive subscription/response side
 type Control struct {
 	Subscription *aeron.Subscription
@@ -34,11 +36,12 @@ type Control struct {
 	// Polling results
 	Results ControlResults
 
-	archive *Archive // link to parent
+	archive           *Archive // link to parent
+	fragmentAssembler *aeron.ControlledFragmentAssembler
 }
 
 // ControlResults for holding state over a Control request/response
-// The polling mechanism is not parameterizsed so we need to set state for the results as we go
+// The polling mechanism is not parameterized so we need to set state for the results as we go
 // These pieces are filled out by various ResponsePollers which will set IsPollComplete to true
 type ControlResults struct {
 	CorrelationId                    int64
@@ -110,8 +113,6 @@ func init() {
 	codecIds.recordingStopped = recordingStopped.SbeTemplateId()
 }
 
-// The current subscription handler doesn't provide a mechanism for passing context
-// so we return data via the control's Results
 func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	pollContext, ok := context.(*PollContext)
 	if !ok {
@@ -350,7 +351,7 @@ func (control *Control) PollForErrorResponse() (int, error) {
 
 	// Poll for async events, errors etc until the queue is drained
 	for {
-		ret := control.PollWithContext(
+		ret := control.poll(
 			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 				errorResponseFragmentHandler(&context, buf, offset, length, header)
 			}, 1)
@@ -500,9 +501,9 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 	}
 }
 
-// Poll provides the control response poller using local state to pass
+// poll provides the control response poller using local state to pass
 // back data from the underlying subscription
-func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (control *Control) poll(handler term.FragmentHandler, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = control.archive.Options.RangeChecking
@@ -513,17 +514,76 @@ func (control *Control) Poll(handler term.FragmentHandler, fragmentLimit int) in
 	return control.Subscription.Poll(handler, fragmentLimit)
 }
 
-// PollWithContext provides a Poll() with a context argument
-func (control *Control) PollWithContext(handler term.FragmentHandler, fragmentLimit int) int {
+// Poll for control response events. Returns number of fragments read during the operation.
+// Zero if no events are available.
+func (control *Control) Poll() (workCount int) {
+	if control.Results.IsPollComplete {
+		// Update our globals in case they've changed so we use the current state in our callback
+		rangeChecking = control.archive.Options.RangeChecking
+		control.Results = ControlResults{}
+	}
 
-	// Update our globals in case they've changed so we use the current state in our callback
-	rangeChecking = control.archive.Options.RangeChecking
+	return control.Subscription.ControlledPoll(control.fragmentAssembler.OnFragment, controlFragmentLimit)
+}
 
-	control.Results.ControlResponse = nil  // Clear old results
-	control.Results.IsPollComplete = false // Clear completion flag
-	control.Results.ErrorResponse = nil    // Clear ErrorResponse
+func (control *Control) onFragment(
+	buffer *atomic.Buffer,
+	offset int32,
+	length int32,
+	header *logbuffer.Header,
+) term.ControlledPollAction {
 
-	return control.Subscription.PollWithContext(handler, fragmentLimit)
+	if control.Results.IsPollComplete {
+		return term.ControlledPollActionAbort
+	}
+
+	var hdr codecs.SbeGoMessageHeader
+
+	buf := new(bytes.Buffer)
+	buffer.WriteBytes(buf, offset, length)
+
+	marshaller := codecs.NewSbeGoMarshaller()
+	if err := hdr.Decode(marshaller, buf); err != nil {
+		// Not much to be done here as we can't correlate
+		err = fmt.Errorf("DescriptorFragmentHandler() failed to decode control message header: %w", err)
+		if control.archive.Listeners.ErrorListener != nil {
+			control.archive.Listeners.ErrorListener(err)
+		}
+		return term.ControlledPollActionContinue
+	}
+
+	switch hdr.TemplateId {
+	case codecIds.controlResponse:
+		var controlResponse = new(codecs.ControlResponse)
+		logger.Debugf("Received controlResponse: length %d", buf.Len())
+		if err := controlResponse.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			err = fmt.Errorf("failed to decode control response: %w", err)
+			if control.archive.Listeners.ErrorListener != nil {
+				control.archive.Listeners.ErrorListener(err)
+			}
+			return term.ControlledPollActionContinue
+		}
+		control.Results.ControlResponse = controlResponse
+		control.Results.IsPollComplete = true
+		control.Results.CorrelationId = controlResponse.CorrelationId
+		return term.ControlledPollActionBreak
+
+	case codecIds.recordingSignalEvent:
+		var recordingSignalEvent = new(codecs.RecordingSignalEvent)
+		if err := recordingSignalEvent.Decode(marshaller, buf, hdr.Version, hdr.BlockLength, rangeChecking); err != nil {
+			// Not much to be done here as we can't correlate
+			err = fmt.Errorf("failed to decode recording signal: %w", err)
+			if control.archive.Listeners.ErrorListener != nil {
+				control.archive.Listeners.ErrorListener(err)
+			}
+			return term.ControlledPollActionContinue
+		}
+
+	default:
+		logger.Debug("descriptorFragmentHandler: Insert decoder for type: %d", hdr.TemplateId)
+	}
+	return term.ControlledPollActionContinue
 }
 
 // PollForResponse polls for a specific correlationID
@@ -544,11 +604,11 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 	start := time.Now()
 	context := PollContext{control, correlationID}
 
+	handler := aeron.NewFragmentAssembler(func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+		controlFragmentHandler(&context, buf, offset, length, header)
+	}, aeron.DefaultFragmentAssemblyBufferLength)
 	for {
-		ret := control.PollWithContext(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-				controlFragmentHandler(&context, buf, offset, length, header)
-			}, 10)
+		ret := control.poll(handler.OnFragment, 10)
 
 		// Check result
 		if control.Results.IsPollComplete {
@@ -737,11 +797,11 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 
 	for !control.Results.IsPollComplete {
 		logger.Debugf("PollForDescriptors(%d:%d, %d)", correlationID, sessionID, int(fragmentsWanted)-descriptorCount)
-		fragments := control.PollWithContext(
+		fragments := control.poll(
 			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 				DescriptorFragmentHandler(&pollContext, buf, offset, length, header)
 			}, int(fragmentsWanted)-descriptorCount)
-		logger.Debugf("PollWithContext(%d:%d) returned %d fragments", correlationID, sessionID, fragments)
+		logger.Debugf("Poll(%d:%d) returned %d fragments", correlationID, sessionID, fragments)
 		descriptorCount = len(control.Results.RecordingDescriptors) + len(control.Results.RecordingSubscriptionDescriptors)
 
 		// A control response may have told us we're complete or we may have all we asked for

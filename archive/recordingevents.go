@@ -48,7 +48,7 @@ func (rea *RecordingEventsAdapter) PollWithContext(handler FragmentHandlerWithLi
 	if fragmentLimit == 0 {
 		fragmentLimit = 1
 	}
-	return rea.Subscription.PollWithContext(
+	return rea.Subscription.Poll(
 		func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 			handler(rea.archive.Listeners, buf, offset, length, header)
 		}, fragmentLimit)
@@ -97,7 +97,7 @@ func reFragmentHandler(listeners *ArchiveListeners, buffer *atomic.Buffer, offse
 				listeners.ErrorListener(err2)
 			}
 		} else {
-			logger.Debugf("RecordingProgress: %#v\n", recordingProgress)
+			logger.Debugf("RecordingProgress: %#v", recordingProgress)
 			// Call the Listener
 			if listeners.RecordingEventProgressListener != nil {
 				listeners.RecordingEventProgressListener(recordingProgress)
@@ -113,7 +113,7 @@ func reFragmentHandler(listeners *ArchiveListeners, buffer *atomic.Buffer, offse
 				listeners.ErrorListener(err2)
 			}
 		} else {
-			logger.Debugf("RecordingStopped: %#v\n", recordingStopped)
+			logger.Debugf("RecordingStopped: %#v", recordingStopped)
 			// Call the Listener
 			if listeners.RecordingEventStoppedListener != nil {
 				listeners.RecordingEventStoppedListener(recordingStopped)
@@ -121,6 +121,6 @@ func reFragmentHandler(listeners *ArchiveListeners, buffer *atomic.Buffer, offse
 		}
 
 	default:
-		logger.Errorf("Insert decoder for type: %d\n", hdr.TemplateId)
+		logger.Errorf("Insert decoder for type: %d", hdr.TemplateId)
 	}
 }

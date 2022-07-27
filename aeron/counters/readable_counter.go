@@ -13,8 +13,8 @@ func NewReadableCounter(reader *Reader, counterId int32) (*ReadableCounter, erro
 	if counterId < 0 || counterId >= int32(reader.maxCounterID) {
 		return nil, fmt.Errorf("counterId=%d maxCounterId=%d", counterId, reader.maxCounterID)
 	}
-	metaDataOffset := counterId * METADATA_LENGTH
-	valueOffset := counterId * COUNTER_LENGTH
+	metaDataOffset := counterId * MetadataLength
+	valueOffset := counterId * CounterLength
 	return &ReadableCounter{reader, counterId, metaDataOffset, valueOffset}, nil
 }
 

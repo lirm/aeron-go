@@ -18,7 +18,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/lirm/aeron-go/aeron"
@@ -27,25 +26,34 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/archive"
+	"github.com/lirm/aeron-go/archive/codecs"
 	"github.com/lirm/aeron-go/archive/examples"
+	"github.com/lirm/aeron-go/archive/replaymerge"
 )
 
-var logID = "basic_recording_subscriber"
+var logID = "basic_replay_merge"
 var logger = logging.MustGetLogger(logID)
 
 func main() {
 	flag.Parse()
 
-	// As per Java example
 	sampleChannel := *examples.Config.SampleChannel
 	sampleStream := int32(*examples.Config.SampleStream)
-	replayStream := sampleStream + 1
 	responseStream := sampleStream + 2
 
 	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.Config.DriverTimeout)
-	context := aeron.NewContext()
-	context.AeronDir(*examples.Config.AeronPrefix)
-	context.MediaDriverTimeout(timeout)
+	context := aeron.NewContext().
+		AeronDir(*examples.Config.AeronPrefix).
+		MediaDriverTimeout(timeout).
+		AvailableImageHandler(func(image *aeron.Image) {
+			logger.Infof("Image available: %+v", image)
+		}).
+		UnavailableImageHandler(func(image *aeron.Image) {
+			logger.Infof("Image unavailable: %+v", image)
+		}).
+		ErrorHandler(func(err error) {
+			logger.Warning(err)
+		})
 
 	options := archive.DefaultOptions()
 	options.RequestChannel = *examples.Config.RequestChannel
@@ -53,6 +61,8 @@ func main() {
 	options.ResponseChannel = *examples.Config.ResponseChannel
 	options.ResponseStream = responseStream
 
+	t := false
+	examples.Config.Verbose = &t
 	if *examples.Config.Verbose {
 		fmt.Printf("Setting loglevel: archive.DEBUG/aeron.INFO\n")
 		options.ArchiveLoglevel = logging.DEBUG
@@ -71,38 +81,71 @@ func main() {
 	// Enable recording events although the defaults will only log in debug mode
 	arch.EnableRecordingEvents()
 
-	recordingID, err := FindLatestRecording(arch, sampleChannel, sampleStream)
-	if err != nil {
-		logger.Fatalf(err.Error())
-	}
-	var position int64
-	var length int64 = math.MaxInt64
-
-	logger.Infof("Start replay of channel:%s, stream:%d, position:%d, length:%d", sampleChannel, replayStream, position, length)
-	replaySessionID, err := arch.StartReplay(recordingID, position, length, sampleChannel, replayStream)
+	recording, err := FindLatestRecording(arch, sampleChannel, sampleStream)
 	if err != nil {
 		logger.Fatalf(err.Error())
 	}
 
-	// Make the channel based upon that recording and subscribe to it
-	subChannel, err := archive.AddSessionIdToChannel(sampleChannel, archive.ReplaySessionIdToStreamId(replaySessionID))
-	if err != nil {
-		logger.Fatalf("AddReplaySessionIdToChannel() failed: %s", err.Error())
-	}
+	subChannelUri, _ := aeron.ParseChannelUri("aeron:udp")
+	subChannelUri.SetControlMode(aeron.MdcControlModeManual)
+	subChannelUri.SetSessionID(recording.SessionId)
+	subChannel := subChannelUri.String()
 
-	logger.Infof("Subscribing to channel:%s, stream:%d", subChannel, replayStream)
-	subscription := <-arch.AddSubscription(subChannel, replayStream)
+	logger.Infof("Subscribing to channel:%s, stream:%d", subChannel, sampleStream)
+	subscription := <-arch.AddSubscription(subChannel, sampleStream)
 	defer subscription.Close()
-	logger.Infof("Subscription found %v", subscription)
 
 	counter := 0
 	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
-		logger.Infof("%s", bytes)
+		logger.Infof("Message: %s", bytes)
 		counter++
 	}
 
-	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 1000}
+	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
+
+	liveDestination := sampleChannel
+
+	replayDestinationUri, _ := aeron.ParseChannelUri("aeron:udp?endpoint=localhost:0")
+	replayDestination := replayDestinationUri.String()
+
+	replayChannelUri, _ := aeron.ParseChannelUri(replayDestination)
+	replayChannelUri.SetSessionID(recording.SessionId)
+	replayChannel := replayChannelUri.String()
+
+	logger.Infof(
+		"ReplayMerge(subChannel:%s,%d,replayChannel:%s,replayDestination:%s,liveDestination:%s)",
+		subscription.Channel(),
+		subscription.StreamID(),
+		replayChannel,
+		replayDestination,
+		liveDestination,
+	)
+	merge, err := replaymerge.NewReplayMerge(
+		subscription,
+		arch,
+		replayChannel,
+		replayDestination,
+		liveDestination,
+		recording.RecordingId,
+		0,
+		5000,
+	)
+	if err != nil {
+		logger.Fatalf(err.Error())
+	}
+	defer merge.Close()
+
+	var fragmentsRead int
+	for !merge.IsMerged() {
+		fragmentsRead, err = merge.Poll(printHandler, 10)
+		if err != nil {
+			logger.Fatalf(err.Error())
+		}
+		arch.RecordingEventsPoll()
+		idleStrategy.Idle(fragmentsRead)
+	}
+
 	for {
 		fragmentsRead := subscription.Poll(printHandler, 10)
 		arch.RecordingEventsPoll()
@@ -112,22 +155,22 @@ func main() {
 }
 
 // FindLatestRecording to lookup the last recording
-func FindLatestRecording(arch *archive.Archive, channel string, stream int32) (int64, error) {
-	descriptors, err := arch.ListRecordingsForUri(0, 100, channel, stream)
+func FindLatestRecording(arch *archive.Archive, channel string, stream int32) (*codecs.RecordingDescriptor, error) {
+	descriptors, err := arch.ListRecordingsForUri(0, 100, "", stream)
 
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if len(descriptors) == 0 {
-		return 0, fmt.Errorf("no recordings found")
+		return nil, fmt.Errorf("no recordings found")
 	}
 
 	descriptor := descriptors[len(descriptors)-1]
 	if descriptor.StopPosition == 0 {
-		return 0, fmt.Errorf("recording length zero")
+		return nil, fmt.Errorf("recording length zero")
 	}
 
 	// Return the last recordingID
-	return descriptor.RecordingId, nil
+	return descriptor, nil
 }

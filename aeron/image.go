@@ -23,37 +23,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-type ControlledPollFragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
-
-var ControlledPollAction = struct {
-	/**
-	 * Abort the current polling operation and do not advance the position for this fragment.
-	 */
-	ABORT int
-
-	/**
-	 * Break from the current polling operation and commit the position as of the end of the current fragment
-	 * being handled.
-	 */
-	BREAK int
-
-	/**
-	 * Continue processing but commit the position as of the end of the current fragment so that
-	 * flow control is applied to this point.
-	 */
-	COMMIT int
-
-	/**
-	 * Continue processing taking the same approach as the in fragment_handler_t.
-	 */
-	CONTINUE int
-}{
-	1,
-	2,
-	3,
-	4,
-}
-
 type Image struct {
 	sourceIdentity     string
 	logBuffers         *logbuffer.LogBuffers
@@ -118,47 +87,128 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	return result
 }
 
-func (image *Image) PollWithContext(handler term.FragmentHandler, fragmentLimit int) int {
+// BoundedPoll polls for new messages in a stream. If new messages are found
+// beyond the last consumed position then they will be delivered to the
+// FragmentHandler up to a limited number of fragments as specified or the
+// maximum position specified. Use a FragmentAssembler to assemble messages
+// which span multiple fragments. Returns the number of fragments that have been
+// consumed.
+func (image *Image) BoundedPoll(
+	handler term.FragmentHandler,
+	limitPosition int64,
+	fragmentLimit int,
+) int {
 	if image.IsClosed() {
 		return 0
 	}
 
-	position := image.subscriberPosition.get()
-	termOffset := int32(position) & image.termLengthMask
-	index := indexByPosition(position, image.positionBitsToShift)
+	fragmentsRead := 0
+	initialPosition := image.subscriberPosition.get()
+	initialOffset := int32(initialPosition) & image.termLengthMask
+	offset := initialOffset
+
+	index := indexByPosition(initialPosition, image.positionBitsToShift)
 	termBuffer := image.termBuffers[index]
 
-	offset, result := term.ReadWithContext(termBuffer, termOffset, handler, fragmentLimit, &image.header)
-
-	newPosition := position + int64(offset-termOffset)
-	if newPosition > position {
-		image.subscriberPosition.set(newPosition)
+	capacity := termBuffer.Capacity()
+	limitOffset := int32(limitPosition-initialPosition) + offset
+	if limitOffset > capacity {
+		limitOffset = capacity
 	}
-	return result
+	header := &image.header
+	header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
+
+	for fragmentsRead < fragmentLimit && offset < limitOffset {
+		length := logbuffer.GetFrameLength(termBuffer, offset)
+		if length <= 0 {
+			break
+		}
+
+		frameOffset := offset
+		alignedLength := util.AlignInt32(length, logbuffer.FrameAlignment)
+		offset += alignedLength
+
+		if logbuffer.IsPaddingFrame(termBuffer, frameOffset) {
+			continue
+		}
+		fragmentsRead++
+		header.SetOffset(frameOffset)
+
+		handler(termBuffer, frameOffset+logbuffer.DataFrameHeader.Length,
+			length-logbuffer.DataFrameHeader.Length, header)
+	}
+	resultingPosition := initialPosition + int64(offset-initialOffset)
+	if resultingPosition > initialPosition {
+		image.subscriberPosition.set(resultingPosition)
+	}
+	return fragmentsRead
 }
 
-func (image *Image) BoundedPoll(handler term.FragmentHandler, limitPosition int64, fragmentLimit int) int {
+// ControlledPoll polls for new messages in a stream. If new messages are found
+// beyond the last consumed position then they will be delivered to the
+// ControlledFragmentHandler up to a limited number of fragments as
+// specified.
+//
+// To assemble messages that span multiple fragments then use
+// ControlledFragmentAssembler. Returns the number of fragments that have been
+// consumed.
+func (image *Image) ControlledPoll(
+	handler term.ControlledFragmentHandler,
+	fragmentLimit int,
+) int {
 	if image.IsClosed() {
 		return 0
 	}
 
-	position := image.subscriberPosition.get()
-	termOffset := int32(position) & image.termLengthMask
-	index := indexByPosition(position, image.positionBitsToShift)
+	fragmentsRead := 0
+	initialPosition := image.subscriberPosition.get()
+	initialOffset := int32(initialPosition) & image.termLengthMask
+	offset := initialOffset
+
+	index := indexByPosition(initialPosition, image.positionBitsToShift)
 	termBuffer := image.termBuffers[index]
-	offsetLimit := (limitPosition - position) + int64(termOffset)
-	termCapacity := int64(termBuffer.Capacity())
-	if offsetLimit > termCapacity {
-		offsetLimit = termCapacity
-	}
 
-	offset, result := term.BoundedRead(termBuffer, termOffset, int32(offsetLimit), handler, fragmentLimit, &image.header)
+	capacity := termBuffer.Capacity()
+	header := &image.header
+	header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
 
-	newPosition := position + int64(offset-termOffset)
-	if newPosition > position {
-		image.subscriberPosition.set(newPosition)
+	for fragmentsRead < fragmentLimit && offset < capacity {
+		length := logbuffer.GetFrameLength(termBuffer, offset)
+		if length <= 0 {
+			break
+		}
+
+		frameOffset := offset
+		alignedLength := util.AlignInt32(length, logbuffer.FrameAlignment)
+		offset += alignedLength
+
+		if logbuffer.IsPaddingFrame(termBuffer, frameOffset) {
+			continue
+		}
+		fragmentsRead++
+		header.SetOffset(frameOffset)
+
+		action := handler(termBuffer, frameOffset+logbuffer.DataFrameHeader.Length,
+			length-logbuffer.DataFrameHeader.Length, header)
+		if action == term.ControlledPollActionAbort {
+			fragmentsRead--
+			offset -= alignedLength
+			break
+		}
+		if action == term.ControlledPollActionBreak {
+			break
+		}
+		if action == term.ControlledPollActionCommit {
+			initialPosition += int64(offset - initialOffset)
+			initialOffset = offset
+			image.subscriberPosition.set(initialPosition)
+		}
 	}
-	return result
+	resultingPosition := initialPosition + int64(offset-initialOffset)
+	if resultingPosition > initialPosition {
+		image.subscriberPosition.set(resultingPosition)
+	}
+	return fragmentsRead
 }
 
 // Position returns the position this Image has been consumed to by the subscriber.

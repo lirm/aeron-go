@@ -18,9 +18,42 @@ limitations under the License.
 package aeron
 
 import (
+	"strings"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 )
+
+const (
+	ChannelStatusErrored      = -1 // Channel has errored. Check logs for information
+	ChannelStatusInitializing = 0  // Channel is being initialized
+	ChannelStatusActive       = 1  // Channel has finished initialization and is active
+	ChannelStatusClosing      = 2  // Channel is being closed
+)
+
+// ChannelStatusString provides a convenience method for logging and error handling
+func ChannelStatusString(channelStatus int) string {
+	switch channelStatus {
+	case ChannelStatusErrored:
+		return "ChannelStatusErrored"
+	case ChannelStatusInitializing:
+		return "ChannelStatusInitializing"
+	case ChannelStatusActive:
+		return "ChannelStatusActive"
+	case ChannelStatusClosing:
+		return "ChannelStatusClosing"
+	default:
+		return "Unknown"
+	}
+}
+
+// From LocalSocketAddressStatus.Java
+const (
+	ChannelStatusIdOffset          = 0
+	LocalSocketAddressLengthOffset = ChannelStatusIdOffset + 4
+	LocalSocketAddressStringOffset = LocalSocketAddressLengthOffset + 4
+)
+const LocalSocketAddressStatusCounterTypeId = 14
 
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and
 // stream ID combination.
@@ -30,6 +63,7 @@ type Subscription struct {
 	roundRobinIndex int
 	registrationID  int64
 	streamID        int32
+	channelStatusID int32
 
 	images *ImageList
 
@@ -37,13 +71,14 @@ type Subscription struct {
 }
 
 // NewSubscription is a factory method to create new subscription to be added to the media driver
-func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32) *Subscription {
+func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32, channelStatusID int32) *Subscription {
 	sub := new(Subscription)
 	sub.images = NewImageList()
 	sub.conductor = conductor
 	sub.channel = channel
 	sub.registrationID = registrationID
 	sub.streamID = streamID
+	sub.channelStatusID = channelStatusID
 	sub.roundRobinIndex = 0
 	sub.isClosed.Set(false)
 
@@ -65,14 +100,18 @@ func (sub *Subscription) IsClosed() bool {
 	return sub.isClosed.Get()
 }
 
-// Status returns the Registration Status
-func (sub *Subscription) Status() (int, error) {
-	return sub.conductor.FindSubscriptionStatus(sub.registrationID)
+// ChannelStatus returns the status of the media channel for this Subscription.
+// The status will be ChannelStatusErrored if a socket exception on setup or ChannelStatusActive if all is well.
+func (sub *Subscription) ChannelStatus() int {
+	if sub.IsClosed() {
+		return -2
+	}
+	return int(sub.conductor.counterReader.GetCounterValue(sub.channelStatusID))
 }
 
-// ChannelStatusID returns the ChannelStatusID
-func (sub *Subscription) ChannelStatusID() (int, error) {
-	return sub.conductor.FindSubscriptionChannelStatusID(sub.registrationID)
+// ChannelStatusId returns the counter ID used to represent the channel status of this Subscription.
+func (sub *Subscription) ChannelStatusId() int32 {
+	return sub.channelStatusID
 }
 
 // Close will release all images in this subscription, send command to the driver and block waiting for response from
@@ -113,8 +152,14 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 	return fragmentsRead
 }
 
-// PollWithContext as for Poll() but provides an integer argument for passing contextual information
-func (sub *Subscription) PollWithContext(handler term.FragmentHandler, fragmentLimit int) int {
+// ControlledPoll polls in a controlled manner the Image s under the subscription for available message fragments.
+// Control is applied to fragments in the stream. If more fragments can be read on another stream
+// they will even if BREAK or ABORT is returned from the fragment handler.
+//
+// Each fragment read will be a whole message if it is under MTU length. If larger than MTU then it will come
+// as a series of fragments ordered within a session.
+// Returns the number of fragments received.
+func (sub *Subscription) ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) int {
 
 	img := sub.images.Get()
 	length := len(img)
@@ -129,11 +174,11 @@ func (sub *Subscription) PollWithContext(handler term.FragmentHandler, fragmentL
 		}
 
 		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].PollWithContext(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
 		}
 
 		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
-			fragmentsRead += img[i].PollWithContext(handler, fragmentLimit-fragmentsRead)
+			fragmentsRead += img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
 		}
 	}
 
@@ -204,7 +249,7 @@ func (sub *Subscription) ImageCount() int {
 	return len(images)
 }
 
-// ImageBySessionId returns the associated with the given sessionId.
+// ImageBySessionID returns the associated with the given sessionId.
 func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 	img := sub.images.Get()
 	for _, image := range img {
@@ -219,39 +264,86 @@ func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 // may be nil if MDS is used and no destination is yet added.
 // The result is simply the first in the list of addresses found if
 // multiple addresses exist
-func (sub *Subscription) ResolvedEndpoint() []byte {
+func (sub *Subscription) ResolvedEndpoint() string {
 	reader := sub.conductor.CounterReader()
-	channelStatus, err := sub.Status()
-	if err != nil {
-		return nil
+	if sub.ChannelStatus() != ChannelStatusActive {
+		return ""
 	}
-	channelStatusID, err := sub.ChannelStatusID()
-	if err != nil {
-		return nil
-	}
-	// logger.Debugf("ResolvedEndpoint: statusID:%d, status:%d\n", channelStatus, channelStatusID)
-	return reader.FindAddress(channelStatus, channelStatusID)
+	var endpoint string
+	reader.ScanForType(LocalSocketAddressStatusCounterTypeId, func(counterId int32, keyBuffer *atomic.Buffer) bool {
+		channelStatusId := keyBuffer.GetInt32(ChannelStatusIdOffset)
+		length := keyBuffer.GetInt32(LocalSocketAddressLengthOffset)
+		if channelStatusId == sub.channelStatusID && length > 0 && reader.GetCounterValue(counterId) == ChannelStatusActive {
+			endpoint = string(keyBuffer.GetBytesArray(LocalSocketAddressStringOffset, length))
+			return false
+		}
+		return true
+	})
+	return endpoint
 }
 
-// Add a destination manually to a multi-destination Subscription.
-// Multi-destination routing is used for ReplayMerge but is generally available
+// TryResolveChannelEndpointPort resolves the channel endpoint and replaces it with the port from the
+// ephemeral range when 0 was provided. If there are no addresses, or if there is more than one, returned from
+// LocalSocketAddresses() then the original channel is returned.
+// If the channel is not ACTIVE, then empty string will be returned.
+func (sub *Subscription) TryResolveChannelEndpointPort() string {
+	if sub.ChannelStatus() != ChannelStatusActive {
+		return ""
+	}
+	localSocketAddresses := sub.LocalSocketAddresses()
+	if len(localSocketAddresses) != 1 {
+		return sub.channel
+	}
+	uri, err := ParseChannelUri(sub.channel)
+	if err != nil {
+		logger.Warningf("error parsing channel (%s): %v", sub.channel, err)
+		return sub.channel
+	}
+	endpoint := uri.Get("endpoint")
+	if strings.HasSuffix(endpoint, ":0") {
+		resolvedEndpoint := localSocketAddresses[0]
+		i := strings.LastIndex(resolvedEndpoint, ":")
+		uri.Set("endpoint", endpoint[:(len(endpoint)-2)]+resolvedEndpoint[i:])
+		return uri.String()
+	}
+	return sub.channel
+}
+
+// LocalSocketAddresses fetches the local socket addresses for this subscription.
+func (sub *Subscription) LocalSocketAddresses() []string {
+	if sub.ChannelStatus() != ChannelStatusActive {
+		return nil
+	}
+	var bindings []string
+	reader := sub.conductor.counterReader
+	reader.ScanForType(LocalSocketAddressStatusCounterTypeId, func(counterId int32, keyBuffer *atomic.Buffer) bool {
+		channelStatusId := keyBuffer.GetInt32(ChannelStatusIdOffset)
+		length := keyBuffer.GetInt32(LocalSocketAddressLengthOffset)
+		if channelStatusId == sub.channelStatusID && length > 0 && reader.GetCounterValue(counterId) == ChannelStatusActive {
+			bindings = append(bindings, string(keyBuffer.GetBytesArray(LocalSocketAddressStringOffset, length)))
+		}
+		return true
+	})
+	return bindings
+}
+
+// AddDestination adds a destination manually to a multi-destination Subscription.
 func (sub *Subscription) AddDestination(endpointChannel string) bool {
 	if sub.IsClosed() {
 		return false
 	}
 
-	sub.conductor.AddDestination(sub.registrationID, endpointChannel)
+	sub.conductor.AddRcvDestination(sub.registrationID, endpointChannel)
 	return true
 }
 
-// Add a destination manually to a multi-destination Subscription.
-// Multi-destination routing is used for ReplayMerge but is generally available
+// RemoveDestination removes a destination manually from a multi-destination Subscription.
 func (sub *Subscription) RemoveDestination(endpointChannel string) bool {
 	if sub.IsClosed() {
 		return false
 	}
 
-	sub.conductor.RemoveDestination(sub.registrationID, endpointChannel)
+	sub.conductor.RemoveRcvDestination(sub.registrationID, endpointChannel)
 	return true
 }
 
