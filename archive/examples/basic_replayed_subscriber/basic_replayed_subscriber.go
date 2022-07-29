@@ -26,6 +26,7 @@ import (
 	"github.com/corymonroe-coinbase/aeron-go/archive"
 	"github.com/corymonroe-coinbase/aeron-go/archive/examples"
 	"math"
+	"os"
 	"time"
 )
 
@@ -38,8 +39,9 @@ func main() {
 	// As per Java example
 	sampleChannel := *examples.Config.SampleChannel
 	sampleStream := int32(*examples.Config.SampleStream)
+	replayChannel := "aeron:ipc"
 	replayStream := sampleStream + 1
-	responseStream := sampleStream + 2
+	//responseStream := 20
 
 	timeout := time.Duration(time.Millisecond.Nanoseconds() * *examples.Config.DriverTimeout)
 	context := aeron.NewContext()
@@ -50,7 +52,7 @@ func main() {
 	options.RequestChannel = *examples.Config.RequestChannel
 	options.RequestStream = int32(*examples.Config.RequestStream)
 	options.ResponseChannel = *examples.Config.ResponseChannel
-	options.ResponseStream = int32(responseStream)
+	//options.ResponseStream = int32(responseStream)
 
 	if *examples.Config.Verbose {
 		fmt.Printf("Setting loglevel: archive.DEBUG/aeron.INFO\n")
@@ -77,14 +79,14 @@ func main() {
 	var position int64
 	var length int64 = math.MaxInt64
 
-	logger.Infof("Start replay of channel:%s, stream:%d, position:%d, length:%d", sampleChannel, replayStream, position, length)
-	replaySessionID, err := arch.StartReplay(recordingID, position, length, sampleChannel, replayStream)
+	logger.Infof("Start replay of channel:%s, stream:%d, position:%d, length:%d", replayChannel, replayStream, position, length)
+	replaySessionID, err := arch.StartReplay(recordingID, position, length, replayChannel, replayStream)
 	if err != nil {
 		logger.Fatalf(err.Error())
 	}
 
 	// Make the channel based upon that recording and subscribe to it
-	subChannel, err := archive.AddSessionIdToChannel(sampleChannel, archive.ReplaySessionIdToStreamId(replaySessionID))
+	subChannel, err := archive.AddSessionIdToChannel(replayChannel, archive.ReplaySessionIdToStreamId(replaySessionID))
 	if err != nil {
 		logger.Fatalf("AddReplaySessionIdToChannel() failed: %s", err.Error())
 	}
@@ -96,9 +98,11 @@ func main() {
 
 	counter := 0
 	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-		bytes := buffer.GetBytesArray(offset, length)
-		logger.Noticef("%s\n", bytes)
+		fmt.Println(buffer.GetBytesArray(offset, length))
 		counter++
+		if counter > 10 {
+			os.Exit(0)
+		}
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 1000}

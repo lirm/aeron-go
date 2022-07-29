@@ -77,12 +77,18 @@ func main() {
 	if idleStr := os.Getenv("NO_OP_IDLE"); idleStr != "" {
 		opts.IdleStrategy = &idlestrategy.Busy{}
 	}
+	// Go cluster
 	opts.IngressChannel = "aeron:udp?alias=cluster-client-ingress|endpoint=localhost:20000"
 	opts.IngressEndpoints = "0=localhost:20000,1=localhost:21000,2=localhost:22000"
 	//opts.EgressChannel = "aeron:udp?alias=cluster-egress|endpoint=localhost:11111"
 
+	// Java cluster
+	//opts.IngressChannel = "aeron:udp"
+	//opts.IngressEndpoints = "0=localhost:9002"
+	//opts.EgressChannel = "aeron:udp?endpoint=localhost:0"
+
 	listener := &TestContext{
-		latencies: make([]int64, 1000),
+		latencies: make([]int64, 10),
 	}
 	clusterClient, err := client.NewAeronCluster(ctx, opts, listener)
 	if err != nil {
