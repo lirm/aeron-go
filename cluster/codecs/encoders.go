@@ -17,6 +17,8 @@ package codecs
 
 import (
 	"bytes"
+
+	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
 // Encoders for all cluster protocol packets
@@ -164,34 +166,11 @@ func CloseSessionRequestPacket(
 	return buffer.Bytes(), nil
 }
 
-func SessionMessageHeaderPacket(
-	marshaller *SbeGoMarshaller,
-	rangeChecking bool,
-	leadershipTermId int64,
-	clusterSessionId int64,
-	timestamp int64,
-) ([]byte, error) {
-	request := SessionMessageHeader{
-		LeadershipTermId: leadershipTermId,
-		ClusterSessionId: clusterSessionId,
-		Timestamp:        timestamp,
-	}
-
-	// Marshal it
-	header := MessageHeader{
-		BlockLength: request.SbeBlockLength(),
-		TemplateId:  request.SbeTemplateId(),
-		SchemaId:    request.SbeSchemaId(),
-		Version:     request.SbeSchemaVersion(),
-	}
-
-	buffer := new(bytes.Buffer)
-	if err := header.Encode(marshaller, buffer); err != nil {
-		return nil, err
-	}
-	if err := request.Encode(marshaller, buffer, rangeChecking); err != nil {
-		return nil, err
-	}
-
-	return buffer.Bytes(), nil
+func MakeClusterMessageBuffer(templateId, blockLength uint16) *atomic.Buffer {
+	buf := atomic.MakeBuffer(make([]byte, 8+blockLength))
+	buf.PutUInt16(0, blockLength)
+	buf.PutUInt16(2, templateId)
+	buf.PutUInt16(4, 111) // schemaId
+	buf.PutUInt16(6, 8)   // schemaVersion
+	return buf
 }

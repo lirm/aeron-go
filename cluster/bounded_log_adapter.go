@@ -76,7 +76,7 @@ func (adapter *boundedLogAdapter) onMessage(
 	templateId := buffer.GetUInt16(offset + 2)
 	schemaId := buffer.GetUInt16(offset + 4)
 	version := buffer.GetUInt16(offset + 6)
-	if schemaId != clusterSchemaId {
+	if schemaId != ClusterSchemaId {
 		logger.Errorf("BoundedLogAdaptor - unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
 		return
@@ -118,7 +118,7 @@ func (adapter *boundedLogAdapter) onMessage(
 		closeReason := codecs.CloseReasonEnum(buffer.GetInt32(offset + 24))
 		adapter.agent.onSessionClose(leadershipTermId, header.Position(), clusterSessionId, timestamp, closeReason)
 	case clusterActionReqTemplateId:
-		e := &codecs.ClusterActionRequest{}
+		e := codecs.ClusterActionRequest{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
 			logger.Errorf("boundedLogAdapter: cluster action request decode error: %v", err)
@@ -126,7 +126,7 @@ func (adapter *boundedLogAdapter) onMessage(
 			adapter.agent.onServiceAction(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.Action)
 		}
 	case newLeadershipTermTemplateId:
-		e := &codecs.NewLeadershipTermEvent{}
+		e := codecs.NewLeadershipTermEvent{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
 			logger.Errorf("boundedLogAdapter: new leadership term decode error: %v", err)
@@ -135,14 +135,14 @@ func (adapter *boundedLogAdapter) onMessage(
 				e.TermBaseLogPosition, e.LeaderMemberId, e.LogSessionId, e.TimeUnit, e.AppVersion)
 		}
 	case membershipChangeTemplateId:
-		e := &codecs.MembershipChangeEvent{}
+		e := codecs.MembershipChangeEvent{}
 		buf := toByteBuffer(buffer, offset, length)
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
 			logger.Errorf("boundedLogAdapter: membership change event decode error: %v", err)
 		} else {
 			adapter.agent.onMembershipChange(e.LogPosition, e.Timestamp, e.ChangeType, e.MemberId)
 		}
-	case sessionMessageHeaderTemplateId:
+	case SessionMessageHeaderTemplateId:
 		if length < SessionMessageHeaderLength {
 			logger.Errorf("received invalid session message - length: %d", length)
 			return

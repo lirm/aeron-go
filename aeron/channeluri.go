@@ -160,6 +160,14 @@ func (uri ChannelUri) Media() string {
 	return uri.media
 }
 
+func (uri ChannelUri) IsIpc() bool {
+	return uri.media == IpcMedia
+}
+
+func (uri ChannelUri) IsUdp() bool {
+	return uri.media == UdpMedia
+}
+
 func (uri *ChannelUri) SetPrefix(prefix string) {
 	uri.prefix = prefix
 }

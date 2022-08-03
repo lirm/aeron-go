@@ -55,6 +55,13 @@ func NewFragmentAssembler(delegate term.FragmentHandler, initialBufferLength int
 	}
 }
 
+// Clear removes all existing session buffers.
+func (f *FragmentAssembler) Clear() {
+	for k := range f.builderBySessionIdMap {
+		delete(f.builderBySessionIdMap, k)
+	}
+}
+
 // OnFragment reassembles and forwards whole messages to the delegate.
 func (f *FragmentAssembler) OnFragment(
 	buffer *atomic.Buffer,

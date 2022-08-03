@@ -18,17 +18,16 @@ back to cluster sessions, and service mark files. The [Cluster](cluster.go) inte
 lacks of the methods of its [Java equivalent](https://github.com/real-logic/aeron/blob/master/aeron-cluster/src/main/java/io/aeron/cluster/service/Cluster.java),
 but these would be trivial additions.
 
-The [Cluster Client](https://github.com/real-logic/aeron/blob/master/aeron-cluster/src/main/java/io/aeron/cluster/client/AeronCluster.java)
-has not been implemented yet. One must use the Java version to connect to cluster.
-
 ## Examples
 
-[echo_service.go](examples/echo_service.go) implements a basic echo service and can be
+[echo_service.go](../examples/cluster/echo_service.go) implements a basic echo service and can be
 used in place of its [Java equivalent](https://github.com/real-logic/aeron/blob/master/aeron-samples/src/main/java/io/aeron/samples/cluster/EchoService.java).
+
+[throughput_test_client.go](../examples/cluster_client/throughput_test_client.go) implements an example
+of using the cluster client. 
 
 # Backlog
  * godoc improvements
  * testing
- * cluster client
  * cluster session close handling (avoid sending duplicate close requests to consensus module)
  * SBE encoding/decoding improvements
