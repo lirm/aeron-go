@@ -88,6 +88,8 @@ func Connect(ctx *Context) (*Aeron, error) {
 	aeron.conductor.onNewPublicationHandler = ctx.newPublicationHandler
 	aeron.conductor.onNewSubscriptionHandler = ctx.newSubscriptionHandler
 
+	aeron.conductor.errorHandler = ctx.errorHandler
+
 	aeron.conductor.Start(ctx.idleStrategy)
 
 	return aeron, nil
