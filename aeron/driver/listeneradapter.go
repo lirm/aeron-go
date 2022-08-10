@@ -17,6 +17,8 @@ limitations under the License.
 package driver
 
 import (
+	"strings"
+
 	"github.com/lirm/aeron-go/aeron/logging"
 
 	"github.com/lirm/aeron-go/aeron/atomic"
@@ -83,6 +85,7 @@ type Listener interface {
 	OnUnavailableImage(correlationID int64, subscriptionRegistrationID int64)
 	OnOperationSuccess(correlationID int64)
 	OnErrorResponse(offendingCommandCorrelationID int64, errorCode int32, errorMessage string)
+	OnChannelEndpointError(correlationID int64, errorMessage string)
 	OnSubscriptionReady(correlationID int64, channelStatusIndicatorID int32)
 	OnAvailableCounter(correlationID int64, counterID int32)
 	OnUnavailableCounter(correlationID int64, counterID int32)
@@ -192,8 +195,13 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 			var msg errorMessage
 			msg.Wrap(buffer, int(offset))
 
-			adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationID.Get(),
-				msg.errorCode.Get(), msg.errorMessage.Get())
+			if msg.errorCode.Get() == command.ErrorCodeChannelEndpointError ||
+				strings.Contains(msg.errorMessage.Get(), "Address already in use") { // hack for c media driver
+				adapter.listener.OnChannelEndpointError(msg.offendingCommandCorrelationID.Get(), msg.errorMessage.Get())
+			} else {
+				adapter.listener.OnErrorResponse(msg.offendingCommandCorrelationID.Get(),
+					msg.errorCode.Get(), msg.errorMessage.Get())
+			}
 		case Events.OnCounterReady:
 			logger.Debugf("received ON_COUNTER_READY")
 

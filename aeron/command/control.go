@@ -46,6 +46,20 @@ const (
 	AddRcvDestination = 0x0c
 	// RemoveRcvDestination removes a Destination for existing Subscription.
 	RemoveRcvDestination = 0x0D
-	// RecordingPosition is rhe position a recording has reached when being archived
-	RecordingPosition = 0x64 // 100
+)
+
+const (
+	ErrorCodeUnknownCodeValue               = -1
+	ErrorCodeUnused                         = 0
+	ErrorCodeInvalidChannel                 = 1
+	ErrorCodeUnknownSubscription            = 2
+	ErrorCodeUnknownPublication             = 3
+	ErrorCodeChannelEndpointError           = 4
+	ErrorCodeUnknownCounter                 = 5
+	ErrorCodeUnknownCommandTypeID           = 6
+	ErrorCodeMalformedCommand               = 7
+	ErrorCodeNotSupported                   = 8
+	ErrorCodeUnknownHost                    = 9
+	ErrorCodeResourceTemporarilyUnavailable = 10
+	ErrorCodeGenericError                   = 11
 )

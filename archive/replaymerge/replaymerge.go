@@ -290,10 +290,10 @@ func (rm *ReplayMerge) getRecordingPosition(nowMs int64) (workCount int, err err
 		return
 	}
 	if success {
-		nextTargetPosition := rm.polledRelevantId()
+		rm.nextTargetPosition = rm.polledRelevantId()
 		rm.activeCorrelationId = aeron.NullValue
 
-		if archive.RecordingPositionNull == nextTargetPosition {
+		if archive.RecordingPositionNull == rm.nextTargetPosition {
 			correlationId := rm.archive.Aeron().NextCorrelationID()
 
 			if rm.archive.Proxy.StopPositionRequest(correlationId, rm.recordingId) == nil {
