@@ -669,6 +669,27 @@ func (cc *ClientConductor) OnOperationSuccess(corrID int64) {
 
 }
 
+func (cc *ClientConductor) OnChannelEndpointError(corrID int64, errorMessage string) {
+	logger.Debugf("OnChannelEndpointError: correlationID=%d, errorMessage=%s", corrID, errorMessage)
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	statusIndicatorId := int32(corrID)
+
+	for _, pubDef := range cc.pubs {
+		if pubDef.publication != nil && pubDef.publication.ChannelStatusID() == statusIndicatorId {
+			cc.onError(fmt.Errorf(errorMessage))
+		}
+	}
+
+	for _, subDef := range cc.subs {
+		if subDef.subscription != nil && subDef.subscription.ChannelStatusId() == statusIndicatorId {
+			cc.onError(fmt.Errorf(errorMessage))
+		}
+	}
+}
+
 func (cc *ClientConductor) OnErrorResponse(corrID int64, errorCode int32, errorMessage string) {
 	logger.Debugf("OnErrorResponse: correlationID=%d, errorCode=%d, errorMessage=%s", corrID, errorCode, errorMessage)
 
@@ -684,7 +705,7 @@ func (cc *ClientConductor) OnErrorResponse(corrID int64, errorCode int32, errorM
 		}
 	}
 
-	for _, subDef := range cc.pubs {
+	for _, subDef := range cc.subs {
 		if subDef.regID == corrID {
 			subDef.status = RegistrationStatus.ErroredMediaDriver
 			subDef.errorCode = errorCode

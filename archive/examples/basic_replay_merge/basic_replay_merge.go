@@ -37,7 +37,7 @@ var logger = logging.MustGetLogger(logID)
 func main() {
 	flag.Parse()
 
-	sampleChannel := *examples.Config.SampleChannel
+	sampleChannel := *examples.Config.MdcChannel
 	sampleStream := int32(*examples.Config.SampleStream)
 	responseStream := sampleStream + 2
 
@@ -145,6 +145,8 @@ func main() {
 		arch.RecordingEventsPoll()
 		idleStrategy.Idle(fragmentsRead)
 	}
+
+	merge.Close()
 
 	for {
 		fragmentsRead := subscription.Poll(printHandler, 10)

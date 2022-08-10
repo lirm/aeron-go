@@ -50,7 +50,7 @@ type Options struct {
 var defaultOptions = Options{
 	RequestChannel:         "aeron:udp?endpoint=localhost:8010",
 	RequestStream:          10,
-	ResponseChannel:        "aeron:udp?endpoint=localhost:8020",
+	ResponseChannel:        "aeron:udp?endpoint=localhost:0",
 	ResponseStream:         20,
 	RecordingEventsChannel: "aeron:udp?control-mode=dynamic|control=localhost:8030",
 	RecordingEventsStream:  30,
