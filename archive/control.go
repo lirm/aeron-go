@@ -737,26 +737,24 @@ func DescriptorFragmentHandler(context interface{}, buffer *atomic.Buffer, offse
 		}
 
 		// Check this was for us
-		if controlResponse.ControlSessionId == control.archive.SessionID && controlResponse.CorrelationId == pollContext.correlationID {
-			// Set our state to let the caller of Poll() which triggered this know they have something
-			// We're basically finished so prepare our OOB return values and log some info if we can
-			logger.Debugf("descriptorFragmentHandler/controlResponse: received for sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
-			control.Results.ControlResponse = controlResponse
-			control.Results.IsPollComplete = true
-		} else {
-			logger.Debugf("descriptorFragmentHandler/controlResponse ignoring sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
-		}
-
-		// Expected if there are no results
-		if controlResponse.Code == codecs.ControlResponseCode.RECORDING_UNKNOWN {
-			logger.Debugf("ControlResponse error UNKNOWN: %s", controlResponse.ErrorMessage)
-			return
-		}
-
-		// Unexpected so log but we deal with it in the parent
-		if controlResponse.Code == codecs.ControlResponseCode.ERROR {
-			logger.Debugf("ControlResponse error ERROR: %s\n%#v", controlResponse.ErrorMessage, controlResponse)
-			return
+		if controlResponse.ControlSessionId == control.archive.SessionID {
+			// RECORDING_UNKNOWN expected if there are no more results
+			if controlResponse.CorrelationId == pollContext.correlationID && controlResponse.Code == codecs.ControlResponseCode.RECORDING_UNKNOWN {
+				// Set our state to let the caller of Poll() which triggered this know they have something
+				// We're basically finished so prepare our OOB return values and log some info if we can
+				logger.Debugf("descriptorFragmentHandler/controlResponse: received for sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
+				control.Results.ControlResponse = controlResponse
+				control.Results.IsPollComplete = true
+				return
+			} else if controlResponse.Code == codecs.ControlResponseCode.ERROR {
+				// Unexpected so log but we deal with it in the parent
+				logger.Debugf("ControlResponse error ERROR: %s\n%#v", controlResponse.ErrorMessage, controlResponse)
+				control.Results.ControlResponse = controlResponse
+				control.Results.IsPollComplete = true
+				return
+			} else {
+				logger.Debugf("descriptorFragmentHandler/controlResponse ignoring sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
+			}
 		}
 
 	case codecIds.recordingSignalEvent:
@@ -831,10 +829,6 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 		if descriptorCount == 0 {
 			logger.Debugf("PollForDescriptors(%d:%d) idling with %d of %d", correlationID, sessionID, control.Results.FragmentsReceived, fragmentsWanted)
 			control.archive.Options.IdleStrategy.Idle(0)
-		} else {
-			// Otherwise we have received everything and we're done
-			logger.Debugf("PollForDescriptors(%d/%d) complete at %d of %d (fragments:%d)", correlationID, sessionID, control.Results.FragmentsReceived, fragmentsWanted, fragments)
-			return nil
 		}
 
 	}
