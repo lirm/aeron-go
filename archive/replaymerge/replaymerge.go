@@ -88,10 +88,10 @@ func NewReplayMerge(
 	recordingId int64,
 	startPosition int64,
 	mergeProgressTimeoutMs int64) (rm *ReplayMerge, err error) {
-	if strings.HasPrefix(subscription.Channel(), aeron.IpcMedia) ||
-		strings.HasPrefix(replayChannel, aeron.IpcMedia) ||
-		strings.HasPrefix(replayDestination, aeron.IpcMedia) ||
-		strings.HasPrefix(liveDestination, aeron.IpcMedia) {
+	if strings.HasPrefix(subscription.Channel(), aeron.IpcChannel) ||
+		strings.HasPrefix(replayChannel, aeron.IpcChannel) ||
+		strings.HasPrefix(replayDestination, aeron.IpcChannel) ||
+		strings.HasPrefix(liveDestination, aeron.IpcChannel) {
 		err = fmt.Errorf("IPC merging is not supported")
 		return
 	}
@@ -290,10 +290,10 @@ func (rm *ReplayMerge) getRecordingPosition(nowMs int64) (workCount int, err err
 		return
 	}
 	if success {
-		nextTargetPosition := rm.polledRelevantId()
+		rm.nextTargetPosition = rm.polledRelevantId()
 		rm.activeCorrelationId = aeron.NullValue
 
-		if archive.RecordingPositionNull == nextTargetPosition {
+		if archive.RecordingPositionNull == rm.nextTargetPosition {
 			correlationId := rm.archive.Aeron().NextCorrelationID()
 
 			if rm.archive.Proxy.StopPositionRequest(correlationId, rm.recordingId) == nil {

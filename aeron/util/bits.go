@@ -77,6 +77,7 @@ func IsPowerOfTwo(value int64) bool {
 }
 
 // Memcpy will copy length bytes from pointer src to dest
+//go:nocheckptr
 func Memcpy(dest uintptr, src uintptr, length int32) {
 	var i int32
 

@@ -264,6 +264,18 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.Control.Subscription = <-archive.aeron.AddSubscription(archive.Options.ResponseChannel, archive.Options.ResponseStream)
 	logger.Debugf("Control response subscription: %#v", archive.Control.Subscription)
 
+	start := time.Now()
+	responseChannel := archive.Control.Subscription.TryResolveChannelEndpointPort()
+	for responseChannel == "" {
+		archive.Options.IdleStrategy.Idle(0)
+		responseChannel = archive.Control.Subscription.TryResolveChannelEndpointPort()
+		if time.Since(start) > archive.Options.Timeout {
+			err = fmt.Errorf("Resolving channel endpoint for %s failed", archive.Control.Subscription.Channel())
+			logger.Errorf(err.Error())
+			return nil, err
+		}
+	}
+
 	// Create the publication half for the proxy that looks after sending requests on that
 	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Options.RequestChannel, archive.Options.RequestStream)
 	logger.Debugf("Proxy request publication: %#v", archive.Proxy.Publication)
@@ -277,18 +289,18 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 
 	// Use Auth if requested
 	if archive.Options.AuthEnabled {
-		if err := archive.Proxy.AuthConnectRequest(correlationID, archive.Options.ResponseStream, archive.Options.ResponseChannel, archive.Options.AuthCredentials); err != nil {
+		if err := archive.Proxy.AuthConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel, archive.Options.AuthCredentials); err != nil {
 			logger.Errorf("AuthConnectRequest failed: %s", err)
 			return nil, err
 		}
 	} else {
-		if err := archive.Proxy.ConnectRequest(correlationID, archive.Options.ResponseStream, archive.Options.ResponseChannel); err != nil {
+		if err := archive.Proxy.ConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel); err != nil {
 			logger.Errorf("ConnectRequest failed: %s", err)
 			return nil, err
 		}
 	}
 
-	start := time.Now()
+	start = time.Now()
 	pollContext := PollContext{archive.Control, correlationID}
 
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {

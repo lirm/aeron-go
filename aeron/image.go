@@ -68,6 +68,7 @@ func (image *Image) IsClosed() bool {
 	return image.isClosed.Get()
 }
 
+//go:norace
 func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	if image.IsClosed() {
 		return 0

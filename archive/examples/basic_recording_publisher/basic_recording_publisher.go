@@ -62,7 +62,7 @@ func main() {
 	}
 	defer arch.Close()
 
-	channel := *examples.Config.SampleChannel + "|ssc=true"
+	channel := *examples.Config.MdcChannel + "|ssc=true"
 	stream := int32(*examples.Config.SampleStream)
 
 	if _, err := arch.StartRecording(channel, stream, true, true); err != nil {

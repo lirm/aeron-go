@@ -185,6 +185,7 @@ func (sub *Subscription) ControlledPoll(handler term.ControlledFragmentHandler, 
 	return fragmentsRead
 }
 
+//go:norace
 func (sub *Subscription) hasImage(sessionID int32) bool {
 	img := sub.images.Get()
 	for _, image := range img {
@@ -195,6 +196,7 @@ func (sub *Subscription) hasImage(sessionID int32) bool {
 	return false
 }
 
+//go:norace
 func (sub *Subscription) addImage(image *Image) *[]Image {
 
 	images := sub.images.Get()
@@ -204,6 +206,7 @@ func (sub *Subscription) addImage(image *Image) *[]Image {
 	return &images
 }
 
+//go:norace
 func (sub *Subscription) removeImage(correlationID int64) *Image {
 
 	img := sub.images.Get()

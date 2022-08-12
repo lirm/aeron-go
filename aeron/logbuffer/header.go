@@ -30,6 +30,7 @@ type Header struct {
 	positionBitsToShift int32
 }
 
+//go:norace
 func (hdr *Header) Wrap(ptr unsafe.Pointer, length int32) *Header {
 	hdr.buffer.Wrap(ptr, length)
 	return hdr
