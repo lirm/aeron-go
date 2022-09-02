@@ -1,8 +1,9 @@
 package logging
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -32,5 +33,4 @@ func TestLogLevels(t *testing.T) {
 	logger.Warning("Log at Warning")
 	logger.Info("Log at Info")
 	logger.Debug("Log at Debug") // Silent
-
 }

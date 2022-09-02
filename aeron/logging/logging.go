@@ -20,9 +20,10 @@
 package logging
 
 import (
+	"sync"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"sync"
 )
 
 // Zaplogger is a container to wrap zap logging with the parts of the go-logging API we use
@@ -49,12 +50,26 @@ const (
 // mechanism for that
 var namedLoggers sync.Map // [string]*ZapLogger
 
+// Default config
+var defaultConfig = zap.Config{
+	Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
+	Development: false,
+	Sampling: &zap.SamplingConfig{
+		Initial:    100,
+		Thereafter: 100,
+	},
+	Encoding:         "console",
+	EncoderConfig:    newAeronEncoderConfig(),
+	OutputPaths:      []string{"stderr"},
+	ErrorOutputPaths: []string{"stderr"},
+}
+
 // MustGetLogger returns a new logger or panic()s
 func MustGetLogger(name string) *ZapLogger {
 	z := new(ZapLogger)
 	z.name = name
 
-	z.config = aeronLoggingConfig()
+	z.config = defaultConfig
 	logger, err := z.config.Build()
 	if err != nil {
 		panic("Failed to make logger")
@@ -86,20 +101,23 @@ func newAeronEncoderConfig() zapcore.EncoderConfig {
 	}
 }
 
-// Default config
-func aeronLoggingConfig() zap.Config {
-	return zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
-		Development: false,
-		Sampling: &zap.SamplingConfig{
-			Initial:    100,
-			Thereafter: 100,
-		},
-		Encoding:         "console",
-		EncoderConfig:    newAeronEncoderConfig(),
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
+func SetConfigAndRebuildAllLoggers(c zap.Config) {
+	defaultConfig = c
+	namedLoggers.Range(func(key, value interface{}) bool {
+		name := key.(string)
+		current := key.(*ZapLogger)
+
+		current.config = defaultConfig
+		logger, err := current.config.Build()
+		if err != nil {
+			return false
+		}
+
+		current.logger = logger.Named(name)
+		current.sugar = current.logger.Sugar()
+
+		return true
+	})
 }
 
 // SetConfigAndRebuild so you can replace the default config
