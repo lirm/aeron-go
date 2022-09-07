@@ -180,6 +180,7 @@ func (rm *ReplayMerge) DoWork() (workCount int, err error) {
 			return
 		}
 		if err = rm.checkProgress(nowMs); err != nil {
+			rm.setState(StateFailed)
 			return
 		}
 	case StateGetRecordingPosition:
@@ -189,6 +190,7 @@ func (rm *ReplayMerge) DoWork() (workCount int, err error) {
 			return
 		}
 		if err = rm.checkProgress(nowMs); err != nil {
+			rm.setState(StateFailed)
 			return
 		}
 	case StateReplay:
@@ -198,6 +200,7 @@ func (rm *ReplayMerge) DoWork() (workCount int, err error) {
 			return
 		}
 		if err = rm.checkProgress(nowMs); err != nil {
+			rm.setState(StateFailed)
 			return
 		}
 	case StateCatchup:
@@ -207,6 +210,7 @@ func (rm *ReplayMerge) DoWork() (workCount int, err error) {
 			return
 		}
 		if err = rm.checkProgress(nowMs); err != nil {
+			rm.setState(StateFailed)
 			return
 		}
 	case StateAttemptLiveJoin:
@@ -216,6 +220,7 @@ func (rm *ReplayMerge) DoWork() (workCount int, err error) {
 			return
 		}
 		if err = rm.checkProgress(nowMs); err != nil {
+			rm.setState(StateFailed)
 			return
 		}
 	}
