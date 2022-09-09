@@ -272,7 +272,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 		if time.Since(start) > archive.Options.Timeout {
 			err = fmt.Errorf("Resolving channel endpoint for %s failed", archive.Control.Subscription.Channel())
 			logger.Errorf(err.Error())
-			return nil, err
+			return archive, err
 		}
 	}
 
@@ -291,12 +291,12 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	if archive.Options.AuthEnabled {
 		if err := archive.Proxy.AuthConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel, archive.Options.AuthCredentials); err != nil {
 			logger.Errorf("AuthConnectRequest failed: %s", err)
-			return nil, err
+			return archive, err
 		}
 	} else {
 		if err := archive.Proxy.ConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel); err != nil {
 			logger.Errorf("ConnectRequest failed: %s", err)
-			return nil, err
+			return archive, err
 		}
 	}
 
