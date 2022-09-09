@@ -193,6 +193,12 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.aeron = new(aeron.Aeron)
 	archive.aeronContext = context
 
+	defer func() {
+		if err != nil {
+			archive.Close()
+		}
+	}()
+
 	// Use the provided options or use our defaults
 	if options != nil {
 		archive.Options = options
@@ -257,7 +263,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	// Connect the underlying aeron
 	archive.aeron, err = aeron.Connect(archive.aeronContext)
 	if err != nil {
-		return archive, err
+		return nil, err
 	}
 
 	// and then the subscription, it's poller and initiate a connection
@@ -272,7 +278,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 		if time.Since(start) > archive.Options.Timeout {
 			err = fmt.Errorf("Resolving channel endpoint for %s failed", archive.Control.Subscription.Channel())
 			logger.Errorf(err.Error())
-			return archive, err
+			return nil, err
 		}
 	}
 
@@ -291,12 +297,12 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	if archive.Options.AuthEnabled {
 		if err := archive.Proxy.AuthConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel, archive.Options.AuthCredentials); err != nil {
 			logger.Errorf("AuthConnectRequest failed: %s", err)
-			return archive, err
+			return nil, err
 		}
 	} else {
 		if err := archive.Proxy.ConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel); err != nil {
 			logger.Errorf("ConnectRequest failed: %s", err)
-			return archive, err
+			return nil, err
 		}
 	}
 
@@ -338,10 +344,20 @@ func (archive *Archive) Close() error {
 	archive.mtx.Lock()
 	defer archive.mtx.Unlock()
 
-	archive.Proxy.CloseSessionRequest()
-	archive.Proxy.Publication.Close()
-	archive.Control.Subscription.Close()
-	return archive.aeron.Close()
+	if archive.Proxy.Publication != nil {
+		archive.Proxy.CloseSessionRequest()
+		archive.Proxy.Publication.Close()
+	}
+
+	if archive.Control.Subscription != nil {
+		archive.Control.Subscription.Close()
+	}
+
+	if archive.aeron != nil {
+		return archive.aeron.Close()
+	}
+
+	return nil
 }
 
 // Aeron returns the archive's aeron client.
