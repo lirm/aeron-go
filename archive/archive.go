@@ -295,12 +295,12 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 
 	// Use Auth if requested
 	if archive.Options.AuthEnabled {
-		if err := archive.Proxy.AuthConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel, archive.Options.AuthCredentials); err != nil {
+		if err = archive.Proxy.AuthConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel, archive.Options.AuthCredentials); err != nil {
 			logger.Errorf("AuthConnectRequest failed: %s", err)
 			return nil, err
 		}
 	} else {
-		if err := archive.Proxy.ConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel); err != nil {
+		if err = archive.Proxy.ConnectRequest(correlationID, archive.Options.ResponseStream, responseChannel); err != nil {
 			logger.Errorf("ConnectRequest failed: %s", err)
 			return nil, err
 		}
@@ -328,8 +328,9 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 		}
 	}
 
-	if archive.Control.State.err != nil {
-		logger.Errorf("Connect failed: %s", archive.Control.State.err)
+	if err = archive.Control.State.err; err != nil {
+		logger.Errorf("Connect failed: %s", err)
+		return nil, err
 	} else if archive.Control.State.state != ControlStateConnected {
 		logger.Error("Connect failed")
 	} else {
