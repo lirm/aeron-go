@@ -288,8 +288,17 @@ func (sub *Subscription) ResolvedEndpoint() string {
 // TryResolveChannelEndpointPort resolves the channel endpoint and replaces it with the port from the
 // ephemeral range when 0 was provided. If there are no addresses, or if there is more than one, returned from
 // LocalSocketAddresses() then the original channel is returned.
+// If the channel media is ipc, then skip checking channel status and just return the channel
 // If the channel is not ACTIVE, then empty string will be returned.
 func (sub *Subscription) TryResolveChannelEndpointPort() string {
+	uri, err := ParseChannelUri(sub.channel)
+	if err != nil {
+		logger.Warningf("error parsing channel (%s): %v", sub.channel, err)
+		return ""
+	}
+	if uri.IsIpc() {
+		return sub.channel
+	}
 	if sub.ChannelStatus() != ChannelStatusActive {
 		return ""
 	}
@@ -297,11 +306,7 @@ func (sub *Subscription) TryResolveChannelEndpointPort() string {
 	if len(localSocketAddresses) != 1 {
 		return sub.channel
 	}
-	uri, err := ParseChannelUri(sub.channel)
-	if err != nil {
-		logger.Warningf("error parsing channel (%s): %v", sub.channel, err)
-		return sub.channel
-	}
+
 	endpoint := uri.Get("endpoint")
 	if strings.HasSuffix(endpoint, ":0") {
 		resolvedEndpoint := localSocketAddresses[0]

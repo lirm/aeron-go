@@ -270,7 +270,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 		archive.Options.IdleStrategy.Idle(0)
 		responseChannel = archive.Control.Subscription.TryResolveChannelEndpointPort()
 		if time.Since(start) > archive.Options.Timeout {
-			err = fmt.Errorf("Resolving channel endpoint for %s failed", archive.Control.Subscription.Channel())
+			err = fmt.Errorf("resolving channel endpoint for %s failed", archive.Control.Subscription.Channel())
 			logger.Errorf(err.Error())
 			return nil, err
 		}
