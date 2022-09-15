@@ -1,0 +1,88 @@
+version: '3'
+
+includes:
+  examples: ./build/taskfile/examples_taskfile.yml
+
+tasks:
+  mod:
+    cmds:
+      - go mod tidy
+      - go mod vendor
+
+  lint:
+    cmds:
+      - golangci-lint run
+
+  fmt:
+    cmds:
+      - goimports -w $(find . -name '*.go' -not -wholename './vendor/*')
+      - gofmt -l -s -w $(find . -name '*.go' -not -wholename './vendor/*')
+
+  test-aeron:
+    desc: "Test aeron package"
+    dir: ./aeron
+    cmds:
+      - go test -v ./...
+    sources:
+      - ./**/*.go
+
+  test-archive:
+    desc: "Test archive package"
+    dir: ./archive
+    cmds:
+      - go test -v ./...
+    sources:
+      - ./**/*.go
+
+  test-cluster:
+    desc: "Test cluster package"
+    dir: ./cluster
+    cmds:
+      - go test -v ./...
+    sources:
+      - ./**/*.go
+
+  test:
+    desc: "Test all packages"
+    deps: [ test-aeron,  test-archive,  test-cluster ]
+
+  compile-aeron:
+    desc: "Create go binaries for aeron package"
+    dir: ./aeron
+    cmds:
+      - go build -v ./...
+    sources:
+      - ./**/*.go
+
+  compile-archive:
+    desc: "Create go binaries for archive package"
+    dir: ./archive
+    cmds:
+      - go build -v ./...
+    sources:
+      - ./**/*.go
+
+  compile-cluster:
+    desc: "Create go binaries for cluster package"
+    dir: ./cluster
+    cmds:
+      - go build -v ./...
+    sources:
+      - ./**/*.go
+
+  compile-examples:
+    desc: "Create go binaries for examples package"
+    cmds:
+      - task examples:compile
+
+  compile:
+    deps: [ compile-aeron,   compile-archive,   compile-cluster,  compile-examples ]
+
+  all:
+    desc: "Test and compile all apps"
+    deps: [ test, compile ]
+
+  clean:
+    desc: "Clear all task cache"
+    cmds:
+      - rm -rf .task

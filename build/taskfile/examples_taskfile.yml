@@ -1,0 +1,80 @@
+version: '3'
+
+tasks:
+  compile-basic_publisher:
+    desc: "Create go binaries for examples/basic_publisher package"
+    cmds:
+      - go build -o ./build/out/basic_publisher ./examples/basic_publisher/basic_publisher.go
+    sources:
+      - ./examples/basic_publisher/basic_publisher.go
+    generates:
+      - ./build/out/basic_publisher
+
+  compile-basic_publisher_claim:
+    desc: "Create go binaries for examples/basic_publisher_claim package"
+    cmds:
+      - go build -o ./build/out/basic_publisher_claim ./examples/basic_publisher_claim/basic_publisher_claim.go
+    sources:
+      - ./examples/basic_publisher_claim/basic_publisher_claim.go
+    generates:
+      - ./build/out/basic_publisher_claim
+
+  compile-basic_rpc:
+    desc: "Create go binaries for examples/basic_rpc package"
+    cmds:
+      - go build -o ./build/out/basic_rpc_client ./examples/basic_rpc/client/basic_client.go
+      - go build -o ./build/out/basic_rpc_server ./examples/basic_rpc/server/basic_server.go
+    sources:
+      - ./examples/basic_rpc/client/basic_client.go
+      - ./examples/basic_rpc/server/basic_server.go
+    generates:
+      - ./build/out/basic_rpc_client
+      - ./build/out/basic_rpc_server
+
+  compile-basic_subscriber:
+    desc: "Create go binaries for examples/basic_subscriber package"
+    cmds:
+      - go build -o ./build/out/basic_subscriber ./examples/basic_subscriber/basic_subscriber.go
+    sources:
+      - ./examples/basic_subscriber/basic_subscriber.go
+    generates:
+      - ./build/out/basic_subscriber
+
+  compile-cluster:
+    desc: "Create go binaries for examples/cluster package"
+    cmds:
+      - go build -o ./build/out/echo_service ./examples/cluster/echo_service.go
+    sources:
+      - ./examples/cluster/echo_service.go
+    generates:
+      - ./build/out/echo_service
+
+  compile-cluster_client:
+    desc: "Create go binaries for examples/cluster_client package"
+    cmds:
+      - go build -o ./build/out/throughput_test_client ./examples/cluster_client/throughput_test_client.go
+    sources:
+      - ./examples/cluster_client/throughput_test_client.go
+    generates:
+      - ./build/out/throughput_test_client
+
+  compile-ping:
+    desc: "Create go binaries for examples/ping package"
+    cmds:
+      - go build -o ./build/out/ping ./examples/ping/ping.go
+    sources:
+      - ./examples/ping/ping.go
+    generates:
+      - ./build/out/ping
+
+  compile-pong:
+    desc: "Create go binaries for examples/pong package"
+    cmds:
+      - go build -o ./build/out/pong ./examples/pong/pong.go
+    sources:
+      - ./examples/pong/pong.go
+    generates:
+      - ./build/out/pong
+
+  compile:
+    deps: [ compile-basic_publisher, compile-basic_publisher_claim, compile-basic_rpc, compile-basic_subscriber, compile-cluster, compile-cluster_client, compile-ping, compile-pong ]

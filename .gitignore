@@ -26,11 +26,10 @@ _testmain.go
 *.pprof
 .idea
 .iml
-examples/pong/pong
-examples/ping/ping
-examples/basic_subscriber/basic_subscriber
-examples/basic_publisher/basic_publisher
-examples/basic_publisher_claim/basic_publisher_claim
 *.bin
 *.iml
 systests/systests
+
+vendor
+.task
+build/out
