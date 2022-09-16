@@ -106,6 +106,9 @@ func (sub *Subscription) ChannelStatus() int {
 	if sub.IsClosed() {
 		return -2
 	}
+	if sub.channelStatusID == -1 { // IPC channels don't have a channel status counter
+		return ChannelStatusActive
+	}
 	return int(sub.conductor.counterReader.GetCounterValue(sub.channelStatusID))
 }
 
