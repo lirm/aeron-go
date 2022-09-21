@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	ChannelStatusErrored      = -1 // Channel has errored. Check logs for information
-	ChannelStatusInitializing = 0  // Channel is being initialized
-	ChannelStatusActive       = 1  // Channel has finished initialization and is active
-	ChannelStatusClosing      = 2  // Channel is being closed
+	ChannelStatusNoIdAllocated = -1 // Channel status counter not allocated for IPC channels
+	ChannelStatusErrored       = -1 // Channel has errored. Check logs for information
+	ChannelStatusInitializing  = 0  // Channel is being initialized
+	ChannelStatusActive        = 1  // Channel has finished initialization and is active
+	ChannelStatusClosing       = 2  // Channel is being closed
 )
 
 // ChannelStatusString provides a convenience method for logging and error handling
@@ -104,7 +105,10 @@ func (sub *Subscription) IsClosed() bool {
 // The status will be ChannelStatusErrored if a socket exception on setup or ChannelStatusActive if all is well.
 func (sub *Subscription) ChannelStatus() int {
 	if sub.IsClosed() {
-		return -2
+		return ChannelStatusNoIdAllocated
+	}
+	if sub.channelStatusID == -1 { // IPC channels don't have a channel status counter
+		return ChannelStatusActive
 	}
 	return int(sub.conductor.counterReader.GetCounterValue(sub.channelStatusID))
 }
