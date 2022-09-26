@@ -237,7 +237,6 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	// Create the listeners and populate
 	archive.Listeners = new(ArchiveListeners)
 	archive.Listeners.ErrorListener = LoggingErrorListener
-	archive.SetAeronErrorHandler(LoggingErrorListener)
 
 	// In Debug mode initialize our listeners with simple loggers
 	// Note that these actually log at INFO so you can do this manually for INFO if you like
@@ -364,11 +363,6 @@ func (archive *Archive) Close() error {
 // Aeron returns the archive's aeron client.
 func (archive *Archive) Aeron() *aeron.Aeron {
 	return archive.aeron
-}
-
-// SetAeronErrorHandler sets the aeron error handler
-func (archive *Archive) SetAeronErrorHandler(handler func(error)) {
-	archive.aeronContext.ErrorHandler(handler)
 }
 
 // SetAeronDir sets the root directory for media driver files
