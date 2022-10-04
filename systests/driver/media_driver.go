@@ -52,7 +52,6 @@ func StartMediaDriver() (*MediaDriver, error) {
 	// If the previous run crashed and so Media Driver didn't clean up the temp dir, `aeron.Connect()` will try to use
 	// it before Media Driver has a chance to execute the "delete on start" code, resulting in a Media Driver crash.
 	// This can be avoided by preemptively deleting the directory.
-
 	timeout := time.Now().Add(5 * time.Second)
 	sleepDuration := 50 * time.Millisecond
 	for removeTempDir() != nil {
