@@ -229,12 +229,34 @@ func (cc *ClientConductor) run(idleStrategy idlestrategy.Idler) {
 			cc.running.Set(false)
 		}
 		cc.conductorRunning.Set(false)
+
+		cc.forceCloseResources()
+
 		logger.Infof("ClientConductor done")
 	}()
 
 	cc.conductorRunning.Set(true)
 	for cc.running.Get() {
 		idleStrategy.Idle(cc.doWork())
+	}
+}
+
+func (cc *ClientConductor) forceCloseResources() {
+	for {
+		select {
+		case r := <-cc.lingeringResources:
+			logger.Debugf("Force closing resource: %v", r)
+			res := r.resource
+			if res != nil {
+				err := res.Close()
+				if err != nil {
+					logger.Warningf("Failed to force close resource: %v", err)
+					cc.onError(err)
+				}
+			}
+		default:
+			break
+		}
 	}
 }
 
