@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +20,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/lirm/aeron-go/systests/driver"
+	"github.com/stretchr/testify/suite"
+	"testing"
 	"time"
 
 	"github.com/lirm/aeron-go/aeron"
@@ -38,6 +42,23 @@ var ExamplesConfig = struct {
 }
 
 var logger = logging.MustGetLogger("systests")
+
+type SysTestSuite struct {
+	suite.Suite
+	mediaDriver *driver.MediaDriver
+}
+
+func (suite *SysTestSuite) SetupSuite() {
+	mediaDriver, err := driver.StartMediaDriver()
+	if err != nil {
+		suite.Fail("Couldn't start Media Driver: ", err)
+	}
+	suite.mediaDriver = mediaDriver
+}
+
+func (suite *SysTestSuite) TearDownSuite() {
+	suite.mediaDriver.StopMediaDriver()
+}
 
 func send(n int, pub *aeron.Publication) {
 	message := "this is a message"
@@ -121,13 +142,12 @@ func logtest(flag bool) {
 }
 
 // TestAeronBasics will check for a simple send/receive scenario.
-// As all systests this assumes a running media driver.
-func testAeronBasics() {
+func (suite *SysTestSuite) TestAeronBasics() {
 	logger.Debug("Started TestAeronBasics")
 
 	a, err := aeron.Connect(aeron.NewContext())
 	if err != nil {
-		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+		suite.Failf("Failed to connect to driver: %s", err.Error())
 	}
 	defer a.Close()
 
@@ -139,22 +159,19 @@ func testAeronBasics() {
 }
 
 // TestAeronSendMultipleMessages tests sending and receive multiple messages in a row.
-// As all systests this assumes a running media driver.
-func testAeronSendMultipleMessages() {
+func (suite *SysTestSuite) TestAeronSendMultipleMessages() {
 	logger.Debug("Started TestAeronSendMultipleMessages")
 
 	a, err := aeron.Connect(aeron.NewContext())
 	if err != nil {
-		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
+		suite.Failf("Failed to connect to driver: %s", err.Error())
 	}
 	defer a.Close()
 
 	for i := 0; i < 3; i++ {
 		logger.Debugf("NextCorrelationID = %d", a.NextCorrelationID())
 	}
-	if a.NextCorrelationID() == 0 {
-		panic("invalid zero NextCorrelationID")
-	}
+	suite.NotEqual(a.NextCorrelationID(), 0, "invalid zero NextCorrelationID")
 
 	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer pub.Close()
@@ -277,18 +294,14 @@ func testAeronClose() {
 	a.Close()
 }
 
-func main() {
+func TestSuiteMain(t *testing.T) {
 	flag.Parse()
-
 	logtest(*ExamplesConfig.LoggingOn)
-
-	testAeronBasics()
+	suite.Run(t, new(SysTestSuite))
 
 	//testAeronClose()
 
 	//testAeronResubscribe()
-
-	testAeronSendMultipleMessages()
 
 	//testAeronSendMultiplePublications()
 
