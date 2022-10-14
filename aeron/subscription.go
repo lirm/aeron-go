@@ -18,6 +18,7 @@ limitations under the License.
 package aeron
 
 import (
+	ctr "github.com/lirm/aeron-go/aeron/counters"
 	"strings"
 
 	"github.com/lirm/aeron-go/aeron/atomic"
@@ -56,10 +57,17 @@ const (
 )
 const LocalSocketAddressStatusCounterTypeId = 14
 
+type ReceivingConductor interface {
+	CounterReader() *ctr.Reader
+	releaseSubscription(regID int64, images []Image)
+	AddRcvDestination(registrationID int64, endpointChannel string)
+	RemoveRcvDestination(registrationID int64, endpointChannel string)
+}
+
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and
 // stream ID combination.
 type Subscription struct {
-	conductor       *ClientConductor
+	conductor       ReceivingConductor
 	channel         string
 	roundRobinIndex int
 	registrationID  int64
@@ -72,7 +80,7 @@ type Subscription struct {
 }
 
 // NewSubscription is a factory method to create new subscription to be added to the media driver
-func NewSubscription(conductor *ClientConductor, channel string, registrationID int64, streamID int32, channelStatusID int32) *Subscription {
+func NewSubscription(conductor ReceivingConductor, channel string, registrationID int64, streamID int32, channelStatusID int32) *Subscription {
 	sub := new(Subscription)
 	sub.images = NewImageList()
 	sub.conductor = conductor
@@ -110,7 +118,7 @@ func (sub *Subscription) ChannelStatus() int {
 	if sub.channelStatusID == -1 { // IPC channels don't have a channel status counter
 		return ChannelStatusActive
 	}
-	return int(sub.conductor.counterReader.GetCounterValue(sub.channelStatusID))
+	return int(sub.conductor.CounterReader().GetCounterValue(sub.channelStatusID))
 }
 
 // ChannelStatusId returns the counter ID used to represent the channel status of this Subscription.
@@ -260,7 +268,7 @@ func (sub *Subscription) ImageCount() int {
 func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
 	img := sub.images.Get()
 	for _, image := range img {
-		if image.sessionID == sessionID {
+		if image.SessionID() == sessionID {
 			return &image
 		}
 	}
@@ -322,7 +330,7 @@ func (sub *Subscription) LocalSocketAddresses() []string {
 		return nil
 	}
 	var bindings []string
-	reader := sub.conductor.counterReader
+	reader := sub.conductor.CounterReader()
 	reader.ScanForType(LocalSocketAddressStatusCounterTypeId, func(counterId int32, keyBuffer *atomic.Buffer) bool {
 		channelStatusId := keyBuffer.GetInt32(ChannelStatusIdOffset)
 		length := keyBuffer.GetInt32(LocalSocketAddressLengthOffset)

@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,151 +18,89 @@ limitations under the License.
 package logbuffer
 
 import (
-	"fmt"
-	"testing"
-	"unsafe"
-
 	"github.com/lirm/aeron-go/aeron/atomic"
-	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/aeron/util"
 	"github.com/lirm/aeron-go/aeron/util/memmap"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"os"
+	"testing"
 )
-
-func prepareFile(t *testing.T) *LogBuffers {
-	logging.SetLevel(logging.INFO, "logbuffers")
-	logging.SetLevel(logging.INFO, "memmap")
-	fname := "logbuffers.bin"
-
-	var logLength = (TermMinLength * PartitionCount) + LogMetaDataLength
-	mmap, err := memmap.NewFile(fname, 0, int(logLength))
-	if err != nil {
-		t.Error(err.Error())
-		return nil
-	}
-	basePtr := uintptr(mmap.GetMemoryPtr())
-	ptr := unsafe.Pointer(basePtr + uintptr(int64(logLength-LogMetaDataLength)))
-	buf := atomic.MakeBuffer(ptr, LogMetaDataLength)
-
-	var meta LogBufferMetaData
-	meta.Wrap(buf, 0)
-
-	meta.TermLen.Set(1024)
-
-	mmap.Close()
-
-	return Wrap(fname)
-}
 
 func TestWrap(t *testing.T) {
 	defer func() {
-		if err := recover(); err != nil {
-			errStr := fmt.Sprintf("Panic: %v", err)
-			logger.Error(errStr)
-			t.FailNow()
-		}
+		err := recover()
+		assert.Nilf(t, err, "Panic: %v", err)
 	}()
 
-	lb := prepareFile(t)
-	if lb != nil {
-		defer lb.Close()
-	} else {
-		t.Fail()
-	}
+	lb, err := NewTestingLogbuffer()
+	defer RemoveTestingLogbufferFile()
+	require.NoError(t, err)
+	lb.Close()
 }
 
 func TestWrapFail(t *testing.T) {
-	defer func() {
-		if err := recover(); err != nil {
-		}
-	}()
-
 	fname := "logbuffers.bin"
 	mmap, err := memmap.NewFile(fname, 0, 16*1024*1024-1)
-	if err != nil {
-		t.Error(err.Error())
-		t.FailNow()
-	}
+	defer os.Remove(fname)
+	require.NoError(t, err)
 	mmap.Close()
 
-	Wrap(fname)
-	t.Fail()
+	assert.Panics(t, func() { Wrap(fname) })
 }
 
 func TestLogBuffers_Buffer(t *testing.T) {
 	defer func() {
-		if err := recover(); err != nil {
-			t.Fatalf("Panic: %v", err)
-		}
+		err := recover()
+		assert.Nilf(t, err, "Panic: %v", err)
 	}()
 
-	lb := prepareFile(t)
-	if lb != nil {
-		defer lb.Close()
-	} else {
-		t.Fail()
-	}
+	lb, err := NewTestingLogbuffer()
+	defer RemoveTestingLogbufferFile()
+	require.NoError(t, err)
+	defer lb.Close()
 
 	for i := 0; i <= PartitionCount; i++ {
-		if nil == lb.Buffer(i) {
-			t.Errorf("nil buffer %d", i)
-		}
+		assert.NotNilf(t, lb.Buffer(i), "buffer %d", i)
 	}
 }
 
 func TestLogBuffers_BufferFail(t *testing.T) {
-	defer func() {
-		if err := recover(); err != nil {
-
-		}
-	}()
-
-	lb := prepareFile(t)
-	if lb != nil {
-		defer lb.Close()
-	} else {
-		t.Fail()
-	}
+	lb, err := NewTestingLogbuffer()
+	defer RemoveTestingLogbufferFile()
+	require.NoError(t, err)
+	defer lb.Close()
 
 	// Index is zero-based
-	lb.Buffer(PartitionCount + 1)
-	t.Fail()
+	assert.Panics(t, func() { lb.Buffer(PartitionCount + 1) })
 }
 
 func TestHeader_ReservedValue(t *testing.T) {
 	bytes := make([]byte, 1000)
 	buffer := atomic.MakeBuffer(bytes)
-	if buffer.Capacity() != 1000 {
-		t.Error("Buffer capacity should be 1000")
-	}
+	assert.Equal(t, buffer.Capacity(), int32(1000))
+
 	var header Header
 	header.Wrap(buffer.Ptr(), 1000)
-	if header.GetReservedValue() != 0 {
-		t.Error("Reserved value should be 0")
-	}
+	assert.Equal(t, header.GetReservedValue(), int64(0))
+
 	header.SetReservedValue(123)
-	if header.GetReservedValue() != 123 {
-		t.Error("Reserved value should be 123")
-	}
+	assert.Equal(t, header.GetReservedValue(), int64(123))
 }
 
 func TestLogBuffers_Meta(t *testing.T) {
 	defer func() {
-		if err := recover(); err != nil {
-			t.Fatalf("Panic: %v", err)
-		}
+		err := recover()
+		assert.Nilf(t, err, "Panic: %v", err)
 	}()
 
-	lb := prepareFile(t)
-	if lb != nil {
-		defer lb.Close()
-	} else {
-		t.Fail()
-	}
+	lb, err := NewTestingLogbuffer()
+	defer RemoveTestingLogbufferFile()
+	require.NoError(t, err)
+	defer lb.Close()
 
 	for i := 0; i <= PartitionCount; i++ {
-		if nil == lb.Buffer(i) {
-			t.Errorf("nil buffer %d", i)
-		}
+		assert.NotNilf(t, lb.Buffer(i), "nil buffer %d", i)
 	}
 
 	meta := lb.Meta()
@@ -175,7 +114,5 @@ func TestLogBuffers_Meta(t *testing.T) {
 	//t.Logf("tailCounter2: %d", meta.TailCounter[2].Get())
 	//t.Logf("defaultFrameHdrLen: %d", meta.DefaultFrameHdrLen.Get())
 
-	if meta.Size() != int(util.CacheLineLength*7) {
-		t.Errorf("Actual size: %d vs %d", meta.Size(), util.CacheLineLength*7)
-	}
+	assert.Equal(t, meta.Size(), int(util.CacheLineLength*7))
 }
