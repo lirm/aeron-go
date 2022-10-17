@@ -32,31 +32,36 @@ const (
 	SessionId       = int32(0x5E55101D)
 )
 
-func FakeFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func fakeFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+}
 
+// If Image is non-nil, caller has to tear down the internal fake logbuffer by calling
+// logbuffer.RemoveTestingLogbufferFile()
+func newTestingImage() (*Image, error) {
+	logbuffers, err := logbuffer.NewTestingLogbuffer()
+	if err != nil {
+		return nil, err
+	}
+	image := NewImage(SessionId, CorrelationId, logbuffers)
+	arr := make([]byte, 64)
+	fakeBuf := atomic.MakeBuffer(arr)
+	image.subscriberPosition = NewPosition(fakeBuf, 0)
+	return image, nil
 }
 
 type SubscriptionTestSuite struct {
 	suite.Suite
-	cc         *MockReceivingConductor
-	sub        *Subscription
-	logbuffers *logbuffer.LogBuffers
-	image      *Image
+	cc    *MockReceivingConductor
+	sub   *Subscription
+	image *Image
 }
 
 func (suite *SubscriptionTestSuite) SetupTest() {
 	suite.cc = new(MockReceivingConductor)
 	suite.sub = NewSubscription(suite.cc, Channel, RegistrationId, StreamId, ChannelStatusId)
-	logbuffers, err := logbuffer.NewTestingLogbuffer()
-	suite.logbuffers = logbuffers
-	// TODO: If error, clean up logbuffer file
+	image, err := newTestingImage()
 	suite.Require().NoError(err)
-	suite.image = NewImage(SessionId, CorrelationId, suite.logbuffers)
-
-	// TODO: Clean up the fake Image code
-	arr := make([]byte, 64)
-	fakeBuf := atomic.MakeBuffer(arr)
-	suite.image.subscriberPosition = NewPosition(fakeBuf, 0)
+	suite.image = image
 }
 
 func (suite *SubscriptionTestSuite) TearDownTest() {
@@ -71,14 +76,18 @@ func (suite *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPol
 }
 
 func (suite *SubscriptionTestSuite) TestShouldReadNothingWhenNoImages() {
-	suite.Assert().Equal(0, suite.sub.Poll(FakeFragmentHandler, 1))
+	suite.Assert().Equal(0, suite.sub.Poll(fakeFragmentHandler, 1))
 }
 
 func (suite *SubscriptionTestSuite) TestShouldReadNothingWhenThereIsNoData() {
 	suite.sub.addImage(suite.image)
 
-	suite.Assert().Equal(0, suite.sub.Poll(FakeFragmentHandler, 1))
+	suite.Assert().Equal(0, suite.sub.Poll(fakeFragmentHandler, 1))
 }
+
+// The Java unittest has a few more test cases:
+// - Reader calls, which requires a fake or interfaced Image dependency injection.
+// - Channel endpoint resolution calls, which requires a fake or interfaced Reader dependency injection.
 
 func TestSubscription(t *testing.T) {
 	suite.Run(t, new(SubscriptionTestSuite))
