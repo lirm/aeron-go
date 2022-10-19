@@ -55,7 +55,7 @@ type ReplayMerge struct {
 	isLiveAdded            bool
 	isReplayActive         bool
 	state                  State
-	image                  *aeron.Image
+	image                  aeron.ImageInterface
 
 	archive           *archive.Archive
 	subscription      *aeron.Subscription
@@ -253,7 +253,7 @@ func (rm *ReplayMerge) HasFailed() bool {
 }
 
 // Image returns the image which is a merge of the replay and live stream.
-func (rm *ReplayMerge) Image() *aeron.Image {
+func (rm *ReplayMerge) Image() aeron.ImageInterface {
 	return rm.image
 }
 

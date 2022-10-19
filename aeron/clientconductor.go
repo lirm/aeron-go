@@ -435,7 +435,7 @@ func waitForMediaDriver(timeOfRegistration int64, cc *ClientConductor) {
 	}
 }
 
-func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
+func (cc *ClientConductor) releaseSubscription(regID int64, images []ImageInterface) {
 	logger.Debugf("ReleaseSubscription: regID=%d", regID)
 
 	cc.verifyDriverIsActive()
@@ -459,7 +459,7 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 			subcnt--
 
 			for i := range images {
-				image := &images[i]
+				image := images[i]
 				if cc.onUnavailableImageHandler != nil {
 					cc.onUnavailableImageHandler(image)
 				}

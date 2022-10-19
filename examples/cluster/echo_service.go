@@ -17,7 +17,7 @@ type EchoService struct {
 	messageCount int32
 }
 
-func (s *EchoService) OnStart(cluster cluster.Cluster, image *aeron.Image) {
+func (s *EchoService) OnStart(cluster cluster.Cluster, image aeron.ImageInterface) {
 	s.cluster = cluster
 	if image == nil {
 		fmt.Printf("OnStart with no image\n")

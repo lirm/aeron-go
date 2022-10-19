@@ -59,7 +59,7 @@ const LocalSocketAddressStatusCounterTypeId = 14
 
 type ReceivingConductor interface {
 	CounterReader() *ctr.Reader
-	releaseSubscription(regID int64, images []Image)
+	releaseSubscription(regID int64, images []ImageInterface)
 	AddRcvDestination(registrationID int64, endpointChannel string)
 	RemoveRcvDestination(registrationID int64, endpointChannel string)
 }
@@ -201,7 +201,7 @@ func (sub *Subscription) ControlledPoll(handler term.ControlledFragmentHandler, 
 func (sub *Subscription) hasImage(sessionID int32) bool {
 	img := sub.images.Get()
 	for _, image := range img {
-		if image.sessionID == sessionID {
+		if image.SessionID() == sessionID {
 			return true
 		}
 	}
@@ -209,21 +209,21 @@ func (sub *Subscription) hasImage(sessionID int32) bool {
 }
 
 //go:norace
-func (sub *Subscription) addImage(image *Image) *[]Image {
+func (sub *Subscription) addImage(image ImageInterface) *[]ImageInterface {
 
 	images := sub.images.Get()
 
-	sub.images.Set(append(images, *image))
+	sub.images.Set(append(images, image))
 
 	return &images
 }
 
 //go:norace
-func (sub *Subscription) removeImage(correlationID int64) *Image {
+func (sub *Subscription) removeImage(correlationID int64) ImageInterface {
 
 	img := sub.images.Get()
 	for ix, image := range img {
-		if image.correlationID == correlationID {
+		if image.CorrelationID() == correlationID {
 			logger.Debugf("Removing image %v for subscription %d", image, sub.registrationID)
 
 			img[ix] = img[len(img)-1]
@@ -231,7 +231,7 @@ func (sub *Subscription) removeImage(correlationID int64) *Image {
 
 			sub.images.Set(img)
 
-			return &image
+			return image
 		}
 	}
 	return nil
@@ -265,11 +265,11 @@ func (sub *Subscription) ImageCount() int {
 }
 
 // ImageBySessionID returns the associated with the given sessionId.
-func (sub *Subscription) ImageBySessionID(sessionID int32) *Image {
+func (sub *Subscription) ImageBySessionID(sessionID int32) ImageInterface {
 	img := sub.images.Get()
 	for _, image := range img {
 		if image.SessionID() == sessionID {
-			return &image
+			return image
 		}
 	}
 	return nil
@@ -368,7 +368,7 @@ func IsConnectedTo(sub *Subscription, pub *Publication) bool {
 	img := sub.images.Get()
 	if sub.channel == pub.channel && sub.streamID == pub.streamID {
 		for _, image := range img {
-			if image.sessionID == pub.sessionID {
+			if image.SessionID() == pub.sessionID {
 				return true
 			}
 		}
