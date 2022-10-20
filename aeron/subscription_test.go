@@ -18,76 +18,94 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"math"
 	"testing"
 )
 
 const (
-	Channel         = "aeron:udp?endpoint=localhost:40124"
-	StreamId        = int32(1002)
-	RegistrationId  = int64(10)
-	ChannelStatusId = int32(100)
-	CorrelationId   = int64(0xC044E1A)
-	SessionId       = int32(0x5E55101D)
+	Channel            = "aeron:udp?endpoint=localhost:40124"
+	StreamId           = int32(1002)
+	RegistrationId     = int64(10)
+	ChannelStatusId    = int32(100)
+	ReadBufferCapacity = 1024
+	FragmentCountLimit = math.MaxInt32
 )
-
-func fakeFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-}
-
-// If Image is non-nil, caller has to tear down the internal fake logbuffer by calling
-// logbuffer.RemoveTestingLogbufferFile()
-func newTestingImage() (*Image, error) {
-	logbuffers, err := logbuffer.NewTestingLogbuffer()
-	if err != nil {
-		return nil, err
-	}
-	image := NewImage(SessionId, CorrelationId, logbuffers)
-	arr := make([]byte, 64)
-	fakeBuf := atomic.MakeBuffer(arr)
-	image.subscriberPosition = NewPosition(fakeBuf, 0)
-	return image, nil
-}
 
 type SubscriptionTestSuite struct {
 	suite.Suite
-	cc    *MockReceivingConductor
-	sub   *Subscription
-	image *Image
+	headerLength        int32 // Effectively a const, but DataFrameHeader declares it in a struct
+	atomicReadBuffer    *atomic.Buffer
+	cc                  *MockReceivingConductor
+	fragmentHandlerMock *term.MockFragmentHandler
+	fragmentHandler     term.FragmentHandler // References the mock's func.  Helps readability
+	imageOne            *MockImage
+	imageTwo            *MockImage
+	header              *logbuffer.Header
+	sub                 *Subscription
 }
 
-func (suite *SubscriptionTestSuite) SetupTest() {
-	suite.cc = new(MockReceivingConductor)
-	suite.sub = NewSubscription(suite.cc, Channel, RegistrationId, StreamId, ChannelStatusId)
-	image, err := newTestingImage()
-	suite.Require().NoError(err)
-	suite.image = image
+func (s *SubscriptionTestSuite) SetupTest() {
+	s.headerLength = logbuffer.DataFrameHeader.Length
+	s.atomicReadBuffer = atomic.MakeBuffer(make([]byte, s.headerLength), s.headerLength)
+	s.cc = NewMockReceivingConductor(s.T())
+	s.fragmentHandlerMock = term.NewMockFragmentHandler(s.T())
+	s.fragmentHandler = s.fragmentHandlerMock.FragmentHandler
+	s.imageOne = NewMockImage(s.T())
+	s.imageTwo = NewMockImage(s.T())
+	s.header = new(logbuffer.Header) // Unused so no need to initialize
+	s.sub = NewSubscription(s.cc, Channel, RegistrationId, StreamId, ChannelStatusId)
 }
 
-func (suite *SubscriptionTestSuite) TearDownTest() {
+func (s *SubscriptionTestSuite) TearDownTest() {
 	logbuffer.RemoveTestingLogbufferFile()
 }
 
-func (suite *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPolling() {
-	suite.cc.On("releaseSubscription", RegistrationId, mock.Anything)
+func (s *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPolling() {
+	s.cc.On("releaseSubscription", RegistrationId, mock.Anything)
 
-	suite.Require().NoError(suite.sub.Close())
-	suite.Assert().True(suite.sub.IsClosed())
+	s.Require().NoError(s.sub.Close())
+	s.Assert().True(s.sub.IsClosed())
 }
 
-func (suite *SubscriptionTestSuite) TestShouldReadNothingWhenNoImages() {
-	suite.Assert().Equal(0, suite.sub.Poll(fakeFragmentHandler, 1))
+func (s *SubscriptionTestSuite) TestShouldReadNothingWhenNoImages() {
+	s.Assert().Equal(0, s.sub.Poll(s.fragmentHandler, 1))
 }
 
-func (suite *SubscriptionTestSuite) TestShouldReadNothingWhenThereIsNoData() {
-	suite.sub.addImage(suite.image)
+func (s *SubscriptionTestSuite) TestShouldReadNothingWhenThereIsNoData() {
+	s.sub.addImage(s.imageOne)
+	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(0)
 
-	suite.Assert().Equal(0, suite.sub.Poll(fakeFragmentHandler, 1))
+	s.Assert().Equal(0, s.sub.Poll(s.fragmentHandler, 1))
 }
 
-// The Java unittest has a few more test cases:
-// - Reader calls, which requires a fake or interfaced Image dependency injection.
-// - Channel endpoint resolution calls, which requires a fake or interfaced Reader dependency injection.
+func (s *SubscriptionTestSuite) TestShouldReadData() {
+	s.sub.addImage(s.imageOne)
+
+	s.fragmentHandlerMock.On("FragmentHandler",
+		s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header)
+
+	s.imageOne.On("Poll", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		handler := args.Get(0).(term.FragmentHandler)
+		handler(s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header)
+	}).Return(1)
+
+	s.Assert().Equal(1, s.sub.Poll(s.fragmentHandler, FragmentCountLimit))
+}
+
+func (s *SubscriptionTestSuite) TestShouldReadDataFromMultipleSources() {
+	s.sub.addImage(s.imageOne)
+	s.sub.addImage(s.imageTwo)
+
+	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(1)
+	s.imageTwo.On("Poll", mock.Anything, mock.Anything).Return(1)
+
+	s.Assert().Equal(2, s.sub.Poll(s.fragmentHandler, FragmentCountLimit))
+}
+
+// TODO: Implement resolveChannel set of tests.
 
 func TestSubscription(t *testing.T) {
 	suite.Run(t, new(SubscriptionTestSuite))
