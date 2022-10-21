@@ -19,6 +19,7 @@ package driver
 import (
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"os"
@@ -37,6 +38,12 @@ const aeronDirDeleteStartPropName = "aeron.dir.delete.on.start"
 // Must match Java's `DIR_DELETE_ON_SHUTDOWN_PROP_NAME`
 const aeronDirDeleteShutdownPropName = "aeron.dir.delete.on.shutdown"
 
+// Must match Java's `CLIENT_LIVENESS_TIMEOUT_PROP_NAME`, measured in nanos
+const aeronClientLivenessTimeoutNs = "aeron.client.liveness.timeout"
+
+// Must match Java's `PUBLICATION_UNBLOCK_TIMEOUT_PROP_NAME`, measured in nanos
+const aeronPublicationUnblockTimeoutNs = "aeron.publication.unblock.timeout"
+
 const jarName = "driver/aeron-all-1.39.0.jar"
 
 const mediaDriverClassName = "io.aeron.driver.MediaDriver"
@@ -44,35 +51,26 @@ const mediaDriverClassName = "io.aeron.driver.MediaDriver"
 var logger = logging.MustGetLogger("systests")
 
 type MediaDriver struct {
-	cmd *exec.Cmd
-	cxn *aeron.Aeron
+	TempDir string
+	cmd     *exec.Cmd
+	cxn     *aeron.Aeron
 }
 
 func StartMediaDriver() (*MediaDriver, error) {
-	// If the previous run crashed and so Media Driver didn't clean up the temp dir, `aeron.Connect()` will try to use
-	// it before Media Driver has a chance to execute the "delete on start" code, resulting in a Media Driver crash.
-	// This can be avoided by preemptively deleting the directory.
-	timeout := time.Now().Add(5 * time.Second)
-	sleepDuration := 50 * time.Millisecond
-	for removeTempDir() != nil {
-		if time.Now().After(timeout) {
-			return nil, errors.New("Couldn't delete temp dir.  Zombie process is probably running")
-		}
-		time.Sleep(sleepDuration)
-	}
-	cmd := setupCmd()
+	tempDir := aeronUniqueTempDir()
+	cmd := setupCmd(tempDir)
 	setupPdeathsig(cmd)
 	if err := cmd.Start(); err != nil {
 		logger.Error("couldn't start Media Driver: ", err)
 		return nil, err
 	}
-	cxn, err := waitForStartup()
+	cxn, err := waitForStartup(tempDir)
 	if err != nil {
 		logger.Error("Media Driver timed out during startup: ", err)
 		killMediaDriver(cmd)
 		return nil, err
 	}
-	return &MediaDriver{cmd, cxn}, nil
+	return &MediaDriver{tempDir, cmd, cxn}, nil
 }
 
 func (mediaDriver MediaDriver) StopMediaDriver() {
@@ -80,13 +78,13 @@ func (mediaDriver MediaDriver) StopMediaDriver() {
 		logger.Error(err)
 	}
 	killMediaDriver(mediaDriver.cmd)
-	if err := removeTempDir(); err != nil {
-		logger.Errorf("Failed to clean up Aeron directories: %s", err)
+	if err := removeTempDir(mediaDriver.TempDir); err != nil {
+		logger.Errorf("Failed to clean up cxn directories: %s", err)
 	}
 }
 
-func removeTempDir() error {
-	return os.RemoveAll(aeronTempDir())
+func removeTempDir(tempDir string) error {
+	return os.RemoveAll(tempDir)
 }
 
 func killMediaDriver(cmd *exec.Cmd) {
@@ -95,18 +93,25 @@ func killMediaDriver(cmd *exec.Cmd) {
 	}
 }
 
-func aeronTempDir() string {
-	return fmt.Sprintf("%s/aeron-%s",
+func aeronUniqueTempDir() string {
+	id := uuid.New().String()
+	return fmt.Sprintf("%s/aeron-%s/%s",
 		aeron.DefaultAeronDir,
-		aeron.UserName)
+		aeron.UserName,
+		id)
 }
 
-func setupCmd() *exec.Cmd {
+func setupCmd(tempDir string) *exec.Cmd {
 	cmd := exec.Command(
 		"java",
-		fmt.Sprintf("-D%s=%s", aeronDirPropName, aeronTempDir()),
+		fmt.Sprintf("-D%s=%s", aeronDirPropName, tempDir),
 		fmt.Sprintf("-D%s=true", aeronDirDeleteStartPropName),
 		fmt.Sprintf("-D%s=true", aeronDirDeleteShutdownPropName),
+		fmt.Sprintf("-D%s=%d", aeronClientLivenessTimeoutNs, time.Minute.Nanoseconds()),
+		fmt.Sprintf("-D%s=%d", aeronPublicationUnblockTimeoutNs, 15*time.Minute.Nanoseconds()),
+		"-XX:+UnlockDiagnosticVMOptions",
+		"-XX:GuaranteedSafepointInterval=300000",
+		"-XX:BiasedLockingStartupDelay=0",
 		"-cp",
 		jarName,
 		mediaDriverClassName,
@@ -129,10 +134,10 @@ func setupPdeathsig(cmd *exec.Cmd) {
 	}
 }
 
-func waitForStartup() (*aeron.Aeron, error) {
+func waitForStartup(tempDir string) (*aeron.Aeron, error) {
 	timeout := time.Now().Add(5 * time.Second)
 	sleepDuration := 50 * time.Millisecond
-	ctx := aeron.NewContext().AeronDir(aeronTempDir()).MediaDriverTimeout(10 * time.Second)
+	ctx := aeron.NewContext().AeronDir(tempDir).MediaDriverTimeout(10 * time.Second)
 	channel := "aeron:ipc"
 	streamID := int32(1)
 	for time.Now().Before(timeout) {
@@ -148,10 +153,6 @@ func waitForStartup() (*aeron.Aeron, error) {
 			return nil, errors.New("timed out waiting for Media Driver publication")
 		case pub := <-pubc:
 			_ = pub.Close()
-			err := cxn.Close()
-			if err != nil {
-				logger.Error("Couldn't close aeron: ", err)
-			}
 			return cxn, nil
 		}
 	}
