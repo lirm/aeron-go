@@ -8,6 +8,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/cluster"
 	"github.com/lirm/aeron-go/cluster/codecs"
 )
@@ -131,6 +132,8 @@ func main() {
 		opts.ClusterDir = "/tmp/aeron-go-poc/cluster"
 	}
 
+	opts.Loglevel = logging.DEBUG
+	opts.ArchiveOptions.AeronLoglevel = logging.DEBUG
 	service := &EchoService{}
 	agent, err := cluster.NewClusteredServiceAgent(ctx, opts, service)
 	if err != nil {
