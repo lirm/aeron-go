@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package systests
 
 import (
 	"flag"
@@ -50,9 +50,7 @@ type SysTestSuite struct {
 
 func (suite *SysTestSuite) SetupSuite() {
 	mediaDriver, err := driver.StartMediaDriver()
-	if err != nil {
-		suite.Fail("Couldn't start Media Driver: ", err)
-	}
+	suite.Require().NoError(err, "Couldn't start Media Driver: ")
 	suite.mediaDriver = mediaDriver
 }
 
@@ -145,7 +143,7 @@ func logtest(flag bool) {
 func (suite *SysTestSuite) TestAeronBasics() {
 	logger.Debug("Started TestAeronBasics")
 
-	a, err := aeron.Connect(aeron.NewContext())
+	a, err := aeron.Connect(aeron.NewContext().AeronDir(suite.mediaDriver.TempDir))
 	if err != nil {
 		suite.Failf("Failed to connect to driver: %s", err.Error())
 	}
@@ -162,7 +160,7 @@ func (suite *SysTestSuite) TestAeronBasics() {
 func (suite *SysTestSuite) TestAeronSendMultipleMessages() {
 	logger.Debug("Started TestAeronSendMultipleMessages")
 
-	a, err := aeron.Connect(aeron.NewContext())
+	a, err := aeron.Connect(aeron.NewContext().AeronDir(suite.mediaDriver.TempDir))
 	if err != nil {
 		suite.Failf("Failed to connect to driver: %s", err.Error())
 	}
@@ -282,7 +280,7 @@ func testResubStress() {
 	}
 }
 
-// TestAeronClose simply tests explicit call to Aeron.Close()
+// TestAeronClose simply tests explicit call to ctx.Close()
 func testAeronClose() {
 	logger.Debug("Started TestAeronClose")
 

@@ -314,7 +314,7 @@ func (cc *ClientConductor) AddExclusivePublication(channel string, streamID int3
 	return regID
 }
 
-func (cc *ClientConductor) FindPublication(regID int64) *Publication {
+func (cc *ClientConductor) FindPublication(regID int64) (*Publication, error) {
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
@@ -341,14 +341,16 @@ func (cc *ClientConductor) FindPublication(regID int64) *Publication {
 					pub.publication = publication
 
 				case RegistrationStatus.ErroredMediaDriver:
-					log.Fatalf("Error on %d: %d: %s", regID, pub.errorCode, pub.errorMessage)
+					err := errors.New(fmt.Sprintf("Error on %d: %d: %s", regID, pub.errorCode, pub.errorMessage))
+					cc.onError(err)
+					return nil, err
 				}
 			}
 			break
 		}
 	}
 
-	return publication
+	return publication, nil
 }
 
 func (cc *ClientConductor) releasePublication(regID int64) {
@@ -399,7 +401,7 @@ func (cc *ClientConductor) AddSubscription(channel string, streamID int32) int64
 	return regID
 }
 
-func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
+func (cc *ClientConductor) FindSubscription(regID int64) (*Subscription, error) {
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
@@ -412,9 +414,9 @@ func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
 			case RegistrationStatus.AwaitingMediaDriver:
 				waitForMediaDriver(sub.timeOfRegistration, cc)
 			case RegistrationStatus.ErroredMediaDriver:
-				errStr := fmt.Sprintf("Error on %d: %d: %s", regID, sub.errorCode, sub.errorMessage)
-				cc.onError(errors.New(errStr))
-				log.Fatalf(errStr)
+				err := errors.New(fmt.Sprintf("Error on %d: %d: %s", regID, sub.errorCode, sub.errorMessage))
+				cc.onError(err)
+				return nil, err
 			}
 
 			subscription = sub.subscription
@@ -422,7 +424,7 @@ func (cc *ClientConductor) FindSubscription(regID int64) *Subscription {
 		}
 	}
 
-	return subscription
+	return subscription, nil
 }
 
 func waitForMediaDriver(timeOfRegistration int64, cc *ClientConductor) {
@@ -866,7 +868,6 @@ func (cc *ClientConductor) closeAllResources(now int64) {
 
 func (cc *ClientConductor) onError(err error) {
 	if cc.errorHandler != nil {
-		logger.Error(err)
 		cc.errorHandler(err)
 	} else {
 		log.Fatal(err)

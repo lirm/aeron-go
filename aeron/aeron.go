@@ -117,15 +117,20 @@ func (aeron *Aeron) AddSubscription(channel string, streamID int32) chan *Subscr
 
 	regID := aeron.conductor.AddSubscription(channel, streamID)
 	go func() {
-		subscription := aeron.conductor.FindSubscription(regID)
-		for subscription == nil {
-			subscription = aeron.conductor.FindSubscription(regID)
-			if subscription == nil {
-				aeron.context.idleStrategy.Idle(0)
+		for {
+			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
+			// FindSubscription can return one of 3 states:
+			// nil, nil: Still waiting, keep polling
+			// subscription, nil: Success, return subscription
+			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
+			subscription, err := aeron.conductor.FindSubscription(regID)
+			if subscription != nil || err != nil {
+				ch <- subscription
+				close(ch)
+				return
 			}
+			aeron.context.idleStrategy.Idle(0)
 		}
-		ch <- subscription
-		close(ch)
 	}()
 
 	return ch
@@ -139,15 +144,20 @@ func (aeron *Aeron) AddPublication(channel string, streamID int32) chan *Publica
 
 	regID := aeron.conductor.AddPublication(channel, streamID)
 	go func() {
-		publication := aeron.conductor.FindPublication(regID)
-		for publication == nil {
-			publication = aeron.conductor.FindPublication(regID)
-			if publication == nil {
-				aeron.context.idleStrategy.Idle(0)
+		for {
+			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
+			// FindPublication can return one of 3 states:
+			// nil, nil: Still waiting, keep polling
+			// publication, nil: Success, return publication
+			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
+			publication, err := aeron.conductor.FindPublication(regID)
+			if publication != nil || err != nil {
+				ch <- publication
+				close(ch)
+				return
 			}
+			aeron.context.idleStrategy.Idle(0)
 		}
-		ch <- publication
-		close(ch)
 	}()
 
 	return ch
@@ -161,15 +171,20 @@ func (aeron *Aeron) AddExclusivePublication(channel string, streamID int32) chan
 
 	regID := aeron.conductor.AddExclusivePublication(channel, streamID)
 	go func() {
-		publication := aeron.conductor.FindPublication(regID)
-		for publication == nil {
-			publication = aeron.conductor.FindPublication(regID)
-			if publication == nil {
-				aeron.context.idleStrategy.Idle(0)
+		for {
+			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
+			// FindPublication can return one of 3 states:
+			// nil, nil: Still waiting, keep polling
+			// publication, nil: Success, return publication
+			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
+			publication, err := aeron.conductor.FindPublication(regID)
+			if publication != nil || err != nil {
+				ch <- publication
+				close(ch)
+				return
 			}
+			aeron.context.idleStrategy.Idle(0)
 		}
-		ch <- publication
-		close(ch)
 	}()
 
 	return ch
