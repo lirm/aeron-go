@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	channel            = "aeron:udp?endpoint=localhost:24325"
 	streamId           = 1001
 	fragmentCountLimit = 10
 	messageLength      = 200
@@ -37,6 +36,7 @@ type BufferClaimMessageTestSuite struct {
 	mediaDriver *driver.MediaDriver
 	connection  *aeron.Aeron
 	errorSink   chan error
+	channel     string
 }
 
 func (suite *BufferClaimMessageTestSuite) SetupSuite() {
@@ -62,19 +62,8 @@ func (suite *BufferClaimMessageTestSuite) TearDownSuite() {
 	suite.mediaDriver.StopMediaDriver()
 }
 
-// TODO: Parameterize this test
 func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithInterleavedAbort() {
-	/*
-		logging.SetLevel(logging.DEBUG, "aeron")
-		logging.SetLevel(logging.DEBUG, "memmap")
-		logging.SetLevel(logging.DEBUG, "driver")
-		logging.SetLevel(logging.DEBUG, "counters")
-		logging.SetLevel(logging.DEBUG, "logbuffers")
-		logging.SetLevel(logging.DEBUG, "buffer")
-		logging.SetLevel(logging.DEBUG, "rb")
-
-	*/
-	var fragmentCount *int32 = new(int32)
+	var fragmentCount = new(int32)
 	fragmentHandler := func(*atomic.Buffer, int32, int32, *logbuffer.Header) {
 		syncatomic.AddInt32(fragmentCount, 1)
 	}
@@ -83,21 +72,21 @@ func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithI
 	arr := make([]byte, messageLength)
 	srcBuffer := atomic.MakeBuffer(arr)
 
-	subscription := <-suite.connection.AddSubscription(channel, streamId)
+	subscription := <-suite.connection.AddSubscription(suite.channel, streamId)
 	suite.Require().NotNil(subscription)
 	defer subscription.Close()
-	publication := <-suite.connection.AddPublication(channel, streamId)
+	publication := <-suite.connection.AddPublication(suite.channel, streamId)
 	suite.Require().NotNil(publication)
 	defer publication.Close()
 
 	suite.publishMessage(srcBuffer, *publication)
 
 	for publication.TryClaim(messageLength, &bufferClaim) < 0 {
-		// TODO: add a timeout
 		time.Sleep(50 * time.Millisecond)
 	}
 
 	suite.publishMessage(srcBuffer, *publication)
+
 	bufferClaim.Abort()
 
 	expectedNumberOfFragments := 2
@@ -105,7 +94,6 @@ func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithI
 	for numFragments < expectedNumberOfFragments {
 		fragments := subscription.Poll(fragmentHandler, fragmentCountLimit)
 		if fragments == 0 {
-			// TODO: add a timeout
 			time.Sleep(50 * time.Millisecond)
 		}
 		numFragments += fragments
@@ -114,13 +102,41 @@ func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithI
 	suite.Assert().EqualValues(expectedNumberOfFragments, syncatomic.LoadInt32(fragmentCount))
 }
 
+func (suite *BufferClaimMessageTestSuite) TestShouldTransferReservedValue() {
+	var bufferClaim logbuffer.Claim
+
+	subscription := <-suite.connection.AddSubscription(suite.channel, streamId)
+	suite.Require().NotNil(subscription)
+	defer subscription.Close()
+	publication := <-suite.connection.AddPublication(suite.channel, streamId)
+	suite.Require().NotNil(publication)
+	defer publication.Close()
+
+	for publication.TryClaim(messageLength, &bufferClaim) < 0 {
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	reservedValue := time.Now().UnixMilli()
+	bufferClaim.SetReservedValue(reservedValue)
+	bufferClaim.Commit()
+
+	fragmentHandler := func(_ *atomic.Buffer, _ int32, length int32, header *logbuffer.Header) {
+		suite.Assert().EqualValues(messageLength, length)
+		suite.Assert().EqualValues(reservedValue, header.GetReservedValue())
+	}
+
+	for 1 != subscription.Poll(fragmentHandler, fragmentCountLimit) {
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 func (suite *BufferClaimMessageTestSuite) publishMessage(srcBuffer *atomic.Buffer, publication aeron.Publication) {
 	for publication.Offer(srcBuffer, 0, messageLength, nil) < 0 {
-		// TODO: add a timeout
 		time.Sleep(50 * time.Millisecond)
 	}
 }
 
 func TestBufferClaimMessage(t *testing.T) {
-	suite.Run(t, new(BufferClaimMessageTestSuite))
+	suite.Run(t, &BufferClaimMessageTestSuite{channel: "aeron:udp?endpoint=localhost:24325"})
+	suite.Run(t, &BufferClaimMessageTestSuite{channel: aeron.IpcChannel})
 }
