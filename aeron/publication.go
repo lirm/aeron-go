@@ -193,16 +193,16 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
 		}
 		if position < limit {
-			var termOffsetA int64
+			var resultingOffset int64
 			var termId int32
 			if length <= pub.maxPayloadLength {
-				termOffsetA, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, reservedValueSupplier)
+				resultingOffset, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, reservedValueSupplier)
 			} else {
 				pub.checkForMaxMessageLength(length)
-				termOffsetA, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, reservedValueSupplier)
+				resultingOffset, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, reservedValueSupplier)
 			}
 
-			newPosition = pub.newPosition(termCount, termOffset, termId, position, termOffsetA)
+			newPosition = pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
 
 		} else {
 			newPosition = pub.backPressureStatus(position, length)
@@ -254,21 +254,21 @@ func (pub *Publication) Offer2(
 			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
 		}
 		if position < limit {
-			var termOffsetA int64
+			var resultingOffset int64
 			var termId int32
 			if length <= pub.maxPayloadLength {
-				termOffsetA, termId = termAppender.AppendUnfragmentedMessage2(
+				resultingOffset, termId = termAppender.AppendUnfragmentedMessage2(
 					bufferOne, offsetOne, lengthOne,
 					bufferTwo, offsetTwo, lengthTwo,
 					reservedValueSupplier)
 			} else {
 				pub.checkForMaxMessageLength(length)
-				termOffsetA, termId = termAppender.AppendFragmentedMessage2(
+				resultingOffset, termId = termAppender.AppendFragmentedMessage2(
 					bufferOne, offsetOne, lengthOne,
 					bufferTwo, offsetTwo, lengthTwo,
 					pub.maxPayloadLength, reservedValueSupplier)
 			}
-			newPosition = pub.newPosition(termCount, termOffset, termId, position, termOffsetA)
+			newPosition = pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
 		} else {
 			newPosition = pub.backPressureStatus(position, length)
 		}
@@ -311,7 +311,8 @@ func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) int
 
 		limit := pub.pubLimit.get()
 		termCount := pub.metaData.ActiveTermCountOff.Get()
-		termAppender := pub.appenders[termCount]
+		termIndex := termCount % logbuffer.PartitionCount
+		termAppender := pub.appenders[termIndex]
 		rawTail := termAppender.RawTail()
 		termOffset := rawTail & 0xFFFFFFFF
 		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
