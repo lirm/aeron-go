@@ -68,14 +68,14 @@ func (suite *SysTestSuite) send(n int, pub *aeron.Publication) {
 		for v <= 0 {
 			v = pub.Offer(srcBuffer, 0, int32(len(message)), nil)
 			if time.Now().After(timeoutAt) {
-				logger.Fatalf("Timed out at %v", time.Now())
+				suite.Fail("Send timed out")
 			}
 			time.Sleep(time.Millisecond)
 		}
 	}
 }
 
-func receive(n int, sub *aeron.Subscription) {
+func (suite *SysTestSuite) receive(n int, sub *aeron.Subscription) {
 	counter := 0
 	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		logger.Debugf("    message: %s", string(buffer.GetBytesArray(offset, length)))
@@ -92,18 +92,13 @@ func receive(n int, sub *aeron.Subscription) {
 				break
 			}
 			if time.Now().After(timeoutAt) {
-				logger.Fatalf("%v: timed out waiting for message", time.Now())
-				break
+				suite.Fail("Receive timed out")
 			}
 			time.Sleep(time.Millisecond)
 		}
 	}
-	if int(fragmentsRead.Get()) != n {
-		logger.Fatalf("Expected %d fragment. Got %d", n, fragmentsRead)
-	}
-	if counter != n {
-		logger.Fatalf("Expected %d message. Got %d", n, counter)
-	}
+	suite.Assert().EqualValues(fragmentsRead.Get(), n)
+	suite.Assert().EqualValues(counter, n)
 }
 
 func (suite *SysTestSuite) subAndSend(n int, a *aeron.Aeron, pub *aeron.Publication) {
@@ -116,7 +111,7 @@ func (suite *SysTestSuite) subAndSend(n int, a *aeron.Aeron, pub *aeron.Publicat
 	}
 
 	suite.send(n, pub)
-	receive(n, sub)
+	suite.receive(n, sub)
 }
 
 func logtest(flag bool) {
@@ -182,7 +177,7 @@ func (suite *SysTestSuite) TestAeronSendMultipleMessages() {
 
 	itCount := 100
 	go suite.send(itCount, pub)
-	receive(itCount, sub)
+	suite.receive(itCount, sub)
 }
 
 // TestAeronSendMultiplePublications tests sending on multiple publications with a sigle
@@ -230,7 +225,7 @@ func (suite *SysTestSuite) NotTestedYet_TestAeronSendMultiplePublications() {
 
 	logger.Debugf(" ==> Got pubs %v", pubs)
 
-	go receive(itCount*pubCount, sub)
+	go suite.receive(itCount*pubCount, sub)
 
 	time.Sleep(200 * time.Millisecond)
 
