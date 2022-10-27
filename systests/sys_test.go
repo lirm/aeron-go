@@ -58,7 +58,7 @@ func (suite *SysTestSuite) TearDownSuite() {
 	suite.mediaDriver.StopMediaDriver()
 }
 
-func send(n int, pub *aeron.Publication) {
+func (suite *SysTestSuite) send(n int, pub *aeron.Publication) {
 	message := "this is a message"
 	srcBuffer := atomic.MakeBuffer(([]byte)(message))
 
@@ -70,7 +70,7 @@ func send(n int, pub *aeron.Publication) {
 			if time.Now().After(timeoutAt) {
 				logger.Fatalf("Timed out at %v", time.Now())
 			}
-			time.Sleep(time.Millisecond * 50)
+			time.Sleep(time.Millisecond)
 		}
 	}
 }
@@ -82,11 +82,11 @@ func receive(n int, sub *aeron.Subscription) {
 		counter++
 	}
 	var fragmentsRead atomic.Int
-	for i := 0; i < n; i++ {
+	for int(fragmentsRead.Get()) < n {
 		timeoutAt := time.Now().Add(time.Second)
 		for {
 			recvd := sub.Poll(handler, 10)
-			if recvd == 1 {
+			if recvd >= 1 {
 				fragmentsRead.Add(int32(recvd))
 				logger.Debugf("  have %d fragments", fragmentsRead)
 				break
@@ -106,7 +106,7 @@ func receive(n int, sub *aeron.Subscription) {
 	}
 }
 
-func subAndSend(n int, a *aeron.Aeron, pub *aeron.Publication) {
+func (suite *SysTestSuite) subAndSend(n int, a *aeron.Aeron, pub *aeron.Publication) {
 	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer sub.Close()
 
@@ -115,7 +115,7 @@ func subAndSend(n int, a *aeron.Aeron, pub *aeron.Publication) {
 		time.Sleep(time.Millisecond)
 	}
 
-	send(n, pub)
+	suite.send(n, pub)
 	receive(n, sub)
 }
 
@@ -153,7 +153,7 @@ func (suite *SysTestSuite) TestAeronBasics() {
 	defer pub.Close()
 	//logger.Debugf("Added publication: %v\n", pub)
 
-	subAndSend(1, a, pub)
+	suite.subAndSend(1, a, pub)
 }
 
 // TestAeronSendMultipleMessages tests sending and receive multiple messages in a row.
@@ -161,15 +161,13 @@ func (suite *SysTestSuite) TestAeronSendMultipleMessages() {
 	logger.Debug("Started TestAeronSendMultipleMessages")
 
 	a, err := aeron.Connect(aeron.NewContext().AeronDir(suite.mediaDriver.TempDir))
-	if err != nil {
-		suite.Failf("Failed to connect to driver: %s", err.Error())
-	}
+	suite.Require().Nil(err, "Failed to connect to driver: %s", err)
 	defer a.Close()
 
 	for i := 0; i < 3; i++ {
 		logger.Debugf("NextCorrelationID = %d", a.NextCorrelationID())
 	}
-	suite.NotEqual(a.NextCorrelationID(), 0, "invalid zero NextCorrelationID")
+	suite.Require().NotEqual(a.NextCorrelationID(), 0, "invalid zero NextCorrelationID")
 
 	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	defer pub.Close()
@@ -183,14 +181,14 @@ func (suite *SysTestSuite) TestAeronSendMultipleMessages() {
 	}
 
 	itCount := 100
-	go send(itCount, pub)
+	go suite.send(itCount, pub)
 	receive(itCount, sub)
 }
 
 // TestAeronSendMultiplePublications tests sending on multiple publications with a sigle
 // subscription receiving. In IPC local mode this will end up with using the same Publication
 // but it's a scenario nonetheless. As all systests this assumes a running media driver.
-func testAeronSendMultiplePublications() {
+func (suite *SysTestSuite) NotTestedYet_TestAeronSendMultiplePublications() {
 	logger.Debug("Started TestAeronSendMultiplePublications")
 
 	//go func() {
@@ -239,7 +237,7 @@ func testAeronSendMultiplePublications() {
 	// Send
 	for i := 0; i < itCount; i++ {
 		for pIx, p := range pubs {
-			send(1, p)
+			suite.send(1, p)
 			logger.Debugf("sent %d to pubs[%d]", i, pIx)
 			logger.Debugf("sent %d to pubs[%d]", i, pIx)
 		}
@@ -248,7 +246,7 @@ func testAeronSendMultiplePublications() {
 }
 
 // TestAeronResubscribe test using different subscriptions with the same publication
-func testAeronResubscribe() {
+func (suite *SysTestSuite) NotTestedYet_TestAeronResubscribe() {
 	logger.Debug("Started TestAeronResubscribe")
 
 	a, err := aeron.Connect(aeron.NewContext())
@@ -259,12 +257,12 @@ func testAeronResubscribe() {
 
 	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 
-	subAndSend(1, a, pub)
-	subAndSend(1, a, pub)
+	suite.subAndSend(1, a, pub)
+	suite.subAndSend(1, a, pub)
 }
 
 // TestResubStress tests sending and receiving when creating a new subscription for each cycle
-func testResubStress() {
+func (suite *SysTestSuite) NotTestedYet_TestResubStress() {
 	logger.Debug("Started TestAeronResubscribe")
 
 	a, err := aeron.Connect(aeron.NewContext())
@@ -275,7 +273,7 @@ func testResubStress() {
 
 	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
 	for i := 0; i < 100; i++ {
-		subAndSend(1, a, pub)
+		suite.subAndSend(1, a, pub)
 		logger.Debugf("bounce %d", i)
 	}
 }
