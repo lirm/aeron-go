@@ -310,8 +310,9 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
 		fragments := archive.Control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 				ConnectionControlFragmentHandler(&pollContext, buf, offset, length, header)
+				return nil
 			}, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragment(s)", fragments)

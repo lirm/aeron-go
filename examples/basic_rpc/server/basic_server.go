@@ -78,7 +78,7 @@ func main() {
 		}
 	}()
 
-	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 		bytes := buffer.GetBytesArray(offset, length)
 
 		c, found := clients[header.SessionId()]
@@ -88,6 +88,7 @@ func main() {
 			}
 			clients[header.SessionId()] = c
 		}
+		return nil
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond}

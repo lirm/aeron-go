@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,9 +25,15 @@ import (
 
 // Read will attempt to read the next frame from the term and invoke the callback if successful.
 // Method will return a tuple of new term offset and number of fragments read
+//
 //go:norace
-func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, fragmentLimit int,
-	header *logbuffer.Header) (int32, int) {
+func Read(
+	termBuffer *atomic.Buffer,
+	termOffset int32,
+	handler FragmentHandler,
+	fragmentLimit int,
+	header *logbuffer.Header,
+	errorHandler func(error)) (int32, int) {
 
 	capacity := termBuffer.Capacity()
 
@@ -41,12 +48,15 @@ func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, 
 		termOffset += util.AlignInt32(frameLength, logbuffer.FrameAlignment)
 
 		if !logbuffer.IsPaddingFrame(termBuffer, fragmentOffset) {
+			fragmentsRead++
 			header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
 			header.SetOffset(fragmentOffset)
-			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
+			err := handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
 				frameLength-logbuffer.DataFrameHeader.Length, header)
-
-			fragmentsRead++
+			if err != nil {
+				errorHandler(err)
+				break
+			}
 		}
 	}
 

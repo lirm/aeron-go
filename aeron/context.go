@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +29,8 @@ type Context struct {
 	aeronDir      string
 	mediaDriverTo time.Duration
 
-	errorHandler func(error)
+	errorHandler           func(error)
+	subscriberErrorHandler func(error)
 
 	newPublicationHandler   NewPublicationHandler
 	newSubscriptionHandler  NewSubscriptionHandler
@@ -49,6 +51,7 @@ func NewContext() *Context {
 	ctx.aeronDir = DefaultAeronDir + "/aeron-" + UserName
 
 	ctx.errorHandler = func(err error) { logger.Error(err) }
+	ctx.subscriberErrorHandler = nil
 
 	ctx.newPublicationHandler = func(string, int32, int32, int64) {}
 	ctx.newSubscriptionHandler = func(string, int32, int64) {}
@@ -69,6 +72,21 @@ func NewContext() *Context {
 func (ctx *Context) ErrorHandler(handler func(error)) *Context {
 	ctx.errorHandler = handler
 	return ctx
+}
+
+// SubscriberErrorHandler sets the error handler which will be used if an error occurs during the callback for poll
+// operations such as `Subscription.poll()`.  The default will be `ErrorHandler()` if not set.
+func (ctx *Context) SubscriberErrorHandler(handler func(error)) *Context {
+	ctx.subscriberErrorHandler = handler
+	return ctx
+}
+
+func (ctx *Context) GetSubscriberErrorHandler() func(error) {
+	if ctx.subscriberErrorHandler == nil {
+		return ctx.errorHandler
+	} else {
+		return ctx.subscriberErrorHandler
+	}
 }
 
 // AeronDir sets the root directory for media driver files

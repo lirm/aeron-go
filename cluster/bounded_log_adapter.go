@@ -39,7 +39,7 @@ func (adapter *boundedLogAdapter) onFragment(
 	offset int32,
 	length int32,
 	header *logbuffer.Header,
-) {
+) error {
 	flags := header.Flags()
 	if (flags & unfragmented) == unfragmented {
 		adapter.onMessage(buffer, offset, length, header)
@@ -61,6 +61,7 @@ func (adapter *boundedLogAdapter) onFragment(
 			adapter.builder.Reset()
 		}
 	}
+	return nil
 }
 
 func (adapter *boundedLogAdapter) onMessage(

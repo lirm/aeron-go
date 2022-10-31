@@ -22,13 +22,15 @@ func (s *EchoService) OnStart(cluster cluster.Cluster, image *aeron.Image) {
 	if image == nil {
 		fmt.Printf("OnStart with no image\n")
 	} else {
-		cnt := image.Poll(func(buf *atomic.Buffer, offset int32, length int32, hdr *logbuffer.Header) {
+		cnt := image.Poll(func(buf *atomic.Buffer, offset int32, length int32, hdr *logbuffer.Header) error {
 			if length == 4 && s.messageCount == 0 {
 				s.messageCount = buf.GetInt32(offset)
 			} else {
+				// TODO: Return a proper error
 				fmt.Printf("WARNING: unexpected snapshot message - pos=%d offset=%d length=%d\n",
 					hdr.Position(), offset, length)
 			}
+			return nil
 		}, 100)
 		fmt.Printf("OnStart with image - snapshotMsgCnt=%d messageCount=%d\n", cnt, s.messageCount)
 	}

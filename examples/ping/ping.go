@@ -85,7 +85,7 @@ func main() {
 
 	hist := hdrhistogram.New(1, 1000000000, 3)
 
-	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 		sent := buffer.GetInt64(offset)
 		now := time.Now().UnixNano()
 
@@ -95,6 +95,7 @@ func main() {
 			logger.Debugf("Received message at offset %d, length %d, position %d, termId %d, frame len %d",
 				offset, length, header.Offset(), header.TermId(), header.FrameLength())
 		}
+		return nil
 	}
 
 	srcBuffer := atomic.MakeBuffer(make([]byte, *examples.ExamplesConfig.Size))

@@ -27,9 +27,9 @@ func (adapter *serviceAdapter) onFragment(
 	offset int32,
 	length int32,
 	header *logbuffer.Header,
-) {
+) error {
 	if length < SBEHeaderLength {
-		return
+		return nil
 	}
 	blockLength := buffer.GetUInt16(offset)
 	templateId := buffer.GetUInt16(offset + 2)
@@ -38,7 +38,8 @@ func (adapter *serviceAdapter) onFragment(
 	if schemaId != ClusterSchemaId {
 		logger.Errorf("serviceAdapter: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
-		return
+		// TODO: Convert to returned error, as is done in the Java ServiceAdapter
+		return nil
 	}
 	offset += SBEHeaderLength
 	length -= SBEHeaderLength
@@ -68,4 +69,5 @@ func (adapter *serviceAdapter) onFragment(
 	default:
 		logger.Debugf("serviceAdapter: unexpected templateId=%d at pos=%d", templateId, header.Position())
 	}
+	return nil
 }

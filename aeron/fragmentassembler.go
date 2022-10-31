@@ -67,7 +67,7 @@ func (f *FragmentAssembler) OnFragment(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
-	header *logbuffer.Header) {
+	header *logbuffer.Header) error {
 	flags := header.Flags()
 	if (flags & unfragmented) == unfragmented {
 		f.delegate(buffer, offset, length, header)
@@ -96,4 +96,5 @@ func (f *FragmentAssembler) OnFragment(
 			}
 		}
 	}
+	return nil
 }

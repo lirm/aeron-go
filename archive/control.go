@@ -352,8 +352,9 @@ func (control *Control) PollForErrorResponse() (int, error) {
 	// Poll for async events, errors etc until the queue is drained
 	for {
 		ret := control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 				errorResponseFragmentHandler(&context, buf, offset, length, header)
+				return nil
 			}, 1)
 		received += ret
 
@@ -373,9 +374,10 @@ func (control *Control) PollForErrorResponse() (int, error) {
 
 // errorResponseFragmentHandler is used to check for errors and async events on an idle control
 // session. Essentially:
-//    ignore messages not on our session ID
-//    process recordingSignalEvents
-//    Log a warning if we have interrupted a synchronous event
+//
+//	ignore messages not on our session ID
+//	process recordingSignalEvents
+//	Log a warning if we have interrupted a synchronous event
 func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	pollContext, ok := context.(*PollContext)
 	if !ok {
@@ -604,8 +606,9 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 	start := time.Now()
 	context := PollContext{control, correlationID}
 
-	handler := aeron.NewFragmentAssembler(func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	handler := aeron.NewFragmentAssembler(func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 		controlFragmentHandler(&context, buf, offset, length, header)
+		return nil
 	}, aeron.DefaultFragmentAssemblyBufferLength)
 	for {
 		ret := control.poll(handler.OnFragment, 10)
@@ -796,8 +799,9 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 	for !control.Results.IsPollComplete {
 		logger.Debugf("PollForDescriptors(%d:%d, %d)", correlationID, sessionID, int(fragmentsWanted)-descriptorCount)
 		fragments := control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 				DescriptorFragmentHandler(&pollContext, buf, offset, length, header)
+				return nil
 			}, int(fragmentsWanted)-descriptorCount)
 		logger.Debugf("Poll(%d:%d) returned %d fragments", correlationID, sessionID, fragments)
 		descriptorCount = len(control.Results.RecordingDescriptors) + len(control.Results.RecordingSubscriptionDescriptors)

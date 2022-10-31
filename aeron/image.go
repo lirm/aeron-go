@@ -26,7 +26,7 @@ import (
 type Image struct {
 	sourceIdentity     string
 	logBuffers         *logbuffer.LogBuffers
-	exceptionHandler   func(error)
+	errorHandler       func(error)
 	termBuffers        [logbuffer.PartitionCount]*atomic.Buffer
 	subscriberPosition Position
 	header             logbuffer.Header
@@ -79,7 +79,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	index := indexByPosition(position, image.positionBitsToShift)
 	termBuffer := image.termBuffers[index]
 
-	offset, result := term.Read(termBuffer, termOffset, handler, fragmentLimit, &image.header)
+	offset, result := term.Read(termBuffer, termOffset, handler, fragmentLimit, &image.header, image.errorHandler)
 
 	newPosition := position + int64(offset-termOffset)
 	if newPosition > position {

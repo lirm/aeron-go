@@ -342,9 +342,9 @@ func (ac *AeronCluster) pollEgress(fragmentLimit int) int {
 	return ac.egressSub.Poll(ac.fragmentAssembler.OnFragment, fragmentLimit)
 }
 
-func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, header *logbuffer.Header) {
+func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, header *logbuffer.Header) error {
 	if length < cluster.SBEHeaderLength {
-		return
+		return nil
 	}
 	blockLength := buffer.GetUInt16(offset)
 	templateId := buffer.GetUInt16(offset + 2)
@@ -353,7 +353,8 @@ func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, 
 	if schemaId != cluster.ClusterSchemaId {
 		logger.Errorf("unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
-		return
+		// TODO: Should return an error
+		return nil
 	}
 	offset += cluster.SBEHeaderLength
 	length -= cluster.SBEHeaderLength
@@ -375,6 +376,7 @@ func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, 
 			logger.Warningf("received challenge, corrId=%d clusterSessionId=%d", e.CorrelationId, e.ClusterSessionId)
 		}
 	}
+	return nil
 }
 
 func (ac *AeronCluster) onNewLeaderEvent(buffer *atomic.Buffer, offset, length int32, version, blockLength uint16) {

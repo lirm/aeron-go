@@ -131,6 +131,7 @@ type ClientConductor struct {
 	onAvailableImageHandler   AvailableImageHandler
 	onUnavailableImageHandler UnavailableImageHandler
 	errorHandler              func(error)
+	subscriberErrorHandler    func(error)
 
 	running          atomic.Bool
 	conductorRunning atomic.Bool
@@ -651,7 +652,7 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 				image.subscriptionRegistrationID = sub.regID
 				image.sourceIdentity = sourceIdentity
 				image.subscriberPosition = NewPosition(cc.counterValuesBuffer, subscriberPositionID)
-				image.exceptionHandler = cc.errorHandler
+				image.errorHandler = cc.subscriberErrorHandler
 				logger.Debugf("OnAvailableImage: new image position: %v -> %d",
 					image.subscriberPosition, image.subscriberPosition.get())
 

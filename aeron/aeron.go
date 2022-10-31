@@ -89,6 +89,7 @@ func Connect(ctx *Context) (*Aeron, error) {
 	aeron.conductor.onNewSubscriptionHandler = ctx.newSubscriptionHandler
 
 	aeron.conductor.errorHandler = ctx.errorHandler
+	aeron.conductor.subscriberErrorHandler = ctx.GetSubscriberErrorHandler()
 
 	aeron.conductor.Start(ctx.idleStrategy)
 

@@ -37,9 +37,9 @@ func (loader *snapshotLoader) onFragment(
 	offset int32,
 	length int32,
 	header *logbuffer.Header,
-) {
+) error {
 	if length < SBEHeaderLength {
-		return
+		return nil
 	}
 	blockLength := buffer.GetUInt16(offset)
 	templateId := buffer.GetUInt16(offset + 2)
@@ -48,7 +48,8 @@ func (loader *snapshotLoader) onFragment(
 	if schemaId != ClusterSchemaId {
 		logger.Errorf("SnapshotLoader: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
-		return
+		// TODO: Convert to returned error, as is done in the Java ServiceSnapshotLoader
+		return nil
 	}
 	offset += SBEHeaderLength
 	length -= SBEHeaderLength
@@ -97,4 +98,5 @@ func (loader *snapshotLoader) onFragment(
 	default:
 		logger.Debugf("SnapshotLoader: unknown templateId=%d at pos=%d", templateId, header.Position())
 	}
+	return nil
 }

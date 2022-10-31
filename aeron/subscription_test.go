@@ -32,7 +32,8 @@ const (
 	SessionId       = int32(0x5E55101D)
 )
 
-func fakeFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func fakeFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+	return nil
 }
 
 // If Image is non-nil, caller has to tear down the internal fake logbuffer by calling
