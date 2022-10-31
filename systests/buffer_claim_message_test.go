@@ -20,7 +20,6 @@ import (
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/systests/driver"
 	"github.com/stretchr/testify/suite"
-	syncatomic "sync/atomic"
 	"testing"
 	"time"
 )
@@ -63,9 +62,9 @@ func (suite *BufferClaimMessageTestSuite) TearDownSuite() {
 }
 
 func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithInterleavedAbort() {
-	var fragmentCount = new(int32)
+	fragmentCount := 0
 	fragmentHandler := func(*atomic.Buffer, int32, int32, *logbuffer.Header) {
-		syncatomic.AddInt32(fragmentCount, 1)
+		fragmentCount++
 	}
 
 	var bufferClaim logbuffer.Claim
@@ -99,7 +98,7 @@ func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithI
 		numFragments += fragments
 	}
 
-	suite.Assert().EqualValues(expectedNumberOfFragments, syncatomic.LoadInt32(fragmentCount))
+	suite.Assert().EqualValues(expectedNumberOfFragments, fragmentCount)
 }
 
 func (suite *BufferClaimMessageTestSuite) TestShouldTransferReservedValue() {
