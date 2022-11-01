@@ -255,7 +255,7 @@ func (cc *ClientConductor) forceCloseResources() {
 				}
 			}
 		default:
-			break
+			return
 		}
 	}
 }
