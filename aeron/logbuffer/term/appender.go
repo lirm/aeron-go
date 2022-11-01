@@ -101,19 +101,18 @@ func (appender *Appender) getAndAddRawTail(alignedLength int32) int64 {
 }
 
 // Claim is the interface for using Buffer Claims for zero copy sends
-func (appender *Appender) Claim(length int32, claim *logbuffer.Claim) (termOffset int64, termID int32) {
+func (appender *Appender) Claim(length int32, claim *logbuffer.Claim) (resultingOffset int64, termID int32) {
 
 	frameLength := length + logbuffer.DataFrameHeader.Length
 	alignedLength := util.AlignInt32(frameLength, logbuffer.FrameAlignment)
 	rawTail := appender.getAndAddRawTail(alignedLength)
-	termOffset = rawTail & 0xFFFFFFFF
-
 	termLength := appender.termBuffer.Capacity()
 
 	termID = logbuffer.TermID(rawTail)
-	termOffset += int64(alignedLength)
-	if termOffset > int64(termLength) {
-		termOffset = handleEndOfLogCondition(termID, appender.termBuffer, int32(termOffset),
+	termOffset := rawTail & 0xFFFFFFFF
+	resultingOffset = termOffset + int64(alignedLength)
+	if resultingOffset > int64(termLength) {
+		resultingOffset = handleEndOfLogCondition(termID, appender.termBuffer, int32(termOffset),
 			&appender.headerWriter, termLength)
 	} else {
 		offset := int32(termOffset)
@@ -121,7 +120,7 @@ func (appender *Appender) Claim(length int32, claim *logbuffer.Claim) (termOffse
 		claim.Wrap(appender.termBuffer, offset, frameLength)
 	}
 
-	return termOffset, termID
+	return resultingOffset, termID
 }
 
 // AppendUnfragmentedMessage appends an unfragmented message in a single frame to the term
@@ -141,7 +140,7 @@ func (appender *Appender) AppendUnfragmentedMessage(srcBuffer *atomic.Buffer, sr
 			&appender.headerWriter, termLength)
 	} else {
 		offset := int32(termOffset)
-		appender.headerWriter.write(appender.termBuffer, offset, frameLength, logbuffer.TermID(rawTail))
+		appender.headerWriter.write(appender.termBuffer, offset, frameLength, termID)
 		appender.termBuffer.PutBytes(offset+logbuffer.DataFrameHeader.Length, srcBuffer, srcOffset, length)
 
 		if nil != reservedValueSupplier {
@@ -247,7 +246,7 @@ func (appender *Appender) AppendFragmentedMessage(srcBuffer *atomic.Buffer, srcO
 }
 
 // AppendFragmentedMessage2 appends the given pair of buffers (with combined length greater than max frame length)
-//  as a batch of fragments
+// as a batch of fragments
 func (appender *Appender) AppendFragmentedMessage2(
 	srcBufferOne *atomic.Buffer, srcOffsetOne int32, lengthOne int32,
 	srcBufferTwo *atomic.Buffer, srcOffsetTwo int32, lengthTwo int32,
