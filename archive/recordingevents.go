@@ -49,8 +49,9 @@ func (rea *RecordingEventsAdapter) PollWithContext(handler FragmentHandlerWithLi
 		fragmentLimit = 1
 	}
 	return rea.Subscription.Poll(
-		func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+		func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 			handler(rea.archive.Listeners, buf, offset, length, header)
+			return nil
 		}, fragmentLimit)
 }
 

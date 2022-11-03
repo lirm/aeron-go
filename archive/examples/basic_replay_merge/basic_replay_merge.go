@@ -96,10 +96,11 @@ func main() {
 	defer subscription.Close()
 
 	counter := 0
-	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 		bytes := buffer.GetBytesArray(offset, length)
 		logger.Infof("Message: %s", bytes)
 		counter++
+		return nil
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}

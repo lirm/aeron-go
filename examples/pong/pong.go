@@ -93,12 +93,13 @@ func main() {
 		done <- true
 	}()
 
-	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 		if logger.IsEnabledFor(logging.DEBUG) {
 			logger.Debugf("Received message at offset %d, length %d, position %d, termId %d, frame len %d",
 				offset, length, header.Offset(), header.TermId(), header.FrameLength())
 		}
 		for true {
+			// TODO: get error from Offer, return it from handler
 			ret := publication.Offer(buffer, offset, length, nil)
 			if ret >= 0 {
 				break
@@ -106,6 +107,7 @@ func main() {
 				//	panic(fmt.Sprintf("Failed to send message of %d bytes due to %d", length, ret))
 			}
 		}
+		return nil
 	}
 
 	go func() {

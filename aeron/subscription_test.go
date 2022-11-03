@@ -52,7 +52,7 @@ func (s *SubscriptionTestSuite) SetupTest() {
 	s.atomicReadBuffer = atomic.MakeBuffer(make([]byte, s.headerLength), s.headerLength)
 	s.cc = NewMockReceivingConductor(s.T())
 	s.fragmentHandlerMock = term.NewMockFragmentHandler(s.T())
-	s.fragmentHandler = s.fragmentHandlerMock.FragmentHandler
+	s.fragmentHandler = s.fragmentHandlerMock.Execute
 	s.imageOne = NewMockImage(s.T())
 	s.imageTwo = NewMockImage(s.T())
 	s.header = new(logbuffer.Header) // Unused so no need to initialize
@@ -84,8 +84,8 @@ func (s *SubscriptionTestSuite) TestShouldReadNothingWhenThereIsNoData() {
 func (s *SubscriptionTestSuite) TestShouldReadData() {
 	s.sub.addImage(s.imageOne)
 
-	s.fragmentHandlerMock.On("FragmentHandler",
-		s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header)
+	s.fragmentHandlerMock.On("Execute",
+		s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header).Return(nil)
 
 	s.imageOne.On("Poll", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		handler := args.Get(0).(term.FragmentHandler)
