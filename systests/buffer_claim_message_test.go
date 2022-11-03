@@ -63,8 +63,9 @@ func (suite *BufferClaimMessageTestSuite) TearDownSuite() {
 
 func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithInterleavedAbort() {
 	fragmentCount := 0
-	fragmentHandler := func(*atomic.Buffer, int32, int32, *logbuffer.Header) {
+	fragmentHandler := func(*atomic.Buffer, int32, int32, *logbuffer.Header) error {
 		fragmentCount++
+		return nil
 	}
 
 	var bufferClaim logbuffer.Claim
@@ -119,9 +120,10 @@ func (suite *BufferClaimMessageTestSuite) TestShouldTransferReservedValue() {
 	bufferClaim.SetReservedValue(reservedValue)
 	bufferClaim.Commit()
 
-	fragmentHandler := func(_ *atomic.Buffer, _ int32, length int32, header *logbuffer.Header) {
+	fragmentHandler := func(_ *atomic.Buffer, _ int32, length int32, header *logbuffer.Header) error {
 		suite.Assert().EqualValues(messageLength, length)
 		suite.Assert().EqualValues(reservedValue, header.GetReservedValue())
+		return nil
 	}
 
 	for 1 != subscription.Poll(fragmentHandler, fragmentCountLimit) {

@@ -27,14 +27,14 @@ import (
 )
 
 const (
-	streamId = 1001
-	channel  = "aeron:ipc"
-	sleep    = 50 * time.Millisecond
+	channel = "aeron:ipc"
+	sleep   = 50 * time.Millisecond
 )
 
 // Note: This is inspired by the Java test shouldHaveCorrectTermBufferLength in ClientErrorHandlerTest.  The name is a
 // copy/paste bug.
 func TestShouldUseCorrectErrorHandlers(t *testing.T) {
+	const streamId = 1001
 	mediaDriver, err := driver.StartMediaDriver()
 	require.NoError(t, err, "Couldn't start Media Driver")
 	defer mediaDriver.StopMediaDriver()
