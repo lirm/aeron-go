@@ -437,7 +437,7 @@ func waitForMediaDriver(timeOfRegistration int64, cc *ClientConductor) {
 	}
 }
 
-func (cc *ClientConductor) releaseSubscription(regID int64, images []ImageInterface) {
+func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) {
 	logger.Debugf("ReleaseSubscription: regID=%d", regID)
 
 	cc.verifyDriverIsActive()

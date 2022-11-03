@@ -86,8 +86,8 @@ type ArchiveListeners struct {
 	// Async events from the underlying Aeron instance
 	NewSubscriptionListener  func(string, int32, int64)
 	NewPublicationListener   func(string, int32, int32, int64)
-	AvailableImageListener   func(aeron.ImageInterface)
-	UnavailableImageListener func(aeron.ImageInterface)
+	AvailableImageListener   func(aeron.Image)
+	UnavailableImageListener func(aeron.Image)
 }
 
 // LoggingErrorListener is set by default and will report internal failures when
@@ -127,12 +127,12 @@ func LoggingNewPublicationListener(channel string, stream int32, session int32, 
 }
 
 // LoggingAvailableImageListener from underlying aeron (called by default only in DEBUG)
-func LoggingAvailableImageListener(image aeron.ImageInterface) {
+func LoggingAvailableImageListener(image aeron.Image) {
 	logger.Infof("NewAvailableImageListener, sessionId is %d", image.SessionID())
 }
 
 // LoggingUnavailableImageListener from underlying aeron (called by default only in DEBUG)
-func LoggingUnavailableImageListener(image aeron.ImageInterface) {
+func LoggingUnavailableImageListener(image aeron.Image) {
 	logger.Infof("NewUnavalableImageListener, sessionId is %d", image.SessionID())
 }
 

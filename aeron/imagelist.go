@@ -30,25 +30,25 @@ type ImageList struct {
 func NewImageList() *ImageList {
 	list := new(ImageList)
 
-	var images []ImageInterface
+	var images []Image
 	list.img = unsafe.Pointer(&images)
 
 	return list
 }
 
 // Get returns a pointer to the underlying image array loaded atomically
-func (l *ImageList) Get() []ImageInterface {
-	return *(*[]ImageInterface)(atomic.LoadPointer(&l.img))
+func (l *ImageList) Get() []Image {
+	return *(*[]Image)(atomic.LoadPointer(&l.img))
 }
 
 // Set atomically sets the reference to the underlying array
-func (l *ImageList) Set(imgs []ImageInterface) {
+func (l *ImageList) Set(imgs []Image) {
 	atomic.StorePointer(&l.img, unsafe.Pointer(&imgs))
 }
 
 // Empty is a convenience method to reset the contents of the list
-func (l *ImageList) Empty() (oldList []ImageInterface) {
+func (l *ImageList) Empty() (oldList []Image) {
 	oldList = l.Get()
-	l.Set(make([]ImageInterface, 0))
+	l.Set(make([]Image, 0))
 	return
 }

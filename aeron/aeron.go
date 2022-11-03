@@ -36,10 +36,10 @@ type NewPublicationHandler func(string, int32, int32, int64)
 type NewSubscriptionHandler func(string, int32, int64)
 
 // AvailableImageHandler is the handler type for image available notification from the media driver
-type AvailableImageHandler func(ImageInterface)
+type AvailableImageHandler func(Image)
 
 // UnavailableImageHandler is the handler type for image unavailable notification from the media driver
-type UnavailableImageHandler func(ImageInterface)
+type UnavailableImageHandler func(Image)
 
 // Aeron is the primary interface to the media driver for managing subscriptions and publications
 type Aeron struct {

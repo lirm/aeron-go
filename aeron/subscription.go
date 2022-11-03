@@ -59,7 +59,7 @@ const LocalSocketAddressStatusCounterTypeId = 14
 
 type ReceivingConductor interface {
 	CounterReader() *ctr.Reader
-	releaseSubscription(regID int64, images []ImageInterface)
+	releaseSubscription(regID int64, images []Image)
 	AddRcvDestination(registrationID int64, endpointChannel string)
 	RemoveRcvDestination(registrationID int64, endpointChannel string)
 }
@@ -164,7 +164,7 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) i
 	return fragmentsRead
 }
 
-// ControlledPoll polls in a controlled manner the Image s under the subscription for available message fragments.
+// ControlledPoll polls in a controlled manner the image s under the subscription for available message fragments.
 // Control is applied to fragments in the stream. If more fragments can be read on another stream
 // they will even if BREAK or ABORT is returned from the fragment handler.
 //
@@ -209,7 +209,7 @@ func (sub *Subscription) hasImage(sessionID int32) bool {
 }
 
 //go:norace
-func (sub *Subscription) addImage(image ImageInterface) *[]ImageInterface {
+func (sub *Subscription) addImage(image Image) *[]Image {
 
 	images := sub.images.Get()
 
@@ -219,7 +219,7 @@ func (sub *Subscription) addImage(image ImageInterface) *[]ImageInterface {
 }
 
 //go:norace
-func (sub *Subscription) removeImage(correlationID int64) ImageInterface {
+func (sub *Subscription) removeImage(correlationID int64) Image {
 
 	img := sub.images.Get()
 	for ix, image := range img {
@@ -242,7 +242,7 @@ func (sub *Subscription) RegistrationID() int64 {
 	return sub.registrationID
 }
 
-// IsConnected returns if this subscription is connected by having at least one open publication Image.
+// IsConnected returns if this subscription is connected by having at least one open publication image.
 func (sub *Subscription) IsConnected() bool {
 	for _, image := range sub.images.Get() {
 		if !image.IsClosed() {
@@ -265,7 +265,7 @@ func (sub *Subscription) ImageCount() int {
 }
 
 // ImageBySessionID returns the associated with the given sessionId.
-func (sub *Subscription) ImageBySessionID(sessionID int32) ImageInterface {
+func (sub *Subscription) ImageBySessionID(sessionID int32) Image {
 	img := sub.images.Get()
 	for _, image := range img {
 		if image.SessionID() == sessionID {

@@ -146,7 +146,7 @@ func (_m *MockReceivingConductor) RemoveRcvDestination(registrationID int64, end
 }
 
 // releaseSubscription provides a mock function with given fields: regID, images
-func (_m *MockReceivingConductor) releaseSubscription(regID int64, images []ImageInterface) {
+func (_m *MockReceivingConductor) releaseSubscription(regID int64, images []Image) {
 	_m.Called(regID, images)
 }
 

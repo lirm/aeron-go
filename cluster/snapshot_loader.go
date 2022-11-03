@@ -12,7 +12,7 @@ import (
 
 type snapshotLoader struct {
 	agent      *ClusteredServiceAgent
-	img        aeron.ImageInterface
+	img        aeron.Image
 	marshaller *codecs.SbeGoMarshaller
 	isDone     bool
 	inSnapshot bool
@@ -21,7 +21,7 @@ type snapshotLoader struct {
 	err        error
 }
 
-func newSnapshotLoader(agent *ClusteredServiceAgent, img aeron.ImageInterface) *snapshotLoader {
+func newSnapshotLoader(agent *ClusteredServiceAgent, img aeron.Image) *snapshotLoader {
 	return &snapshotLoader{agent: agent, img: img, marshaller: codecs.NewSbeGoMarshaller()}
 }
 

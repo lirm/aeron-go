@@ -23,7 +23,7 @@ import (
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-type Image struct {
+type image struct {
 	sourceIdentity     string
 	logBuffers         *logbuffer.LogBuffers
 	exceptionHandler   func(error)
@@ -43,9 +43,9 @@ type Image struct {
 }
 
 // NewImage wraps around provided LogBuffers setting up the structures for polling
-func NewImage(sessionID int32, correlationID int64, logBuffers *logbuffer.LogBuffers) *Image {
+func NewImage(sessionID int32, correlationID int64, logBuffers *logbuffer.LogBuffers) *image {
 
-	image := new(Image)
+	image := new(image)
 
 	image.correlationID = correlationID
 	image.sessionID = sessionID
@@ -64,12 +64,12 @@ func NewImage(sessionID int32, correlationID int64, logBuffers *logbuffer.LogBuf
 }
 
 // IsClosed returns whether this image has been closed. No further operations are valid.
-func (image *Image) IsClosed() bool {
+func (image *image) IsClosed() bool {
 	return image.isClosed.Get()
 }
 
 //go:norace
-func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (image *image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	if image.IsClosed() {
 		return 0
 	}
@@ -94,7 +94,7 @@ func (image *Image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 // maximum position specified. Use a FragmentAssembler to assemble messages
 // which span multiple fragments. Returns the number of fragments that have been
 // consumed.
-func (image *Image) BoundedPoll(
+func (image *image) BoundedPoll(
 	handler term.FragmentHandler,
 	limitPosition int64,
 	fragmentLimit int,
@@ -153,7 +153,7 @@ func (image *Image) BoundedPoll(
 // To assemble messages that span multiple fragments then use
 // ControlledFragmentAssembler. Returns the number of fragments that have been
 // consumed.
-func (image *Image) ControlledPoll(
+func (image *image) ControlledPoll(
 	handler term.ControlledFragmentHandler,
 	fragmentLimit int,
 ) int {
@@ -212,8 +212,8 @@ func (image *Image) ControlledPoll(
 	return fragmentsRead
 }
 
-// Position returns the position this Image has been consumed to by the subscriber.
-func (image *Image) Position() int64 {
+// Position returns the position this image has been consumed to by the subscriber.
+func (image *image) Position() int64 {
 	if image.IsClosed() {
 		return image.finalPosition
 	}
@@ -221,7 +221,7 @@ func (image *Image) Position() int64 {
 }
 
 // IsEndOfStream returns if the current consumed position at the end of the stream?
-func (image *Image) IsEndOfStream() bool {
+func (image *image) IsEndOfStream() bool {
 	if image.IsClosed() {
 		return image.isEos
 	}
@@ -229,22 +229,22 @@ func (image *Image) IsEndOfStream() bool {
 }
 
 // SessionID returns the sessionId for the steam of messages.
-func (image *Image) SessionID() int32 {
+func (image *image) SessionID() int32 {
 	return image.sessionID
 }
 
 // CorrelationID returns the correlationId for identification of the image with the media driver.
-func (image *Image) CorrelationID() int64 {
+func (image *image) CorrelationID() int64 {
 	return image.correlationID
 }
 
-// SubscriptionRegistrationID returns the registrationId for the Subscription of the Image.
-func (image *Image) SubscriptionRegistrationID() int64 {
+// SubscriptionRegistrationID returns the registrationId for the Subscription of the image.
+func (image *image) SubscriptionRegistrationID() int64 {
 	return image.subscriptionRegistrationID
 }
 
 // TermBufferLength returns the length in bytes for each term partition in the log buffer.
-func (image *Image) TermBufferLength() int32 {
+func (image *image) TermBufferLength() int32 {
 	return image.termLengthMask + 1
 }
 
@@ -252,12 +252,12 @@ func (image *Image) TermBufferLength() int32 {
 // transports within the image liveness timeout.
 //
 // Returns 0 if the image is closed, if no datagrams have arrived or the image is IPC
-func (image *Image) ActiveTransportCount() int32 {
+func (image *image) ActiveTransportCount() int32 {
 	return image.logBuffers.Meta().ActiveTransportCount()
 }
 
 // Close the image and mappings. The image becomes unusable after closing.
-func (image *Image) Close() error {
+func (image *image) Close() error {
 	var err error
 	if image.isClosed.CompareAndSet(false, true) {
 		image.finalPosition = image.subscriberPosition.get()

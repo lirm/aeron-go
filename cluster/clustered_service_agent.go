@@ -407,7 +407,7 @@ func (agent *ClusteredServiceAgent) setRole(newRole Role) {
 func (agent *ClusteredServiceAgent) awaitImage(
 	sessionId int32,
 	subscription *aeron.Subscription,
-) aeron.ImageInterface {
+) aeron.Image {
 	for {
 		if img := subscription.ImageBySessionID(sessionId); img != nil {
 			return img

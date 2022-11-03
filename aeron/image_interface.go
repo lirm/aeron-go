@@ -17,9 +17,9 @@ package aeron
 
 import "github.com/lirm/aeron-go/aeron/logbuffer/term"
 
-// ImageInterface is a Java-style interface for the Image struct.  This is to allow dependency injection and testing of
-// the many structs that use Image, without deviating from the existing function signatures and code structure.
-type ImageInterface interface {
+// Image is a Java-style interface for the image struct.  This is to allow dependency injection and testing of
+// the many structs that use image, without deviating from the existing function signatures and code structure.
+type Image interface {
 	IsClosed() bool
 	Poll(handler term.FragmentHandler, fragmentLimit int) int
 	BoundedPoll(handler term.FragmentHandler, limitPosition int64, fragmentLimit int) int

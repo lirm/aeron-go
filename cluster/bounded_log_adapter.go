@@ -19,7 +19,7 @@ type boundedLogAdapter struct {
 	marshaller     *codecs.SbeGoMarshaller
 	options        *Options
 	agent          *ClusteredServiceAgent
-	image          aeron.ImageInterface
+	image          aeron.Image
 	builder        *bytes.Buffer
 	maxLogPosition int64
 }

@@ -45,10 +45,10 @@ func main() {
 	context := aeron.NewContext().
 		AeronDir(*examples.Config.AeronPrefix).
 		MediaDriverTimeout(timeout).
-		AvailableImageHandler(func(image aeron.ImageInterface) {
+		AvailableImageHandler(func(image aeron.Image) {
 			logger.Infof("Image available: %+v", image)
 		}).
-		UnavailableImageHandler(func(image aeron.ImageInterface) {
+		UnavailableImageHandler(func(image aeron.Image) {
 			logger.Infof("Image unavailable: %+v", image)
 		}).
 		ErrorHandler(func(err error) {
