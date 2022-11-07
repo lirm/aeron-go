@@ -22,17 +22,20 @@ func (s *EchoService) OnStart(cluster cluster.Cluster, image aeron.Image) {
 	if image == nil {
 		fmt.Printf("OnStart with no image\n")
 	} else {
-		cnt := image.Poll(func(buf *atomic.Buffer, offset int32, length int32, hdr *logbuffer.Header) error {
+		cnt, err := image.Poll(func(buf *atomic.Buffer, offset int32, length int32, hdr *logbuffer.Header) error {
 			if length == 4 && s.messageCount == 0 {
 				s.messageCount = buf.GetInt32(offset)
 			} else {
-				// TODO use an error
-				fmt.Printf("WARNING: unexpected snapshot message - pos=%d offset=%d length=%d\n",
+				return fmt.Errorf("unexpected snapshot message - pos=%d offset=%d length=%d\n",
 					hdr.Position(), offset, length)
 			}
 			return nil
 		}, 100)
-		fmt.Printf("OnStart with image - snapshotMsgCnt=%d messageCount=%d\n", cnt, s.messageCount)
+		if err == nil {
+			fmt.Printf("OnStart with image - snapshotMsgCnt=%d messageCount=%d\n", cnt, s.messageCount)
+		} else {
+			fmt.Printf("OnStrart encountered an error %s", err)
+		}
 	}
 }
 
@@ -139,5 +142,7 @@ func main() {
 		panic(err)
 	}
 
-	agent.StartAndRun()
+	if err := agent.StartAndRun(); err != nil {
+		panic(err)
+	}
 }

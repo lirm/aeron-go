@@ -86,7 +86,8 @@ func (suite *SysTestSuite) receive(n int, sub *aeron.Subscription) {
 	for int(fragmentsRead.Get()) < n {
 		timeoutAt := time.Now().Add(time.Second)
 		for {
-			recvd := sub.Poll(handler, 10)
+			recvd, err := sub.Poll(handler, 10)
+			suite.Assert().NoError(err)
 			if recvd >= 1 {
 				fragmentsRead.Add(int32(recvd))
 				logger.Debugf("  have %d fragments", fragmentsRead)

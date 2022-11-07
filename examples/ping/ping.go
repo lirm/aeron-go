@@ -116,11 +116,12 @@ func main() {
 		}
 
 		for true {
-			ret := subscription.Poll(handler, 10)
+			ret, err := subscription.Poll(handler, 10)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to poll due to %d", ret))
+			}
 			if ret > 0 {
 				break
-			} else if ret < 0 {
-				panic(fmt.Sprintf("Failed to poll due to %d", ret))
 			}
 		}
 	}
@@ -136,11 +137,15 @@ func main() {
 		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
 		}
 
-		for subscription.Poll(handler, 10) <= 0 {
+		for emptyPoll(subscription.Poll(handler, 10)) {
 		}
 	}
 
 	OutputPercentileDistribution(os.Stdout, hist, 1000.0)
+}
+
+func emptyPoll(fragments int, err error) bool {
+	return fragments <= 0 || err != nil
 }
 
 func OutputPercentileDistribution(out io.Writer, h *hdrhistogram.Histogram, scalingFactor float64) {

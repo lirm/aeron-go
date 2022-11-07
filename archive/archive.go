@@ -309,11 +309,15 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	pollContext := PollContext{archive.Control, correlationID}
 
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
-		fragments := archive.Control.poll(
+		var fragments int
+		fragments, err = archive.Control.poll(
 			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
 				ConnectionControlFragmentHandler(&pollContext, buf, offset, length, header)
 				return nil
 			}, 1)
+		if err != nil {
+			return nil, err
+		}
 		if fragments > 0 {
 			logger.Debugf("Read %d fragment(s)", fragments)
 		}
@@ -422,7 +426,7 @@ func (archive *Archive) DisableRecordingEvents() {
 }
 
 // RecordingEventsPoll is used to poll for recording events
-func (archive *Archive) RecordingEventsPoll() int {
+func (archive *Archive) RecordingEventsPoll() (int, error) {
 	archive.mtx.Lock()
 	defer archive.mtx.Unlock()
 	return archive.Events.PollWithContext(nil, 1)

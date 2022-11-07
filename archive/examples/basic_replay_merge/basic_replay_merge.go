@@ -150,7 +150,10 @@ func main() {
 	merge.Close()
 
 	for {
-		fragmentsRead := subscription.Poll(printHandler, 10)
+		fragmentsRead, err := subscription.Poll(printHandler, 10)
+		if err != nil {
+			logger.Error(err)
+		}
 		arch.RecordingEventsPoll()
 
 		idleStrategy.Idle(fragmentsRead)

@@ -113,7 +113,10 @@ func main() {
 	go func() {
 		idleStrategy := idlestrategy.Busy{}
 		for {
-			fragmentsRead := subscription.Poll(handler, 10)
+			fragmentsRead, err := subscription.Poll(handler, 10)
+			if err != nil {
+				fmt.Print("error polling, retrying: ", err)
+			}
 			idleStrategy.Idle(fragmentsRead)
 		}
 	}()

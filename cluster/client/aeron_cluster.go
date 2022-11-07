@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -130,7 +131,7 @@ func (ac *AeronCluster) IsClosed() bool {
 	return ac.state == clientClosed
 }
 
-func (ac *AeronCluster) Poll() int {
+func (ac *AeronCluster) Poll() (int, error) {
 	switch ac.state {
 	case clientDisconnected:
 		if time.Now().UnixMilli() > ac.nextRetryConnectTime {
@@ -158,7 +159,7 @@ func (ac *AeronCluster) Poll() int {
 			ac.state = clientCreatePublications
 		}
 	}
-	return 0
+	return 0, nil
 }
 
 func (ac *AeronCluster) Offer(buffer *atomic.Buffer, offset, length int32) int64 {
@@ -245,7 +246,7 @@ func (ac *AeronCluster) updateMemberEndpoints(endpoints string) {
 	}
 }
 
-func (ac *AeronCluster) createPublications() int {
+func (ac *AeronCluster) createPublications() (int, error) {
 	if len(ac.memberByIdMap) > 0 {
 		for _, member := range ac.memberByIdMap {
 			if member.publication == nil {
@@ -257,7 +258,7 @@ func (ac *AeronCluster) createPublications() int {
 	}
 	ac.state = clientAwaitPublicationConnected
 	ac.awaitTimeoutTime = time.Now().UnixMilli() + (5 * time.Second).Milliseconds()
-	return 1
+	return 1, nil
 }
 
 func (ac *AeronCluster) createIngressPublication(endpoint string) *aeron.Publication {
@@ -274,17 +275,18 @@ func (ac *AeronCluster) createIngressPublication(endpoint string) *aeron.Publica
 	}
 }
 
-func (ac *AeronCluster) awaitPublicationConnected() int {
+func (ac *AeronCluster) awaitPublicationConnected() (int, error) {
 	responseChannel := ac.egressSub.TryResolveChannelEndpointPort()
 	if responseChannel == "" {
-		return 0
+		// TODO: Is this an error or success condition?
+		return 0, nil
 	}
 	now := time.Now().UnixMilli()
 	if now > ac.awaitTimeoutTime {
-		logger.Warningf("timed out waiting for connected publication")
 		ac.state = clientDisconnected
 		// close publications? shouldn't be necessary unless we've hit some bug
 		ac.nextRetryConnectTime = now + (30 * time.Second).Milliseconds()
+		return 0, errors.New("timed out waiting for connected publication")
 	}
 	if len(ac.memberByIdMap) > 0 {
 		for _, member := range ac.memberByIdMap {
@@ -304,7 +306,7 @@ func (ac *AeronCluster) awaitPublicationConnected() int {
 		ac.state = clientAwaitConnectReply
 		ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 	}
-	return 0
+	return 0, nil
 }
 
 func (ac *AeronCluster) sendConnectRequest(responseChannel string) bool {
@@ -338,7 +340,7 @@ func (ac *AeronCluster) sendConnectRequest(responseChannel string) bool {
 	}
 }
 
-func (ac *AeronCluster) pollEgress(fragmentLimit int) int {
+func (ac *AeronCluster) pollEgress(fragmentLimit int) (int, error) {
 	return ac.egressSub.Poll(ac.fragmentAssembler.OnFragment, fragmentLimit)
 }
 

@@ -95,7 +95,10 @@ func main() {
 
 	counter := 0
 	for {
-		fragmentsRead := subscription.Poll(handler, 10)
+		fragmentsRead, err := subscription.Poll(handler, 10)
+		if err != nil {
+			logger.Error(err)
+		}
 
 		if counter > *examples.ExamplesConfig.Messages {
 			break

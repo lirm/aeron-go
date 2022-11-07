@@ -21,9 +21,9 @@ import "github.com/lirm/aeron-go/aeron/logbuffer/term"
 // the many structs that use image, without deviating from the existing function signatures and code structure.
 type Image interface {
 	IsClosed() bool
-	Poll(handler term.FragmentHandler, fragmentLimit int) int
-	BoundedPoll(handler term.FragmentHandler, limitPosition int64, fragmentLimit int) int
-	ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) int
+	Poll(handler term.FragmentHandler, fragmentLimit int) (int, error)
+	BoundedPoll(handler term.FragmentHandler, limitPosition int64, fragmentLimit int) (int, error)
+	ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) (int, error)
 	Position() int64
 	IsEndOfStream() bool
 	SessionID() int32

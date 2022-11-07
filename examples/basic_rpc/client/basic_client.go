@@ -134,11 +134,15 @@ func main() {
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond}
 
 	for {
-		fragmentsRead := subscription.Poll(handler, 10)
-		select {
-		case <-interrupt:
-			return
-		default:
+		fragmentsRead, err := subscription.Poll(handler, 10)
+		if err == nil {
+			select {
+			case <-interrupt:
+				return
+			default:
+			}
+		} else {
+			logger.Error(err)
 		}
 		idleStrategy.Idle(fragmentsRead)
 

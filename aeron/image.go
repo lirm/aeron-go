@@ -17,6 +17,7 @@ limitations under the License.
 package aeron
 
 import (
+	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/logbuffer/term"
@@ -68,10 +69,18 @@ func (image *image) IsClosed() bool {
 	return image.isClosed.Get()
 }
 
+// Poll for new messages in a stream.  If new messages are found beyond the
+// last consumed position then they will be delivered to the FragmentHandler
+// up to a limited number of fragments as specified.  Use a FragmentAssembler
+// to assemble messages which span multiple fragments.  Returns the number of
+// fragments that have been consumed successfully, as well as an error if a
+// fragment had one.  A fragment with an error will cause Poll to terminate
+// early, even if fragmentLimit has not been hit.
+//
 //go:norace
-func (image *image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (image *image) Poll(handler term.FragmentHandler, fragmentLimit int) (int, error) {
 	if image.IsClosed() {
-		return 0
+		return 0, nil
 	}
 
 	position := image.subscriberPosition.get()
@@ -79,13 +88,13 @@ func (image *image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	index := indexByPosition(position, image.positionBitsToShift)
 	termBuffer := image.termBuffers[index]
 
-	offset, result := term.Read(termBuffer, termOffset, handler, fragmentLimit, &image.header)
+	offset, result, err := term.Read(termBuffer, termOffset, handler, fragmentLimit, &image.header)
 
 	newPosition := position + int64(offset-termOffset)
 	if newPosition > position {
 		image.subscriberPosition.set(newPosition)
 	}
-	return result
+	return result, err
 }
 
 // BoundedPoll polls for new messages in a stream. If new messages are found
@@ -93,14 +102,16 @@ func (image *image) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 // FragmentHandler up to a limited number of fragments as specified or the
 // maximum position specified. Use a FragmentAssembler to assemble messages
 // which span multiple fragments. Returns the number of fragments that have been
-// consumed.
+// consumed successfully, as well as an error if a fragment had one. A fragment
+// with an error will cause BoundedPoll to terminate early, even if neither
+// limit has been hit.
 func (image *image) BoundedPoll(
 	handler term.FragmentHandler,
 	limitPosition int64,
 	fragmentLimit int,
-) int {
+) (int, error) {
 	if image.IsClosed() {
-		return 0
+		return 0, nil
 	}
 
 	fragmentsRead := 0
@@ -119,9 +130,11 @@ func (image *image) BoundedPoll(
 	header := &image.header
 	header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
 
-	for fragmentsRead < fragmentLimit && offset < limitOffset {
+	var err error
+	for fragmentsRead < fragmentLimit && offset < limitOffset && err == nil {
 		length := logbuffer.GetFrameLength(termBuffer, offset)
 		if length <= 0 {
+			err = fmt.Errorf("invalid frameLength %d", length)
 			break
 		}
 
@@ -135,14 +148,14 @@ func (image *image) BoundedPoll(
 		fragmentsRead++
 		header.SetOffset(frameOffset)
 
-		handler(termBuffer, frameOffset+logbuffer.DataFrameHeader.Length,
+		err = handler(termBuffer, frameOffset+logbuffer.DataFrameHeader.Length,
 			length-logbuffer.DataFrameHeader.Length, header)
 	}
 	resultingPosition := initialPosition + int64(offset-initialOffset)
 	if resultingPosition > initialPosition {
 		image.subscriberPosition.set(resultingPosition)
 	}
-	return fragmentsRead
+	return fragmentsRead, err
 }
 
 // ControlledPoll polls for new messages in a stream. If new messages are found
@@ -156,9 +169,9 @@ func (image *image) BoundedPoll(
 func (image *image) ControlledPoll(
 	handler term.ControlledFragmentHandler,
 	fragmentLimit int,
-) int {
+) (int, error) {
 	if image.IsClosed() {
-		return 0
+		return 0, nil
 	}
 
 	fragmentsRead := 0
@@ -173,9 +186,11 @@ func (image *image) ControlledPoll(
 	header := &image.header
 	header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
 
+	var err error
 	for fragmentsRead < fragmentLimit && offset < capacity {
 		length := logbuffer.GetFrameLength(termBuffer, offset)
 		if length <= 0 {
+			err = fmt.Errorf("invalid frameLength %d", length)
 			break
 		}
 
@@ -209,7 +224,7 @@ func (image *image) ControlledPoll(
 	if resultingPosition > initialPosition {
 		image.subscriberPosition.set(resultingPosition)
 	}
-	return fragmentsRead
+	return fragmentsRead, err
 }
 
 // Position returns the position this image has been consumed to by the subscriber.

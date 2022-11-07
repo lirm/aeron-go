@@ -105,7 +105,10 @@ func main() {
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 1000}
 	for {
-		fragmentsRead := subscription.Poll(printHandler, 10)
+		fragmentsRead, err := subscription.Poll(printHandler, 10)
+		if err != nil {
+			logger.Fatal(err)
+		}
 		arch.RecordingEventsPoll()
 
 		idleStrategy.Idle(fragmentsRead)

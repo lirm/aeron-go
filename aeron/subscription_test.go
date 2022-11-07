@@ -71,14 +71,18 @@ func (s *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPolling
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadNothingWhenNoImages() {
-	s.Assert().Equal(0, s.sub.Poll(s.fragmentHandler, 1))
+	fragments, err := s.sub.Poll(s.fragmentHandler, 1)
+	s.Assert().Equal(0, fragments)
+	s.Assert().NoError(err)
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadNothingWhenThereIsNoData() {
 	s.sub.addImage(s.imageOne)
-	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(0)
+	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(0, nil)
 
-	s.Assert().Equal(0, s.sub.Poll(s.fragmentHandler, 1))
+	fragments, err := s.sub.Poll(s.fragmentHandler, 1)
+	s.Assert().Equal(0, fragments)
+	s.Assert().NoError(err)
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadData() {
@@ -89,20 +93,24 @@ func (s *SubscriptionTestSuite) TestShouldReadData() {
 
 	s.imageOne.On("Poll", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		handler := args.Get(0).(term.FragmentHandler)
-		handler(s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header)
-	}).Return(1)
+		s.Assert().NoError(handler(s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header))
+	}).Return(1, nil)
 
-	s.Assert().Equal(1, s.sub.Poll(s.fragmentHandler, FragmentCountLimit))
+	fragments, err := s.sub.Poll(s.fragmentHandler, FragmentCountLimit)
+	s.Assert().Equal(1, fragments)
+	s.Assert().NoError(err)
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadDataFromMultipleSources() {
 	s.sub.addImage(s.imageOne)
 	s.sub.addImage(s.imageTwo)
 
-	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(1)
-	s.imageTwo.On("Poll", mock.Anything, mock.Anything).Return(1)
+	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(1, nil)
+	s.imageTwo.On("Poll", mock.Anything, mock.Anything).Return(1, nil)
 
-	s.Assert().Equal(2, s.sub.Poll(s.fragmentHandler, FragmentCountLimit))
+	fragments, err := s.sub.Poll(s.fragmentHandler, FragmentCountLimit)
+	s.Assert().Equal(2, fragments)
+	s.Assert().NoError(err)
 }
 
 // TODO: Implement resolveChannel set of tests.

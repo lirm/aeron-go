@@ -45,7 +45,7 @@ func (_m *MockImage) ActiveTransportCount() int32 {
 }
 
 // BoundedPoll provides a mock function with given fields: handler, limitPosition, fragmentLimit
-func (_m *MockImage) BoundedPoll(handler term.FragmentHandler, limitPosition int64, fragmentLimit int) int {
+func (_m *MockImage) BoundedPoll(handler term.FragmentHandler, limitPosition int64, fragmentLimit int) (int, error) {
 	ret := _m.Called(handler, limitPosition, fragmentLimit)
 
 	var r0 int
@@ -55,7 +55,14 @@ func (_m *MockImage) BoundedPoll(handler term.FragmentHandler, limitPosition int
 		r0 = ret.Get(0).(int)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(term.FragmentHandler, int64, int) error); ok {
+		r1 = rf(handler, limitPosition, fragmentLimit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Close provides a mock function with given fields:
@@ -73,7 +80,7 @@ func (_m *MockImage) Close() error {
 }
 
 // ControlledPoll provides a mock function with given fields: handler, fragmentLimit
-func (_m *MockImage) ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) int {
+func (_m *MockImage) ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) (int, error) {
 	ret := _m.Called(handler, fragmentLimit)
 
 	var r0 int
@@ -83,7 +90,14 @@ func (_m *MockImage) ControlledPoll(handler term.ControlledFragmentHandler, frag
 		r0 = ret.Get(0).(int)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(term.ControlledFragmentHandler, int) error); ok {
+		r1 = rf(handler, fragmentLimit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // CorrelationID provides a mock function with given fields:
@@ -129,7 +143,7 @@ func (_m *MockImage) IsEndOfStream() bool {
 }
 
 // Poll provides a mock function with given fields: handler, fragmentLimit
-func (_m *MockImage) Poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (_m *MockImage) Poll(handler term.FragmentHandler, fragmentLimit int) (int, error) {
 	ret := _m.Called(handler, fragmentLimit)
 
 	var r0 int
@@ -139,7 +153,14 @@ func (_m *MockImage) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 		r0 = ret.Get(0).(int)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(term.FragmentHandler, int) error); ok {
+		r1 = rf(handler, fragmentLimit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Position provides a mock function with given fields:

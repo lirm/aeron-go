@@ -17,21 +17,26 @@ limitations under the License.
 package term
 
 import (
+	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
 // Read will attempt to read the next frame from the term and invoke the callback if successful.
-// Method will return a tuple of new term offset and number of fragments read
+// Method will return a tuple of new term offset, number of fragments read, and an error reading
+// fragments.  An error will interrupt reading before fragmentLimit, but any fragments read prior
+// to the error will still be processed, and that number will be returned with the error.
+//
 //go:norace
 func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, fragmentLimit int,
-	header *logbuffer.Header) (int32, int) {
+	header *logbuffer.Header) (int32, int, error) {
 
 	capacity := termBuffer.Capacity()
 
 	var fragmentsRead int
-	for fragmentsRead < fragmentLimit && termOffset < capacity {
+	var err error
+	for fragmentsRead < fragmentLimit && termOffset < capacity && err == nil {
 		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
 		if frameLength <= 0 {
 			break
@@ -42,26 +47,27 @@ func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, 
 
 		if !logbuffer.IsPaddingFrame(termBuffer, fragmentOffset) {
 			header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
-			header.SetOffset(fragmentOffset)
-			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
-				frameLength-logbuffer.DataFrameHeader.Length, header)
-
 			fragmentsRead++
+			header.SetOffset(fragmentOffset)
+			err = handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
+				frameLength-logbuffer.DataFrameHeader.Length, header)
 		}
 	}
 
-	return termOffset, fragmentsRead
+	return termOffset, fragmentsRead, err
 }
 
 // BoundedRead will attempt to read frames from the term up to the specified offsetLimit.
 // Method will return a tuple of new term offset and number of fragments read
 func BoundedRead(termBuffer *atomic.Buffer, termOffset int32, offsetLimit int32, handler FragmentHandler,
-	fragmentLimit int, header *logbuffer.Header) (int32, int) {
+	fragmentLimit int, header *logbuffer.Header) (int32, int, error) {
 
 	var fragmentsRead int
-	for fragmentsRead < fragmentLimit && termOffset < offsetLimit {
+	var err error
+	for fragmentsRead < fragmentLimit && termOffset < offsetLimit && err == nil {
 		frameLength := logbuffer.GetFrameLength(termBuffer, termOffset)
 		if frameLength <= 0 {
+			err = fmt.Errorf("invalid frameLength %d", frameLength)
 			break
 		}
 
@@ -70,13 +76,12 @@ func BoundedRead(termBuffer *atomic.Buffer, termOffset int32, offsetLimit int32,
 
 		if !logbuffer.IsPaddingFrame(termBuffer, fragmentOffset) {
 			header.Wrap(termBuffer.Ptr(), termBuffer.Capacity())
-			header.SetOffset(fragmentOffset)
-			handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
-				frameLength-logbuffer.DataFrameHeader.Length, header)
-
 			fragmentsRead++
+			header.SetOffset(fragmentOffset)
+			err = handler(termBuffer, fragmentOffset+logbuffer.DataFrameHeader.Length,
+				frameLength-logbuffer.DataFrameHeader.Length, header)
 		}
 	}
 
-	return termOffset, fragmentsRead
+	return termOffset, fragmentsRead, err
 }

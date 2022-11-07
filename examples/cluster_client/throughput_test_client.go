@@ -90,7 +90,11 @@ func main() {
 	}
 
 	for !clusterClient.IsConnected() {
-		opts.IdleStrategy.Idle(clusterClient.Poll())
+		fragments, err := clusterClient.Poll()
+		if err != nil {
+			fmt.Print("error polling, retrying: ", err)
+		}
+		opts.IdleStrategy.Idle(fragments)
 	}
 
 	sendBuf := atomic.MakeBuffer(make([]byte, 100))
@@ -117,7 +121,10 @@ func main() {
 			}
 		}
 		for listener.messageCount < sentCt {
-			pollCt := clusterClient.Poll()
+			pollCt, err := clusterClient.Poll()
+			if err != nil {
+				fmt.Print("error polling, retrying: ", err)
+			}
 			if pollCt == 0 {
 				listener.sendKeepAliveIfNecessary()
 			}
@@ -132,7 +139,11 @@ func main() {
 
 		for time.Since(now) < 10*time.Second {
 			listener.sendKeepAliveIfNecessary()
-			opts.IdleStrategy.Idle(clusterClient.Poll())
+			fragments, err := clusterClient.Poll()
+			if err != nil {
+				fmt.Print("error polling, retrying: ", err)
+			}
+			opts.IdleStrategy.Idle(fragments)
 		}
 	}
 	clusterClient.Close()

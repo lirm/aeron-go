@@ -30,7 +30,7 @@ func (adapter *boundedLogAdapter) isDone() bool {
 		adapter.image.IsClosed()
 }
 
-func (adapter *boundedLogAdapter) poll(limitPos int64) int {
+func (adapter *boundedLogAdapter) poll(limitPos int64) (int, error) {
 	return adapter.image.BoundedPoll(adapter.onFragment, limitPos, adapter.options.LogFragmentLimit)
 }
 

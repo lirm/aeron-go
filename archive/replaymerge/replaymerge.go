@@ -239,7 +239,7 @@ func (rm *ReplayMerge) Poll(fragmentHandler term.FragmentHandler, fragmentLimit 
 	if rm.image == nil {
 		return
 	}
-	return rm.image.Poll(fragmentHandler, fragmentLimit), nil
+	return rm.image.Poll(fragmentHandler, fragmentLimit)
 }
 
 // IsMerged returns if the live stream merged and the replay stopped?
@@ -466,11 +466,16 @@ func (rm *ReplayMerge) checkProgress(nowMs int64) error {
 	return nil
 }
 
-func (rm *ReplayMerge) pollForResponse() (success bool, err error) {
+// Returns whether this succeeded, and what the error is.
+func (rm *ReplayMerge) pollForResponse() (bool, error) {
 	correlationId := rm.activeCorrelationId
 	poller := rm.archive.Control
 
-	if poller.Poll() > 0 && poller.Results.IsPollComplete {
+	fragments, err := poller.Poll()
+	if err != nil {
+		return false, err
+	}
+	if fragments > 0 && poller.Results.IsPollComplete {
 		if poller.Results.ControlResponse.ControlSessionId == rm.archive.SessionID {
 			if poller.Results.ErrorResponse != nil {
 				err = fmt.Errorf(
@@ -483,7 +488,9 @@ func (rm *ReplayMerge) pollForResponse() (success bool, err error) {
 		}
 		return poller.Results.CorrelationId == correlationId, nil
 	}
-	return
+	// TODO: (false, nil) is what was here before, but I suspect that (true, nil) is more accurate?
+	// Check this when revamping archive code.
+	return false, nil
 }
 
 func (rm *ReplayMerge) polledRelevantId() int64 {

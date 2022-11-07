@@ -73,7 +73,10 @@ func main() {
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond}
 
 	for {
-		fragmentsRead := subscription.Poll(handler, 10)
+		fragmentsRead, err := subscription.Poll(handler, 10)
+		if err != nil {
+			logger.Error(err)
+		}
 		idleStrategy.Idle(fragmentsRead)
 	}
 }

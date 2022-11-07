@@ -135,13 +135,14 @@ func NewClusteredServiceAgent(
 	return agent, nil
 }
 
-func (agent *ClusteredServiceAgent) StartAndRun() {
+func (agent *ClusteredServiceAgent) StartAndRun() error {
 	if err := agent.OnStart(); err != nil {
-		panic(err)
+		return err
 	}
 	for agent.isServiceActive {
 		agent.opts.IdleStrategy.Idle(agent.DoWork())
 	}
+	return nil
 }
 
 func (agent *ClusteredServiceAgent) OnStart() error {
@@ -247,7 +248,11 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	img := agent.awaitImage(int32(replaySessionId), subscription)
 	loader := newSnapshotLoader(agent, img)
 	for !loader.isDone {
-		agent.opts.IdleStrategy.Idle(loader.poll())
+		fragmentsRead, err := loader.poll()
+		if err != nil {
+			return err
+		}
+		agent.opts.IdleStrategy.Idle(fragmentsRead)
 	}
 	if util.SemanticVersionMajor(uint32(agent.opts.AppVersion)) != util.SemanticVersionMajor(uint32(loader.appVersion)) {
 		panic(fmt.Errorf("incompatible app version: %v snapshot=%v",
@@ -277,7 +282,11 @@ func (agent *ClusteredServiceAgent) checkForClockTick() bool {
 }
 
 func (agent *ClusteredServiceAgent) pollServiceAdapter() {
-	agent.serviceAdapter.poll()
+	if _, err := agent.serviceAdapter.poll(); err != nil {
+		logger.Error(err)
+		agent.terminate()
+		return
+	}
 
 	if agent.activeLogEvent != nil && agent.logAdapter.image == nil {
 		event := agent.activeLogEvent
@@ -314,7 +323,11 @@ func (agent *ClusteredServiceAgent) DoWork() int {
 	}
 
 	if agent.logAdapter.image != nil {
-		polled := agent.logAdapter.poll(agent.commitPosition.Get())
+		polled, err := agent.logAdapter.poll(agent.commitPosition.Get())
+		if err != nil {
+			// TODO: Better way to handle this error?
+			logger.Error(err)
+		}
 		work += polled
 		if polled == 0 && agent.logAdapter.isDone() {
 			agent.closeLog()
