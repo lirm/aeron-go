@@ -59,9 +59,9 @@ const LocalSocketAddressStatusCounterTypeId = 14
 
 type ReceivingConductor interface {
 	CounterReader() *ctr.Reader
-	releaseSubscription(regID int64, images []Image)
-	AddRcvDestination(registrationID int64, endpointChannel string)
-	RemoveRcvDestination(registrationID int64, endpointChannel string)
+	releaseSubscription(regID int64, images []Image) error
+	AddRcvDestination(registrationID int64, endpointChannel string) error
+	RemoveRcvDestination(registrationID int64, endpointChannel string) error
 }
 
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and

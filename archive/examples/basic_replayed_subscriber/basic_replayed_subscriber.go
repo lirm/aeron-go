@@ -91,7 +91,10 @@ func main() {
 	}
 
 	logger.Infof("Subscribing to channel:%s, stream:%d", subChannel, replayStream)
-	subscription := <-arch.AddSubscription(subChannel, replayStream)
+	subscription, err := arch.AddSubscription(subChannel, replayStream)
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer subscription.Close()
 	logger.Infof("Subscription found %v", subscription)
 

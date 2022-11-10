@@ -87,7 +87,10 @@ func NewAeronCluster(
 		return nil, err
 	}
 
-	egressSub := <-aeronClient.AddSubscription(options.EgressChannel, options.EgressStreamId)
+	egressSub, err := aeronClient.AddSubscription(options.EgressChannel, options.EgressStreamId)
+	if err != nil {
+		return nil, err
+	}
 
 	sessionMsgHdrBuf := codecs.MakeClusterMessageBuffer(cluster.SessionMessageHeaderTemplateId, cluster.SessionMessageHdrBlockLength)
 
@@ -235,7 +238,12 @@ func (ac *AeronCluster) updateMemberEndpoints(endpoints string) {
 			}
 			if member.memberId == ac.leaderMemberId {
 				if member.publication == nil {
-					member.publication = ac.createIngressPublication(address)
+					pub, err := ac.createIngressPublication(address)
+					if err == nil {
+						member.publication = pub
+					} else {
+						logger.Warning(err)
+					}
 				}
 				ac.ingressPub = member.publication
 				ac.fragmentAssembler.Clear()
@@ -250,18 +258,26 @@ func (ac *AeronCluster) createPublications() (int, error) {
 	if len(ac.memberByIdMap) > 0 {
 		for _, member := range ac.memberByIdMap {
 			if member.publication == nil {
-				member.publication = ac.createIngressPublication(member.endpoint)
+				pub, err := ac.createIngressPublication(member.endpoint)
+				if err != nil {
+					return 0, err
+				}
+				member.publication = pub
 			}
 		}
 	} else if ac.ingressPub == nil {
-		ac.ingressPub = ac.createIngressPublication(ac.opts.IngressChannel)
+		pub, err := ac.createIngressPublication(ac.opts.IngressChannel)
+		if err != nil {
+			return 0, err
+		}
+		ac.ingressPub = pub
 	}
 	ac.state = clientAwaitPublicationConnected
 	ac.awaitTimeoutTime = time.Now().UnixMilli() + (5 * time.Second).Milliseconds()
 	return 1, nil
 }
 
-func (ac *AeronCluster) createIngressPublication(endpoint string) *aeron.Publication {
+func (ac *AeronCluster) createIngressPublication(endpoint string) (*aeron.Publication, error) {
 	if ac.ingressChannel.IsUdp() {
 		ac.ingressChannel.Set("endpoint", endpoint)
 	}
@@ -269,9 +285,9 @@ func (ac *AeronCluster) createIngressPublication(endpoint string) *aeron.Publica
 	logger.Debugf("createIngressPublication - endpoint=%s isUdp=%v isExclusive=%v",
 		endpoint, ac.ingressChannel.IsUdp(), ac.opts.IsIngressExclusive)
 	if ac.opts.IsIngressExclusive {
-		return <-ac.aeronClient.AddExclusivePublication(channel, ac.opts.IngressStreamId)
+		return ac.aeronClient.AddExclusivePublication(channel, ac.opts.IngressStreamId)
 	} else {
-		return <-ac.aeronClient.AddPublication(channel, ac.opts.IngressStreamId)
+		return ac.aeronClient.AddPublication(channel, ac.opts.IngressStreamId)
 	}
 }
 

@@ -77,10 +77,16 @@ func NewClusteredServiceAgent(
 		return nil, err
 	}
 
-	pub := <-aeronClient.AddPublication(options.ControlChannel, options.ConsensusModuleStreamId)
+	pub, err := aeronClient.AddPublication(options.ControlChannel, options.ConsensusModuleStreamId)
+	if err != nil {
+		return nil, err
+	}
 	proxy := newConsensusModuleProxy(options, pub)
 
-	sub := <-aeronClient.AddSubscription(options.ControlChannel, options.ServiceStreamId)
+	sub, err := aeronClient.AddSubscription(options.ControlChannel, options.ServiceStreamId)
+	if err != nil {
+		return nil, err
+	}
 	serviceAdapter := &serviceAdapter{
 		marshaller:   codecs.NewSbeGoMarshaller(),
 		subscription: sub,
@@ -242,7 +248,10 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 
 	logger.Debugf("replaying snapshot - recId=%d sessionId=%d streamId=%d",
 		recordingId, replaySessionId, streamId)
-	subscription := <-arch.AddSubscription(subChannel, streamId)
+	subscription, err := arch.AddSubscription(subChannel, streamId)
+	if err != nil {
+		return err
+	}
 	defer closeSubscription(subscription)
 
 	img := agent.awaitImage(int32(replaySessionId), subscription)
@@ -373,14 +382,17 @@ type activeLogEvent struct {
 	logChannel     string
 }
 
-func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
-	logSub := <-agent.aeronClient.AddSubscription(event.logChannel, event.logStreamId)
+func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) error {
+	logSub, err := agent.aeronClient.AddSubscription(event.logChannel, event.logStreamId)
+	if err != nil {
+		return err
+	}
 	img := agent.awaitImage(event.logSessionId, logSub)
 	if img.Position() != agent.logPosition {
-		panic(fmt.Errorf("joinActiveLog - image.position=%v expected=%v", img.Position(), agent.logPosition))
+		return fmt.Errorf("joinActiveLog - image.position=%v expected=%v", img.Position(), agent.logPosition)
 	}
 	if event.logPosition != agent.logPosition {
-		panic(fmt.Errorf("joinActiveLog - event.logPos=%v expected=%v", event.logPosition, agent.logPosition))
+		return fmt.Errorf("joinActiveLog - event.logPos=%v expected=%v", event.logPosition, agent.logPosition)
 	}
 	agent.logAdapter.image = img
 	agent.logAdapter.maxLogPosition = event.maxLogPosition
@@ -397,6 +409,7 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) {
 	agent.markFile.flyweight.MemberId.Set(agent.memberId)
 
 	agent.setRole(event.role)
+	return nil
 }
 
 func (agent *ClusteredServiceAgent) closeLog() {
@@ -437,26 +450,30 @@ func (agent *ClusteredServiceAgent) onSessionOpen(
 	responseStreamId int32,
 	responseChannel string,
 	encodedPrincipal []byte,
-) {
+) error {
 	agent.logPosition = logPosition
 	agent.clusterTime = timestamp
 	if _, ok := agent.sessions[clusterSessionId]; ok {
-		logger.Errorf("clashing open session - id=%d leaderTermId=%d logPos=%d",
+		return fmt.Errorf("clashing open session - id=%d leaderTermId=%d logPos=%d",
 			clusterSessionId, leadershipTermId, logPosition)
 	} else {
-		session := newContainerClientSession(
+		session, err := newContainerClientSession(
 			clusterSessionId,
 			responseStreamId,
 			responseChannel,
 			encodedPrincipal,
 			agent,
 		)
+		if err != nil {
+			return err
+		}
 		// TODO: looks like we only want to connect if this is the leader
 		// currently always connecting
 
 		agent.sessions[session.id] = session
 		agent.service.OnSessionOpen(session, timestamp)
 	}
+	return nil
 }
 
 func (agent *ClusteredServiceAgent) onSessionClose(

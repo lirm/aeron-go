@@ -39,15 +39,19 @@ func newContainerClientSession(
 	responseChannel string,
 	encodedPrincipal []byte,
 	agent *ClusteredServiceAgent,
-) *containerClientSession {
+) (*containerClientSession, error) {
+	pub, err := agent.aeronClient.AddPublication(responseChannel, responseStreamId)
+	if err != nil {
+		return nil, err
+	}
 	return &containerClientSession{
 		id:               id,
 		responseStreamId: responseStreamId,
 		responseChannel:  responseChannel,
 		encodedPrincipal: encodedPrincipal,
 		agent:            agent,
-		response:         <-agent.aeronClient.AddPublication(responseChannel, responseStreamId),
-	}
+		response:         pub,
+	}, nil
 }
 
 func (s *containerClientSession) Id() int64 {

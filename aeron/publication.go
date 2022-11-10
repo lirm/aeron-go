@@ -141,7 +141,7 @@ func (pub *Publication) IsOriginal() bool {
 func (pub *Publication) Close() error {
 	// FIXME Why can pub be nil?!
 	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
-		pub.conductor.releasePublication(pub.regID)
+		return pub.conductor.releasePublication(pub.regID)
 	}
 
 	return nil

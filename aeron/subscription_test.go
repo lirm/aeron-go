@@ -64,7 +64,7 @@ func (s *SubscriptionTestSuite) TearDownTest() {
 }
 
 func (s *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPolling() {
-	s.cc.On("releaseSubscription", RegistrationId, mock.Anything)
+	s.cc.On("releaseSubscription", RegistrationId, mock.Anything).Return(nil)
 
 	s.Require().NoError(s.sub.Close())
 	s.Assert().True(s.sub.IsClosed())
@@ -128,8 +128,17 @@ type MockReceivingConductor struct {
 }
 
 // AddRcvDestination provides a mock function with given fields: registrationID, endpointChannel
-func (_m *MockReceivingConductor) AddRcvDestination(registrationID int64, endpointChannel string) {
-	_m.Called(registrationID, endpointChannel)
+func (_m *MockReceivingConductor) AddRcvDestination(registrationID int64, endpointChannel string) error {
+	ret := _m.Called(registrationID, endpointChannel)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int64, string) error); ok {
+		r0 = rf(registrationID, endpointChannel)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // CounterReader provides a mock function with given fields:
@@ -149,13 +158,31 @@ func (_m *MockReceivingConductor) CounterReader() *counters.Reader {
 }
 
 // RemoveRcvDestination provides a mock function with given fields: registrationID, endpointChannel
-func (_m *MockReceivingConductor) RemoveRcvDestination(registrationID int64, endpointChannel string) {
-	_m.Called(registrationID, endpointChannel)
+func (_m *MockReceivingConductor) RemoveRcvDestination(registrationID int64, endpointChannel string) error {
+	ret := _m.Called(registrationID, endpointChannel)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int64, string) error); ok {
+		r0 = rf(registrationID, endpointChannel)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // releaseSubscription provides a mock function with given fields: regID, images
-func (_m *MockReceivingConductor) releaseSubscription(regID int64, images []Image) {
-	_m.Called(regID, images)
+func (_m *MockReceivingConductor) releaseSubscription(regID int64, images []Image) error {
+	ret := _m.Called(regID, images)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int64, []Image) error); ok {
+		r0 = rf(regID, images)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewMockReceivingConductor interface {

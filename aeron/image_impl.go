@@ -27,7 +27,6 @@ import (
 type image struct {
 	sourceIdentity     string
 	logBuffers         *logbuffer.LogBuffers
-	exceptionHandler   func(error)
 	termBuffers        [logbuffer.PartitionCount]*atomic.Buffer
 	subscriberPosition Position
 	header             logbuffer.Header

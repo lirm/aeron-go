@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +18,14 @@ limitations under the License.
 package rb
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-const insufficientCapacity int32 = -2
+var insufficientCapacity error = errors.New("insufficient capacity")
 
 var descriptor = struct {
 	tailPositionOffset       int32
@@ -93,7 +95,7 @@ func (buf *ManyToOne) consumerPosition() int64 {
 	return buf.buffer.GetInt64Volatile(buf.headPositionIndex)
 }
 
-func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
+func (buf *ManyToOne) claimCapacity(requiredCapacity int32) (int32, error) {
 
 	mask := buf.capacity - 1
 	head := buf.buffer.GetInt64Volatile(buf.headCachePositionIndex)
@@ -110,7 +112,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 			head = buf.buffer.GetInt64Volatile(buf.headPositionIndex)
 
 			if requiredCapacity > (buf.capacity - int32(tail-head)) {
-				return insufficientCapacity
+				return 0, insufficientCapacity
 			}
 
 			buf.buffer.PutInt64Ordered(buf.headCachePositionIndex, head)
@@ -128,7 +130,7 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 				headIndex = int32(head & int64(mask))
 
 				if requiredCapacity > headIndex {
-					return insufficientCapacity
+					return 0, insufficientCapacity
 				}
 
 				buf.buffer.PutInt64Ordered(buf.headCachePositionIndex, head)
@@ -143,36 +145,37 @@ func (buf *ManyToOne) claimCapacity(requiredCapacity int32) int32 {
 		tailIndex = 0
 	}
 
-	return tailIndex
+	return tailIndex, nil
 }
 
-func (buf *ManyToOne) checkMsgLength(length int32) {
+func (buf *ManyToOne) checkMsgLength(length int32) error {
 	if length > buf.maxMsgLength {
-		panic(fmt.Sprintf("encoded message exceeds maxMsgLength of %d, length=%d", buf.maxMsgLength, length))
+		return fmt.Errorf("encoded message exceeds maxMsgLength of %d, length=%d", buf.maxMsgLength, length)
+	} else {
+		return nil
 	}
 }
 
-// Write will attempt to append the bytes from srcBuffer to this rinf buffer
-func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex int32, length int32) bool {
-
-	isSuccessful := false
-
-	checkMsgTypeID(msgTypeID)
-	buf.checkMsgLength(length)
+// Write will attempt to append the bytes from srcBuffer to this ring buffer
+func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex int32, length int32) error {
+	if err := checkMsgTypeID(msgTypeID); err != nil {
+		return err
+	}
+	if err := buf.checkMsgLength(length); err != nil {
+		return err
+	}
 
 	recordLength := length + RecordDescriptor.HeaderLength
 	requiredCapacity := util.AlignInt32(recordLength, RecordDescriptor.RecordAlignment)
-	recordIndex := buf.claimCapacity(requiredCapacity)
-
-	if insufficientCapacity != recordIndex {
-		buf.buffer.PutInt64Ordered(recordIndex, makeHeader(-recordLength, msgTypeID))
-		buf.buffer.PutBytes(EncodedMsgOffset(recordIndex), srcBuffer, srcIndex, length)
-		buf.buffer.PutInt32Ordered(LengthOffset(recordIndex), recordLength)
-
-		isSuccessful = true
+	recordIndex, err := buf.claimCapacity(requiredCapacity)
+	if err != nil {
+		return err
 	}
 
-	return isSuccessful
+	buf.buffer.PutInt64Ordered(recordIndex, makeHeader(-recordLength, msgTypeID))
+	buf.buffer.PutBytes(EncodedMsgOffset(recordIndex), srcBuffer, srcIndex, length)
+	buf.buffer.PutInt32Ordered(LengthOffset(recordIndex), recordLength)
+	return nil
 }
 
 func (buf *ManyToOne) read(Handler, messageCountLimit int) int32 {
