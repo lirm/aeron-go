@@ -113,7 +113,6 @@ type lingerResourse struct {
 }
 
 type ClientConductor struct {
-	// TODO: Investigate if these would be more efficiently stored as maps
 	pubs []*publicationStateDefn
 	subs []*subscriptionStateDefn
 

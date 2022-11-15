@@ -75,7 +75,10 @@ func Connect(ctx *Context) (*Aeron, error) {
 
 	aeron.driverProxy.Init(&aeron.toDriverRingBuffer)
 
-	aeron.toClientsBroadcastReceiver = broadcast.NewReceiver(aeron.counters.ToClientsBuf.Get())
+	aeron.toClientsBroadcastReceiver, err = broadcast.NewReceiver(aeron.counters.ToClientsBuf.Get())
+	if err != nil {
+		return nil, err
+	}
 
 	aeron.toClientsCopyReceiver = broadcast.NewCopyReceiver(aeron.toClientsBroadcastReceiver)
 
