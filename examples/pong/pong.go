@@ -105,12 +105,12 @@ func main() {
 				offset, length, header.Offset(), header.TermId(), header.FrameLength())
 		}
 		for true {
-			// TODO: get error from Offer, return it from handler
-			ret := publication.Offer(buffer, offset, length, nil)
+			ret, err := publication.Offer(buffer, offset, length, nil)
+			if err != nil {
+				return err
+			}
 			if ret >= 0 {
 				break
-				//} else {
-				//	panic(fmt.Sprintf("Failed to send message of %d bytes due to %d", length, ret))
 			}
 		}
 		return nil

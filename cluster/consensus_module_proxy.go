@@ -1,8 +1,21 @@
+// Copyright 2022 Steven Stern
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cluster
 
 import (
-	"fmt"
-
+	"errors"
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
@@ -81,13 +94,15 @@ func (proxy *consensusModuleProxy) scheduleTimer(correlationId int64, deadline i
 	buf := proxy.initBuffer(scheduleTimerTemplateId, scheduleTimerBlockLength)
 	buf.PutInt64(SBEHeaderLength, correlationId)
 	buf.PutInt64(SBEHeaderLength+8, deadline)
-	return proxy.offer(buf, SBEHeaderLength+scheduleTimerBlockLength) >= 0
+	_, err := proxy.offer(buf, SBEHeaderLength+scheduleTimerBlockLength)
+	return err != nil
 }
 
 func (proxy *consensusModuleProxy) cancelTimer(correlationId int64) bool {
 	buf := proxy.initBuffer(cancelTimerTemplateId, cancelTimerBlockLength)
 	buf.PutInt64(SBEHeaderLength, correlationId)
-	return proxy.offer(buf, SBEHeaderLength+cancelTimerBlockLength) >= 0
+	_, err := proxy.offer(buf, SBEHeaderLength+cancelTimerBlockLength)
+	return err != nil
 }
 
 func (proxy *consensusModuleProxy) initBuffer(templateId uint16, blockLength uint16) *atomic.Buffer {
@@ -102,20 +117,28 @@ func (proxy *consensusModuleProxy) initBuffer(templateId uint16, blockLength uin
 // send to our request publication
 func (proxy *consensusModuleProxy) send(payload []byte) {
 	buffer := atomic.MakeBuffer(payload)
-	for proxy.offer(buffer, buffer.Capacity()) < 0 {
+	for {
+		_, err := proxy.offer(buffer, buffer.Capacity())
+		if err == nil {
+			break
+		}
 		proxy.idleStrategy.Idle(0)
 	}
 }
 
-func (proxy *consensusModuleProxy) offer(buffer *atomic.Buffer, length int32) int64 {
+func (proxy *consensusModuleProxy) offer(buffer *atomic.Buffer, length int32) (int64, error) {
 	var result int64
+	var err error
 	for i := 0; i < 3; i++ {
-		result = proxy.publication.Offer(buffer, 0, length, nil)
-		if result >= 0 {
-			break
-		} else if result == aeron.NotConnected || result == aeron.PublicationClosed || result == aeron.MaxPositionExceeded {
-			panic(fmt.Sprintf("offer failed, result=%d", result))
+		result, err = proxy.publication.Offer(buffer, 0, length, nil)
+		if err != nil {
+			return result, err
+		}
+		if errors.Is(err, aeron.NotConnectedErr) ||
+			errors.Is(err, aeron.PublicationClosedErr) ||
+			errors.Is(err, aeron.MaxPositionExceededErr) {
+			return 0, err
 		}
 	}
-	return result
+	return result, err
 }

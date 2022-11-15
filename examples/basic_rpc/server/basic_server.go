@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -116,13 +117,12 @@ func main() {
 		srcBuffer := atomic.MakeBuffer(([]byte)(message))
 		for _, c := range clients {
 			publication := c.pub
-			ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
-			switch ret {
-			case aeron.NotConnected:
+			ret, err := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
+			if errors.Is(err, aeron.NotConnectedErr) {
 				log.Printf("%d: not connected yet", counter)
-			case aeron.BackPressured:
+			} else if errors.Is(err, aeron.BackPressuredErr) {
 				log.Printf("%d: back pressured", counter)
-			default:
+			} else {
 				if ret < 0 {
 					log.Printf("%d: Unrecognized code: %d", counter, ret)
 				} else {

@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -97,14 +98,13 @@ func main() {
 	for {
 		counter := 0
 		srcBuffer := atomic.MakeBuffer([]byte(subChannel), len(subChannel))
-		ret := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+		ret, err := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
 		success := false
-		switch ret {
-		case aeron.NotConnected:
+		if errors.Is(err, aeron.NotConnectedErr) {
 			log.Printf("%d: not connected yet", counter)
-		case aeron.BackPressured:
+		} else if errors.Is(err, aeron.BackPressuredErr) {
 			log.Printf("%d: back pressured", counter)
-		default:
+		} else {
 			if ret < 0 {
 				log.Printf("%d: Unrecognized code: %d", counter, ret)
 			} else {

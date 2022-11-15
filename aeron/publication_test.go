@@ -99,9 +99,9 @@ func TestNewPublication(t *testing.T) {
 	srcBuffer := atomic.MakeBuffer(make([]byte, 256))
 
 	milliEpoch := (time.Nanosecond * time.Duration(time.Now().UnixNano())) / time.Millisecond
-	pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	pos, err := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
 	t.Logf("new pos: %d", pos)
-	assert.Equalf(t, pos, NotConnected, "Expected publication to not be connected at %d: %d", milliEpoch, pos)
+	assert.Equalf(t, err, NotConnectedErr, "Expected publication to not be connected at %d: %d", milliEpoch, pos)
 
 	//pub.metaData.TimeOfLastStatusMsg.Set(milliEpoch.Nanoseconds())
 	//pos = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
@@ -111,7 +111,8 @@ func TestNewPublication(t *testing.T) {
 	//}
 	//
 	pub.pubLimit.set(1024)
-	pos = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	pos, err = pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	assert.NoError(t, err)
 	t.Logf("new pos: %d", pos)
 	assert.EqualValuesf(t, pos, srcBuffer.Capacity()+logbuffer.DataFrameHeader.Length,
 		"Expected publication to advance to position %d", srcBuffer.Capacity()+logbuffer.DataFrameHeader.Length)
@@ -166,15 +167,16 @@ func TestPublication_Offer(t *testing.T) {
 	frameLen := int64(srcBuffer.Capacity() + logbuffer.DataFrameHeader.Length)
 	pub.pubLimit.set(int64(termBufLen))
 	for i := int64(1); i <= int64(termBufLen)/frameLen; i++ {
-		pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+		pos, err := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+		assert.NoError(t, err)
 		//t.Logf("new pos: %d", pos)
 
 		assert.Equalf(t, pos, frameLen*i,
 			"Expected publication to advance to position %d (have %d)", frameLen*i, pos)
 	}
 
-	pos := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+	pos, err := pub.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
 	t.Logf("new pos: %d", pos)
-	assert.Equalf(t, pos, AdminAction,
-		"Expected publication to trigger AdminAction (%d)", pos)
+	assert.Equalf(t, err, AdminActionErr,
+		"Expected publication to trigger AdminAction (%s)", err)
 }

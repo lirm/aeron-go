@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -60,12 +61,11 @@ func (s *EchoService) OnSessionMessage(
 	header *logbuffer.Header,
 ) {
 	s.messageCount++
-	var result int64
 	for offerCnt := 1; ; offerCnt++ {
-		result = session.Offer(buffer, offset, length, nil)
-		if result >= 0 {
+		result, err := session.Offer(buffer, offset, length, nil)
+		if err == nil {
 			return
-		} else if result == aeron.BackPressured || result == aeron.AdminAction {
+		} else if errors.Is(err, aeron.BackPressuredErr) || errors.Is(err, aeron.AdminActionErr) {
 			s.cluster.IdleStrategy().Idle(0)
 		} else {
 			fmt.Printf("WARNING: OnSessionMessage offer failed - sessionId=%d time=%d pos=%d len=%d offerCnt=%d result=%v\n",
@@ -84,10 +84,10 @@ func (s *EchoService) OnTakeSnapshot(publication *aeron.Publication) {
 	buf := atomic.MakeBuffer(make([]byte, 4))
 	buf.PutInt32(0, s.messageCount)
 	for {
-		result := publication.Offer(buf, 0, buf.Capacity(), nil)
-		if result >= 0 {
+		result, err := publication.Offer(buf, 0, buf.Capacity(), nil)
+		if err != nil {
 			return
-		} else if result == aeron.BackPressured || result == aeron.AdminAction {
+		} else if errors.Is(err, aeron.BackPressuredErr) || errors.Is(err, aeron.AdminActionErr) {
 			s.cluster.IdleStrategy().Idle(0)
 		} else {
 			fmt.Printf("WARNING: OnTakeSnapshot offer failed - result=%v\n", result)

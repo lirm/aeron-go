@@ -1,3 +1,17 @@
+// Copyright 2022 Steven Stern
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package client
 
 import (
@@ -165,9 +179,9 @@ func (ac *AeronCluster) Poll() (int, error) {
 	return 0, nil
 }
 
-func (ac *AeronCluster) Offer(buffer *atomic.Buffer, offset, length int32) int64 {
+func (ac *AeronCluster) Offer(buffer *atomic.Buffer, offset, length int32) (int64, error) {
 	if ac.state != clientConnected {
-		return aeron.NotConnected
+		return 0, aeron.NotConnectedErr
 	} else {
 		hdrBuf := ac.sessionMsgHdrBuffer
 		return ac.ingressPub.Offer2(hdrBuf, 0, hdrBuf.Capacity(), buffer, offset, length, nil)
@@ -180,7 +194,7 @@ func (ac *AeronCluster) SendKeepAlive() bool {
 	}
 	buf := ac.keepAliveBuffer
 	for i := 0; i < 3; i++ {
-		if result := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); result >= 0 {
+		if _, err := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); err != nil {
 			return true
 		}
 		ac.opts.IdleStrategy.Idle(0)
@@ -309,23 +323,28 @@ func (ac *AeronCluster) awaitPublicationConnected() (int, error) {
 			if member.publication != nil && member.publication.IsConnected() {
 				ac.ingressPub = member.publication
 				ac.fragmentAssembler.Clear()
-				if ac.sendConnectRequest(responseChannel) {
+				err := ac.sendConnectRequest(responseChannel)
+				if err == nil {
 					logger.Debugf("sent connect request to memberId=%d correlationId=%d channel=%s",
 						member.memberId, ac.correlationId, member.publication.Channel())
 					ac.state = clientAwaitConnectReply
 					ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 					break
 				}
+				if !errors.Is(err, aeron.TemporaryError) {
+					return 0, err
+				}
 			}
 		}
-	} else if ac.ingressPub.IsConnected() && ac.sendConnectRequest(responseChannel) {
+	} else if ac.ingressPub.IsConnected() && ac.sendConnectRequest(responseChannel) == nil {
 		ac.state = clientAwaitConnectReply
 		ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 	}
 	return 0, nil
 }
 
-func (ac *AeronCluster) sendConnectRequest(responseChannel string) bool {
+// Returns nil on success, TemporaryError, or any other error is a permanent error.
+func (ac *AeronCluster) sendConnectRequest(responseChannel string) error {
 	ac.correlationId = ac.aeronClient.NextCorrelationID()
 	req := codecs.SessionConnectRequest{
 		CorrelationId:    ac.correlationId,
@@ -341,19 +360,19 @@ func (ac *AeronCluster) sendConnectRequest(responseChannel string) bool {
 	}
 	writer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, writer); err != nil {
-		panic(err)
+		return err
 	}
 	if err := req.Encode(marshaller, writer, true); err != nil {
-		panic(err)
+		return err
 	}
 	buffer := atomic.MakeBuffer(writer.Bytes())
-	result := ac.ingressPub.Offer(buffer, 0, buffer.Capacity(), nil)
-	if result >= 0 {
-		return true
-	} else {
+	// TODO: Not every Offer() error is temporary.  However, I'm preserving backwards functionality for now.
+	result, err := ac.ingressPub.Offer(buffer, 0, buffer.Capacity(), nil)
+	if err != nil {
 		logger.Debugf("failed to send connect request, channel=%s result=%d", ac.ingressPub.Channel(), result)
-		return false
+		return fmt.Errorf("%w error: %s", aeron.TemporaryError, err.Error())
 	}
+	return nil
 }
 
 func (ac *AeronCluster) pollEgress(fragmentLimit int) (int, error) {
@@ -505,7 +524,7 @@ func (ac *AeronCluster) sendCloseSession() {
 	buf.PutInt64(cluster.SBEHeaderLength, ac.leadershipTermId)
 	buf.PutInt64(cluster.SBEHeaderLength+8, ac.clusterSessionId)
 	for i := 0; i < 3; i++ {
-		if result := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); result >= 0 {
+		if _, err := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); err != nil {
 			return
 		}
 		ac.opts.IdleStrategy.Idle(0)

@@ -112,19 +112,15 @@ func main() {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-		for true {
-			ret := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
-			if ret > 0 {
-				break
-			} else {
-				panic(fmt.Sprintf("Failed to offer message of %d bytes due to %d", srcBuffer.Capacity(), ret))
-			}
+		_, err := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to offer message of %d bytes due to %s", srcBuffer.Capacity(), err))
 		}
 
 		for true {
 			ret, err := subscription.Poll(handler, 10)
 			if err != nil {
-				panic(fmt.Sprintf("Failed to poll due to %d", ret))
+				panic(fmt.Sprintf("Failed to poll due to %s", err))
 			}
 			if ret > 0 {
 				break
@@ -140,7 +136,11 @@ func main() {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
+		for true {
+			_, err := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+			if err == nil {
+				break
+			}
 		}
 
 		for emptyPoll(subscription.Poll(handler, 10)) {

@@ -1,6 +1,21 @@
+// Copyright 2022 Steven Stern
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cluster
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -67,8 +82,8 @@ func (st *snapshotTaker) markSnapshot(
 	if err != nil {
 		return err
 	}
-	if ret := st.offer(bytes); ret < 0 {
-		return fmt.Errorf("snapshotTaker.offer failed: %d", ret)
+	if _, err := st.offer(bytes); err != nil {
+		return fmt.Errorf("snapshotTaker.offer failed: %w", err)
 	}
 	return nil
 }
@@ -79,29 +94,29 @@ func (st *snapshotTaker) snapshotSession(session ClientSession) error {
 	if err != nil {
 		return err
 	}
-	if ret := st.offer(bytes); ret < 0 {
-		return fmt.Errorf("snapshotTaker.offer failed: %d", ret)
+	if _, err := st.offer(bytes); err != nil {
+		return fmt.Errorf("snapshotTaker.offer failed: %w", err)
 	}
 	return nil
 }
 
 // Offer to our request publication
-func (st *snapshotTaker) offer(bytes []byte) int64 {
+func (st *snapshotTaker) offer(bytes []byte) (int64, error) {
 	buffer := atomic.MakeBuffer(bytes)
 	length := int32(len(bytes))
 	start := time.Now()
 	var ret int64
+	var err error
 	for time.Since(start) < st.options.Timeout {
-		ret = st.publication.Offer(buffer, 0, length, nil)
-		switch ret {
-		// Retry on these
-		case aeron.NotConnected, aeron.BackPressured, aeron.AdminAction:
+		ret, err = st.publication.Offer(buffer, 0, length, nil)
+		if errors.Is(err, aeron.NotConnectedErr) ||
+			errors.Is(err, aeron.BackPressuredErr) ||
+			errors.Is(err, aeron.AdminActionErr) {
 			st.options.IdleStrategy.Idle(0)
-		// Fail or succeed on other values
-		default:
-			return ret
+		} else {
+			return ret, err
 		}
 	}
 	// Give up, returning the last failure
-	return ret
+	return ret, err
 }
