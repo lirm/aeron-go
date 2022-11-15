@@ -37,7 +37,7 @@ const (
 
 // FindCounterIdByRecording finds the active counter id for a stream based on the recording id.
 // Returns the counter id if found otherwise NullCounterId
-func FindCounterIdByRecording(countersReader *counters.Reader, recordingId int64) int32 {
+func FindCounterIdByRecording(countersReader *counters.Reader, recordingId int64) (int32, error) {
 	return countersReader.FindCounter(RECORDING_POSITION_COUNTER_TYPE_ID, func(keyBuffer *atomic.Buffer) bool {
 		return keyBuffer.GetInt64(RECORDING_ID_OFFSET) == recordingId
 	})
@@ -45,7 +45,7 @@ func FindCounterIdByRecording(countersReader *counters.Reader, recordingId int64
 
 // FindCounterIdBySession finds the active counterID for a stream based on the session id.
 // Returns the counter id if found otherwise NullCounterId
-func FindCounterIdBySession(countersReader *counters.Reader, sessionId int32) int32 {
+func FindCounterIdBySession(countersReader *counters.Reader, sessionId int32) (int32, error) {
 	return countersReader.FindCounter(RECORDING_POSITION_COUNTER_TYPE_ID, func(keyBuffer *atomic.Buffer) bool {
 		return keyBuffer.GetInt32(SESSION_ID_OFFSET) == sessionId
 	})

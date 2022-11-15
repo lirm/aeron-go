@@ -160,14 +160,14 @@ func (agent *ClusteredServiceAgent) OnStart() error {
 
 func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
 	for {
-		id := agent.counters.FindCounter(commitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id, err := agent.counters.FindCounter(commitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			return keyBuffer.GetInt32(0) == agent.opts.ClusterId
 		})
-		if id != counters.NullCounterId {
-			commitPos, err := counters.NewReadableCounter(agent.counters, id)
+		if err != nil {
+			commitPos, err2 := counters.NewReadableCounter(agent.counters, id)
 			logger.Debugf("found commit position counter - id=%d value=%d", id, commitPos.Get())
 			agent.commitPosition = commitPos
-			return err
+			return err2
 		}
 		agent.Idle(0)
 	}
@@ -212,7 +212,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 	for {
 		var leadershipTermId int64
-		id := agent.counters.FindCounter(recoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id, err := agent.counters.FindCounter(recoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(24) == agent.opts.ClusterId {
 				leadershipTermId = keyBuffer.GetInt64(0)
 				agent.logPosition = keyBuffer.GetInt64(8)
@@ -221,7 +221,7 @@ func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 			}
 			return false
 		})
-		if id != counters.NullCounterId {
+		if err != nil {
 			return id, leadershipTermId
 		}
 		agent.Idle(0)
@@ -623,14 +623,14 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 	start := time.Now()
 	for time.Since(start) < agent.opts.Timeout {
 		recId := int64(NullValue)
-		counterId := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		_, err := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(8) == sessionId {
 				recId = keyBuffer.GetInt64(0)
 				return true
 			}
 			return false
 		})
-		if counterId != NullValue {
+		if err != nil {
 			return recId, nil
 		}
 		agent.Idle(0)

@@ -17,12 +17,13 @@ limitations under the License.
 package broadcast
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/lirm/aeron-go/aeron/atomic"
 )
 
-type Handler func(int32, *atomic.Buffer, int32, int32)
+type Handler func(int32, *atomic.Buffer, int32, int32) error
 
 type CopyReceiver struct {
 	receiver      *Receiver
@@ -40,31 +41,34 @@ func NewCopyReceiver(receiver *Receiver) *CopyReceiver {
 	return bcast
 }
 
-func (bcast *CopyReceiver) Receive(handler Handler) int {
+func (bcast *CopyReceiver) Receive(handler Handler) (int, error) {
 	messagesReceived := 0
 	lastSeenLappedCount := bcast.receiver.GetLappedCount()
 
 	if bcast.receiver.receiveNext() {
 		if lastSeenLappedCount != bcast.receiver.GetLappedCount() {
-			panic("Unable to keep up with broadcast buffer")
+			return 0, errors.New("unable to keep up with broadcast buffer")
 		}
 
 		length := bcast.receiver.length()
 		if length > bcast.scratchBuffer.Capacity() {
-			panic(fmt.Sprintf("Buffer required size %d but only has %d", length, bcast.scratchBuffer.Capacity()))
+			return 0, fmt.Errorf("buffer required size %d but only has %d",
+				length, bcast.scratchBuffer.Capacity())
 		}
 
 		msgTypeID := bcast.receiver.typeID()
 		bcast.scratchBuffer.PutBytes(0, bcast.receiver.buffer, bcast.receiver.offset(), length)
 
 		if !bcast.receiver.Validate() {
-			panic("Unable to keep up with broadcast buffer")
+			return 0, errors.New("unable to keep up with broadcast buffer")
 		}
 
-		handler(msgTypeID, bcast.scratchBuffer, 0, length)
+		if err := handler(msgTypeID, bcast.scratchBuffer, 0, length); err != nil {
+			return 0, err
+		}
 
 		messagesReceived = 1
 	}
 
-	return messagesReceived
+	return messagesReceived, nil
 }

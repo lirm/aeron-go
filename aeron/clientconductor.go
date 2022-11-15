@@ -240,7 +240,12 @@ func (cc *ClientConductor) run(idleStrategy idlestrategy.Idler) {
 
 	cc.conductorRunning.Set(true)
 	for cc.running.Get() {
-		idleStrategy.Idle(cc.doWork())
+		workCount, err := cc.doWork()
+		if err != nil {
+			cc.onError(err)
+			return
+		}
+		idleStrategy.Idle(workCount)
 	}
 }
 
@@ -263,10 +268,13 @@ func (cc *ClientConductor) forceCloseResources() {
 	}
 }
 
-func (cc *ClientConductor) doWork() (workCount int) {
-	workCount += cc.driverListenerAdapter.ReceiveMessages()
-	workCount += cc.onHeartbeatCheckTimeouts()
-	return
+func (cc *ClientConductor) doWork() (int, error) {
+	workCount, err := cc.driverListenerAdapter.ReceiveMessages()
+	if err != nil {
+		return workCount, err
+	}
+	heartbeats, err2 := cc.onHeartbeatCheckTimeouts()
+	return workCount + heartbeats, err2
 }
 
 func (cc *ClientConductor) getDriverStatus() error {
@@ -784,7 +792,7 @@ func (cc *ClientConductor) OnErrorResponse(corrID int64, errorCode int32, errorM
 	}
 }
 
-func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
+func (cc *ClientConductor) onHeartbeatCheckTimeouts() (int, error) {
 	var result int
 
 	now := time.Now().UnixNano()
@@ -792,13 +800,12 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 	if now > (cc.timeOfLastDoWork + cc.interServiceTimeoutNs) {
 		cc.closeAllResources(now)
 
-		err := fmt.Errorf("Timeout between service calls over %d ms (%d > %d + %d) (%d)",
+		return 0, fmt.Errorf("timeout between service calls over %d ms (%d > %d + %d) (%d)",
 			cc.interServiceTimeoutNs/time.Millisecond.Nanoseconds(),
 			now/time.Millisecond.Nanoseconds(),
 			cc.timeOfLastDoWork,
 			cc.interServiceTimeoutNs/time.Millisecond.Nanoseconds(),
 			(now-cc.timeOfLastDoWork)/time.Millisecond.Nanoseconds())
-		cc.onError(err)
 	}
 
 	cc.timeOfLastDoWork = now
@@ -807,11 +814,10 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 		age := cc.driverProxy.TimeOfLastDriverKeepalive()*time.Millisecond.Nanoseconds() + cc.driverTimeoutNs
 		if now > age {
 			cc.driverActive.Set(false)
-			err := fmt.Errorf("MediaDriver keepalive (ms): age=%d > timeout=%d",
+			return 0, fmt.Errorf("MediaDriver keepalive (ms): age=%d > timeout=%d",
 				age,
 				cc.driverTimeoutNs/time.Millisecond.Nanoseconds(),
 			)
-			cc.onError(err)
 		}
 
 		if cc.heartbeatTimestamp != nil {
@@ -820,14 +826,13 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 				cc.heartbeatTimestamp.Set(now / time.Millisecond.Nanoseconds())
 			} else {
 				cc.closeAllResources(now)
-				err := fmt.Errorf("client heartbeat timestamp not active")
-				cc.onError(err)
+				return 0, fmt.Errorf("client heartbeat timestamp not active")
 			}
 		} else {
-			counterId := cc.counterReader.FindCounter(heartbeatTypeId, func(keyBuffer *atomic.Buffer) bool {
+			counterId, err := cc.counterReader.FindCounter(heartbeatTypeId, func(keyBuffer *atomic.Buffer) bool {
 				return keyBuffer.GetInt64(heartheatRegistrationIdOffset) == cc.driverProxy.ClientID()
 			})
-			if counterId != ctr.NullCounterId {
+			if err != nil {
 				var ctrErr error
 				if cc.heartbeatTimestamp, ctrErr = ctr.NewAtomicCounter(cc.counterReader, counterId); ctrErr != nil {
 					logger.Warning("unable to allocate heartbeat counter %d", counterId)
@@ -847,7 +852,7 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() int {
 		result = 1
 	}
 
-	return result
+	return result, nil
 }
 
 func (cc *ClientConductor) onCheckManagedResources(now int64) {

@@ -17,6 +17,7 @@ limitations under the License.
 package driver
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/lirm/aeron-go/aeron/logging"
@@ -105,8 +106,8 @@ func NewAdapter(driverListener Listener, broadcastReceiver *broadcast.CopyReceiv
 	return adapter
 }
 
-func (adapter *ListenerAdapter) ReceiveMessages() int {
-	handler := func(msgTypeID int32, buffer *atomic.Buffer, offset int32, length int32) {
+func (adapter *ListenerAdapter) ReceiveMessages() (int, error) {
+	handler := func(msgTypeID int32, buffer *atomic.Buffer, offset int32, length int32) error {
 		logger.Debugf("received %d", msgTypeID)
 		switch int32(msgTypeID) {
 		case Events.OnPublicationReady:
@@ -224,8 +225,9 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 
 			adapter.listener.OnClientTimeout(msg.clientID.Get())
 		default:
-			logger.Fatalf("received unhandled %d", msgTypeID)
+			return fmt.Errorf("received unhandled %d", msgTypeID)
 		}
+		return nil
 	}
 
 	return adapter.broadcastReceiver.Receive(handler)
