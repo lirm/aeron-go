@@ -381,17 +381,15 @@ func (ac *AeronCluster) pollEgress(fragmentLimit int) (int, error) {
 
 func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, header *logbuffer.Header) error {
 	if length < cluster.SBEHeaderLength {
-		// TODO use an error, here and below
-		return nil
+		return errors.New("length is too small")
 	}
 	blockLength := buffer.GetUInt16(offset)
 	templateId := buffer.GetUInt16(offset + 2)
 	schemaId := buffer.GetUInt16(offset + 4)
 	version := buffer.GetUInt16(offset + 6)
 	if schemaId != cluster.ClusterSchemaId {
-		logger.Errorf("unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
+		return fmt.Errorf("unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
-		return nil
 	}
 	offset += cluster.SBEHeaderLength
 	length -= cluster.SBEHeaderLength
