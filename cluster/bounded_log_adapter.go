@@ -103,7 +103,7 @@ func (adapter *boundedLogAdapter) onMessage(
 			return
 		}
 
-		adapter.agent.onSessionOpen(
+		err := adapter.agent.onSessionOpen(
 			event.LeadershipTermId,
 			header.Position(),
 			event.ClusterSessionId,
@@ -112,6 +112,9 @@ func (adapter *boundedLogAdapter) onMessage(
 			string(event.ResponseChannel),
 			event.EncodedPrincipal,
 		)
+		if err != nil {
+			logger.Errorf("boundedLogAdapter: session open error: %w", err)
+		}
 	case sessionCloseTemplateId:
 		leadershipTermId := buffer.GetInt64(offset)
 		clusterSessionId := buffer.GetInt64(offset + 8)

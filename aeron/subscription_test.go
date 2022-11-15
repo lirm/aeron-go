@@ -59,10 +59,6 @@ func (s *SubscriptionTestSuite) SetupTest() {
 	s.sub = NewSubscription(s.cc, Channel, RegistrationId, StreamId, ChannelStatusId)
 }
 
-func (s *SubscriptionTestSuite) TearDownTest() {
-	logbuffer.RemoveTestingLogbufferFile()
-}
-
 func (s *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPolling() {
 	s.cc.On("releaseSubscription", RegistrationId, mock.Anything).Return(nil)
 

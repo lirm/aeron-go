@@ -34,17 +34,17 @@ func TestWrap(t *testing.T) {
 	}()
 
 	lb, err := NewTestingLogbuffer()
-	defer RemoveTestingLogbufferFile()
+	defer assert.NoError(t, RemoveTestingLogbufferFile())
 	require.NoError(t, err)
-	lb.Close()
+	assert.NoError(t, lb.Close())
 }
 
 func TestWrapFail(t *testing.T) {
 	fname := "logbuffers.bin"
 	mmap, err := memmap.NewFile(fname, 0, 16*1024*1024-1)
-	defer os.Remove(fname)
+	defer assert.NoError(t, os.Remove(fname))
 	require.NoError(t, err)
-	mmap.Close()
+	assert.NoError(t, mmap.Close())
 
 	assert.Panics(t, func() { Wrap(fname) })
 }
@@ -56,9 +56,9 @@ func TestLogBuffers_Buffer(t *testing.T) {
 	}()
 
 	lb, err := NewTestingLogbuffer()
-	defer RemoveTestingLogbufferFile()
+	defer assert.NoError(t, RemoveTestingLogbufferFile())
 	require.NoError(t, err)
-	defer lb.Close()
+	defer assert.NoError(t, lb.Close())
 
 	for i := 0; i <= PartitionCount; i++ {
 		assert.NotNilf(t, lb.Buffer(i), "buffer %d", i)
@@ -67,9 +67,9 @@ func TestLogBuffers_Buffer(t *testing.T) {
 
 func TestLogBuffers_BufferFail(t *testing.T) {
 	lb, err := NewTestingLogbuffer()
-	defer RemoveTestingLogbufferFile()
+	defer assert.NoError(t, RemoveTestingLogbufferFile())
 	require.NoError(t, err)
-	defer lb.Close()
+	defer assert.NoError(t, lb.Close())
 
 	// Index is zero-based
 	assert.Panics(t, func() { lb.Buffer(PartitionCount + 1) })
@@ -95,9 +95,9 @@ func TestLogBuffers_Meta(t *testing.T) {
 	}()
 
 	lb, err := NewTestingLogbuffer()
-	defer RemoveTestingLogbufferFile()
+	defer assert.NoError(t, RemoveTestingLogbufferFile())
 	require.NoError(t, err)
-	defer lb.Close()
+	defer assert.NoError(t, lb.Close())
 
 	for i := 0; i <= PartitionCount; i++ {
 		assert.NotNilf(t, lb.Buffer(i), "nil buffer %d", i)

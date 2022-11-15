@@ -18,6 +18,7 @@ limitations under the License.
 package aeron
 
 import (
+	"errors"
 	ctr "github.com/lirm/aeron-go/aeron/counters"
 	"strings"
 
@@ -131,7 +132,7 @@ func (sub *Subscription) ChannelStatusId() int32 {
 func (sub *Subscription) Close() error {
 	if sub.isClosed.CompareAndSet(false, true) {
 		images := sub.images.Empty()
-		sub.conductor.releaseSubscription(sub.registrationID, images)
+		return sub.conductor.releaseSubscription(sub.registrationID, images)
 	}
 
 	return nil
@@ -352,23 +353,21 @@ func (sub *Subscription) LocalSocketAddresses() []string {
 }
 
 // AddDestination adds a destination manually to a multi-destination Subscription.
-func (sub *Subscription) AddDestination(endpointChannel string) bool {
+func (sub *Subscription) AddDestination(endpointChannel string) error {
 	if sub.IsClosed() {
-		return false
+		return errors.New("subscription is closed")
 	}
 
-	sub.conductor.AddRcvDestination(sub.registrationID, endpointChannel)
-	return true
+	return sub.conductor.AddRcvDestination(sub.registrationID, endpointChannel)
 }
 
 // RemoveDestination removes a destination manually from a multi-destination Subscription.
-func (sub *Subscription) RemoveDestination(endpointChannel string) bool {
+func (sub *Subscription) RemoveDestination(endpointChannel string) error {
 	if sub.IsClosed() {
-		return false
+		return errors.New("subscription is closed")
 	}
 
-	sub.conductor.RemoveRcvDestination(sub.registrationID, endpointChannel)
-	return true
+	return sub.conductor.RemoveRcvDestination(sub.registrationID, endpointChannel)
 }
 
 // IsConnectedTo is a helper function used primarily by tests, which is used within the same process to verify that
