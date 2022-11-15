@@ -20,9 +20,10 @@
 package logging
 
 import (
+	"sync"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"sync"
 )
 
 // Zaplogger is a container to wrap zap logging with the parts of the go-logging API we use
@@ -168,7 +169,7 @@ func (z *ZapLogger) GetLevel() zapcore.Level {
 
 // IsEnabledFor returns true if logging is enabled for the specified level
 func (z *ZapLogger) IsEnabledFor(level zapcore.Level) bool {
-	return level <= z.GetLevel()
+	return level >= z.GetLevel()
 }
 
 // Fatalf logs a formatted string at log level Fatal and will then always exit()
