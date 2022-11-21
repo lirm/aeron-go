@@ -30,8 +30,9 @@ type Context struct {
 
 	errorHandler func(error)
 
-	newPublicationHandler          NewPublicationHandler
-	newSubscriptionHandler         NewSubscriptionHandler
+	newPublicationHandler  NewPublicationHandler
+	newSubscriptionHandler NewSubscriptionHandler
+	// TODO: Rename back to original
 	defaultAvailableImageHandler   AvailableImageHandler
 	defaultUnavailableImageHandler UnavailableImageHandler
 

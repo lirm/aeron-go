@@ -157,8 +157,9 @@ type ClientConductor struct {
 	pendingCloses      map[int64]chan bool
 	lingeringResources chan lingerResourse
 
-	onNewPublicationHandler          NewPublicationHandler
-	onNewSubscriptionHandler         NewSubscriptionHandler
+	onNewPublicationHandler  NewPublicationHandler
+	onNewSubscriptionHandler NewSubscriptionHandler
+	// TODO: Rename back to original
 	defaultOnAvailableImageHandler   AvailableImageHandler
 	defaultOnUnavailableImageHandler UnavailableImageHandler
 	errorHandler                     func(error)
@@ -440,6 +441,14 @@ func (cc *ClientConductor) releasePublication(regID int64) error {
 
 // AddSubscription sends the add subscription command through the driver proxy
 func (cc *ClientConductor) AddSubscription(channel string, streamID int32) (int64, error) {
+	return cc.AddSubscriptionWithHandlers(channel, streamID,
+		cc.defaultOnAvailableImageHandler, cc.defaultOnUnavailableImageHandler)
+}
+
+// AddSubscriptionWithHandlers sends the add subscription command through the driver proxy.  It will use the specified Handlers for
+// available/unavailable Images instead of the default handlers.
+func (cc *ClientConductor) AddSubscriptionWithHandlers(channel string, streamID int32,
+	onAvailableImage AvailableImageHandler, onUnavailableImage UnavailableImageHandler) (int64, error) {
 	logger.Debugf("AddSubscription: channel=%s, streamId=%d", channel, streamID)
 
 	if err := cc.getDriverStatus(); err != nil {
@@ -457,7 +466,7 @@ func (cc *ClientConductor) AddSubscription(channel string, streamID int32) (int6
 	}
 
 	subState := new(subscriptionStateDefn)
-	subState.Init(channel, regID, streamID, now, cc.defaultOnAvailableImageHandler, cc.defaultOnUnavailableImageHandler)
+	subState.Init(channel, regID, streamID, now, onAvailableImage, onUnavailableImage)
 
 	cc.subs = append(cc.subs, subState)
 

@@ -26,11 +26,12 @@ import (
 )
 
 const (
-	StreamId1              = int32(1002)
-	RegistrationId1        = int64(2000)
-	SessionId1             = int32(13)
-	SourceInfo             = "127.0.0.1:40789"
-	SubscriptionPositionId = int32(2)
+	StreamId1                          = int32(1002)
+	CorrelationId1                     = int64(2000)
+	SessionId1                         = int32(13)
+	SourceInfo                         = "127.0.0.1:40789"
+	SubscriptionPositionId             = int32(2)
+	SubscriptionPositionRegistrationId = int64(4001)
 )
 
 type ClientConductorTestSuite struct {
@@ -44,27 +45,23 @@ func (c *ClientConductorTestSuite) SetupTest() {
 	c.cc.Init(&c.driverProxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, &meta)
 }
 
-func (c *ClientConductorTestSuite) TearDownSuite() {
-
-}
-
 func (c *ClientConductorTestSuite) TestAddPublicationShouldNotifyMediaDriver() {
 	c.driverProxy.On("AddPublication", Channel, StreamId1).
-		Return(RegistrationId1, nil)
+		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddPublication(Channel, StreamId1)
 	c.Assert().NoError(err)
-	c.Assert().Equal(reg, RegistrationId1)
+	c.Assert().Equal(reg, CorrelationId1)
 }
 
 func (c *ClientConductorTestSuite) TestAddPublicationShouldTimeoutWithoutReadyMessage() {
 	c.driverProxy.On("AddPublication", Channel, StreamId1).
-		Return(RegistrationId1, nil)
+		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddPublication(Channel, StreamId1)
 	c.Require().NoError(err)
-	c.Require().Equal(reg, RegistrationId1)
+	c.Require().Equal(reg, CorrelationId1)
 
 	// First a temporary error.
-	pub, err := c.cc.FindPublication(RegistrationId1)
+	pub, err := c.cc.FindPublication(CorrelationId1)
 	c.Assert().True(errors.Is(err, TemporaryError))
 	c.Assert().Nil(pub)
 
@@ -72,21 +69,20 @@ func (c *ClientConductorTestSuite) TestAddPublicationShouldTimeoutWithoutReadyMe
 	oldTimeout := c.cc.driverTimeoutNs
 	c.cc.driverTimeoutNs = 1
 	defer func() { c.cc.driverTimeoutNs = oldTimeout }()
-	pub, err = c.cc.FindPublication(RegistrationId1)
+	pub, err = c.cc.FindPublication(CorrelationId1)
 	c.Assert().False(errors.Is(err, TemporaryError))
 	c.Assert().Nil(pub)
 }
 
 func (c *ClientConductorTestSuite) TestShouldFailToAddPublicationOnMediaDriverError() {
 	c.driverProxy.On("AddPublication", Channel, StreamId1).
-		Return(RegistrationId1, nil)
+		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddPublication(Channel, StreamId1)
 	c.Require().NoError(err)
-	c.Require().Equal(reg, RegistrationId1)
+	c.Require().Equal(reg, CorrelationId1)
 
-	// TODO: Revamp CC's OnError so this is an actual error that bubbles back to FindPublication below.
-	c.cc.OnErrorResponse(RegistrationId1, 1, "error")
-	pub, err := c.cc.FindPublication(RegistrationId1)
+	c.cc.OnErrorResponse(CorrelationId1, 1, "error")
+	pub, err := c.cc.FindPublication(CorrelationId1)
 	c.Assert().Nil(pub)
 	c.Assert().Error(err)
 	c.Assert().False(errors.Is(err, TemporaryError))
@@ -94,21 +90,21 @@ func (c *ClientConductorTestSuite) TestShouldFailToAddPublicationOnMediaDriverEr
 
 func (c *ClientConductorTestSuite) TestAddSubscriptionShouldNotifyMediaDriver() {
 	c.driverProxy.On("AddSubscription", Channel, StreamId1).
-		Return(RegistrationId1, nil)
+		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddSubscription(Channel, StreamId1)
 	c.Assert().NoError(err)
-	c.Assert().Equal(reg, RegistrationId1)
+	c.Assert().Equal(reg, CorrelationId1)
 }
 
 func (c *ClientConductorTestSuite) TestAddSubscriptionShouldTimeoutWithoutOperationSuccessful() {
 	c.driverProxy.On("AddSubscription", Channel, StreamId1).
-		Return(RegistrationId1, nil)
+		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddSubscription(Channel, StreamId1)
 	c.Require().NoError(err)
-	c.Require().Equal(reg, RegistrationId1)
+	c.Require().Equal(reg, CorrelationId1)
 
 	// First a temporary error.
-	sub, err := c.cc.FindSubscription(RegistrationId1)
+	sub, err := c.cc.FindSubscription(CorrelationId1)
 	c.Assert().True(errors.Is(err, TemporaryError))
 	c.Assert().Nil(sub)
 
@@ -116,40 +112,38 @@ func (c *ClientConductorTestSuite) TestAddSubscriptionShouldTimeoutWithoutOperat
 	oldTimeout := c.cc.driverTimeoutNs
 	c.cc.driverTimeoutNs = 1
 	defer func() { c.cc.driverTimeoutNs = oldTimeout }()
-	sub, err = c.cc.FindSubscription(RegistrationId1)
+	sub, err = c.cc.FindSubscription(CorrelationId1)
 	c.Assert().False(errors.Is(err, TemporaryError))
 	c.Assert().Nil(sub)
 }
 
 func (c *ClientConductorTestSuite) TestShouldFailToAddSubscriptionOnMediaDriverError() {
 	c.driverProxy.On("AddSubscription", Channel, StreamId1).
-		Return(RegistrationId1, nil)
+		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddSubscription(Channel, StreamId1)
 	c.Require().NoError(err)
-	c.Require().Equal(reg, RegistrationId1)
+	c.Require().Equal(reg, CorrelationId1)
 
-	// TODO: Revamp CC's OnError so this is an actual error that bubbles back to FindSubscription below.
-	c.cc.OnErrorResponse(RegistrationId1, 1, "error")
-	sub, err := c.cc.FindSubscription(RegistrationId1)
+	c.cc.OnErrorResponse(CorrelationId1, 1, "error")
+	sub, err := c.cc.FindSubscription(CorrelationId1)
 	c.Assert().Nil(sub)
 	c.Assert().Error(err)
 	c.Assert().False(errors.Is(err, TemporaryError))
 }
 
-// Java calls this test clientNotifiedOfNewImageShouldMapLogFile and uses a mock LogBufferFactory as a way to check that
-// Images were created.  For us, that would involve mocking several followup calls to LogBuffer, so it's easier to just
-// have a mock ImageFactory.
-func (c *ClientConductorTestSuite) TestClientNotifiedOfNewImageWithDefaultHandler() {
-	var defaultImageHandler = FakeImageHandler{}
-	c.cc.defaultOnAvailableImageHandler = defaultImageHandler.Handle
+func (c *ClientConductorTestSuite) TestClientNotifiedOfNewAndInactiveImagesWithDefaultHandler() {
+	var availableHandler = FakeImageHandler{}
+	var unavailableHandler = FakeImageHandler{}
+	c.cc.defaultOnAvailableImageHandler = availableHandler.Handle
+	c.cc.defaultOnUnavailableImageHandler = unavailableHandler.Handle
 	c.driverProxy.On("AddSubscription", Channel, StreamId1).
-		Return(RegistrationId1, nil)
+		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddSubscription(Channel, StreamId1)
 	c.Require().NoError(err)
-	c.Require().Equal(reg, RegistrationId1)
+	c.Require().Equal(reg, CorrelationId1)
 
-	c.cc.OnSubscriptionReady(RegistrationId1, -1)
-	sub, err := c.cc.FindSubscription(RegistrationId1)
+	c.cc.OnSubscriptionReady(CorrelationId1, -1)
+	sub, err := c.cc.FindSubscription(CorrelationId1)
 	c.Require().NoError(err)
 	c.Require().NotNil(sub)
 
@@ -160,10 +154,81 @@ func (c *ClientConductorTestSuite) TestClientNotifiedOfNewImageWithDefaultHandle
 
 	c.Require().Equal(sub.ImageCount(), 0)
 	c.cc.OnAvailableImage(StreamId1, SessionId1, fmt.Sprintf("%d-log", SessionId1), SourceInfo,
-		SubscriptionPositionId, RegistrationId1, RegistrationId1)
+		SubscriptionPositionId, CorrelationId1, CorrelationId1)
 	c.Require().Equal(sub.ImageCount(), 1)
-	c.Require().Equal(defaultImageHandler.GetNextImage(), &image)
-	c.Require().Nil(defaultImageHandler.GetNextImage())
+	c.Require().Equal(availableHandler.GetHandledImage(), &image)
+	c.Require().Nil(availableHandler.GetHandledImage())
+	c.Require().Nil(unavailableHandler.GetHandledImage())
+
+	image.On("CorrelationID").Return(CorrelationId1)
+	c.cc.OnUnavailableImage(CorrelationId1, sub.RegistrationID())
+	c.Require().Equal(sub.ImageCount(), 0)
+	c.Require().Equal(unavailableHandler.GetHandledImage(), &image)
+	c.Require().Nil(unavailableHandler.GetHandledImage())
+	c.Require().Nil(availableHandler.GetHandledImage())
+}
+
+func (c *ClientConductorTestSuite) TestClientNotifiedOfNewAndInactiveImagesWithSpecificHandler() {
+	var failHandler = func(_ Image) {
+		c.Fail("Default handler called instead of specified handler")
+	}
+	c.cc.defaultOnAvailableImageHandler = failHandler
+	c.cc.defaultOnUnavailableImageHandler = failHandler
+
+	var availableHandler = FakeImageHandler{}
+	var unavailableHandler = FakeImageHandler{}
+
+	c.driverProxy.On("AddSubscription", Channel, StreamId1).
+		Return(CorrelationId1, nil)
+	reg, err := c.cc.AddSubscriptionWithHandlers(Channel, StreamId1, availableHandler.Handle, unavailableHandler.Handle)
+	c.Require().NoError(err)
+	c.Require().Equal(reg, CorrelationId1)
+
+	c.cc.OnSubscriptionReady(CorrelationId1, -1)
+	sub, err := c.cc.FindSubscription(CorrelationId1)
+	c.Require().NoError(err)
+	c.Require().NotNil(sub)
+
+	var image MockImage
+	c.cc.imageFactory = func(_ int32, _ int64, _ string, _ int64, _ string, _ *atomic.Buffer, _ int32) Image {
+		return &image
+	}
+
+	c.Require().Equal(sub.ImageCount(), 0)
+	c.cc.OnAvailableImage(StreamId1, SessionId1, fmt.Sprintf("%d-log", SessionId1), SourceInfo,
+		SubscriptionPositionId, CorrelationId1, CorrelationId1)
+	c.Require().Equal(sub.ImageCount(), 1)
+	c.Require().Equal(availableHandler.GetHandledImage(), &image)
+	c.Require().Nil(availableHandler.GetHandledImage())
+	c.Require().Nil(unavailableHandler.GetHandledImage())
+
+	image.On("CorrelationID").Return(CorrelationId1)
+	c.cc.OnUnavailableImage(CorrelationId1, sub.RegistrationID())
+	c.Require().Equal(sub.ImageCount(), 0)
+	c.Require().Equal(unavailableHandler.GetHandledImage(), &image)
+	c.Require().Nil(unavailableHandler.GetHandledImage())
+	c.Require().Nil(availableHandler.GetHandledImage())
+}
+
+func (c *ClientConductorTestSuite) TestShouldIgnoreUnknownNewImage() {
+	var failHandler = func(_ Image) {
+		c.Fail("Unknown image should not trigger any handler")
+	}
+	c.cc.defaultOnAvailableImageHandler = failHandler
+	c.cc.defaultOnUnavailableImageHandler = failHandler
+
+	c.cc.OnAvailableImage(StreamId1, SessionId1, fmt.Sprintf("%d-log", SessionId1), SourceInfo,
+		SubscriptionPositionId, SubscriptionPositionRegistrationId, CorrelationId1)
+}
+
+func (c *ClientConductorTestSuite) TestShouldIgnoreUnknownInactiveImage() {
+	var failHandler = func(_ Image) {
+		c.Fail("Unknown image should not trigger any handler")
+	}
+	c.cc.defaultOnAvailableImageHandler = failHandler
+	c.cc.defaultOnUnavailableImageHandler = failHandler
+
+	c.cc.OnUnavailableImage(CorrelationId1, SubscriptionPositionRegistrationId)
 }
 
 func TestClientConductor(t *testing.T) {
@@ -181,7 +246,7 @@ func (f *FakeImageHandler) Handle(image Image) {
 	f.images = append(f.images, image)
 }
 
-func (f *FakeImageHandler) GetNextImage() Image {
+func (f *FakeImageHandler) GetHandledImage() Image {
 	if len(f.images) == 0 {
 		return nil
 	}
