@@ -157,13 +157,12 @@ type ClientConductor struct {
 	pendingCloses      map[int64]chan bool
 	lingeringResources chan lingerResourse
 
-	onNewPublicationHandler  NewPublicationHandler
-	onNewSubscriptionHandler NewSubscriptionHandler
-	// TODO: Rename back to original
-	defaultOnAvailableImageHandler   AvailableImageHandler
-	defaultOnUnavailableImageHandler UnavailableImageHandler
-	errorHandler                     func(error)
-	imageFactory                     ImageFactory
+	onNewPublicationHandler   NewPublicationHandler
+	onNewSubscriptionHandler  NewSubscriptionHandler
+	onAvailableImageHandler   AvailableImageHandler
+	onUnavailableImageHandler UnavailableImageHandler
+	errorHandler              func(error)
+	imageFactory              ImageFactory
 
 	running          atomic.Bool
 	conductorRunning atomic.Bool
@@ -442,7 +441,7 @@ func (cc *ClientConductor) releasePublication(regID int64) error {
 // AddSubscription sends the add subscription command through the driver proxy
 func (cc *ClientConductor) AddSubscription(channel string, streamID int32) (int64, error) {
 	return cc.AddSubscriptionWithHandlers(channel, streamID,
-		cc.defaultOnAvailableImageHandler, cc.defaultOnUnavailableImageHandler)
+		cc.onAvailableImageHandler, cc.onUnavailableImageHandler)
 }
 
 // AddSubscriptionWithHandlers sends the add subscription command through the driver proxy.  It will use the specified Handlers for
@@ -542,7 +541,7 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) erro
 			subcnt--
 			var handler func(Image)
 			if sub.subscription != nil {
-				handler = sub.subscription.unavailableImageHandler
+				handler = sub.subscription.UnavailableImageHandler()
 			}
 
 			for i := range images {
@@ -762,7 +761,7 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 
 				sub.subscription.addImage(image)
 
-				if handler := sub.subscription.availableImageHandler; handler != nil {
+				if handler := sub.subscription.AvailableImageHandler(); handler != nil {
 					handler(image)
 				}
 			}
@@ -780,7 +779,7 @@ func (cc *ClientConductor) OnUnavailableImage(corrID int64, subscriptionRegistra
 		if sub.regID == subscriptionRegistrationID {
 			if sub.subscription != nil {
 				image := sub.subscription.removeImage(corrID)
-				if handler := sub.subscription.unavailableImageHandler; handler != nil {
+				if handler := sub.subscription.UnavailableImageHandler(); handler != nil {
 					handler(image)
 				}
 				cc.lingeringResources <- lingerResourse{time.Now().UnixNano(), image}

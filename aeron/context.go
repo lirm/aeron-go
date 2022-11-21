@@ -30,11 +30,10 @@ type Context struct {
 
 	errorHandler func(error)
 
-	newPublicationHandler  NewPublicationHandler
-	newSubscriptionHandler NewSubscriptionHandler
-	// TODO: Rename back to original
-	defaultAvailableImageHandler   AvailableImageHandler
-	defaultUnavailableImageHandler UnavailableImageHandler
+	newPublicationHandler   NewPublicationHandler
+	newSubscriptionHandler  NewSubscriptionHandler
+	availableImageHandler   AvailableImageHandler
+	unavailableImageHandler UnavailableImageHandler
 
 	resourceLingerTo        time.Duration
 	publicationConnectionTo time.Duration
@@ -53,8 +52,8 @@ func NewContext() *Context {
 
 	ctx.newPublicationHandler = func(string, int32, int32, int64) {}
 	ctx.newSubscriptionHandler = func(string, int32, int64) {}
-	ctx.defaultAvailableImageHandler = func(Image) {}
-	ctx.defaultUnavailableImageHandler = func(Image) {}
+	ctx.availableImageHandler = func(Image) {}
+	ctx.unavailableImageHandler = func(Image) {}
 
 	ctx.mediaDriverTo = time.Second * 5
 	ctx.resourceLingerTo = time.Second * 3
@@ -115,13 +114,13 @@ func (ctx *Context) NewPublicationHandler(handler func(string, int32, int32, int
 
 // AvailableImageHandler sets an optional default callback for available image notifications
 func (ctx *Context) AvailableImageHandler(handler func(Image)) *Context {
-	ctx.defaultAvailableImageHandler = handler
+	ctx.availableImageHandler = handler
 	return ctx
 }
 
 // UnavailableImageHandler sets an optional default callback for unavailable image notification
 func (ctx *Context) UnavailableImageHandler(handler func(Image)) *Context {
-	ctx.defaultUnavailableImageHandler = handler
+	ctx.unavailableImageHandler = handler
 	return ctx
 }
 

@@ -87,8 +87,8 @@ func Connect(ctx *Context) (*Aeron, error) {
 	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTo, ctx.mediaDriverTo,
 		ctx.publicationConnectionTo, ctx.resourceLingerTo, aeron.counters)
 
-	aeron.conductor.defaultOnAvailableImageHandler = ctx.defaultAvailableImageHandler
-	aeron.conductor.defaultOnUnavailableImageHandler = ctx.defaultUnavailableImageHandler
+	aeron.conductor.onAvailableImageHandler = ctx.availableImageHandler
+	aeron.conductor.onUnavailableImageHandler = ctx.unavailableImageHandler
 	aeron.conductor.onNewPublicationHandler = ctx.newPublicationHandler
 	aeron.conductor.onNewSubscriptionHandler = ctx.newSubscriptionHandler
 
@@ -117,7 +117,7 @@ func (aeron *Aeron) Close() error {
 // AddSubscription will add a new subscription to the driver and wait until it is ready.
 func (aeron *Aeron) AddSubscription(channel string, streamID int32) (*Subscription, error) {
 	return aeron.AddSubscriptionWithHandlers(channel, streamID,
-		aeron.context.defaultAvailableImageHandler, aeron.context.defaultUnavailableImageHandler)
+		aeron.context.availableImageHandler, aeron.context.unavailableImageHandler)
 }
 
 // AddSubscriptionWithHandlers will add a new subscription to the driver and wait until it is ready.  It will use the
@@ -143,7 +143,7 @@ func (aeron *Aeron) AddSubscriptionWithHandlers(channel string, streamID int32,
 // to get the Subscription with GetSubscription().
 func (aeron *Aeron) AsyncAddSubscription(channel string, streamID int32) (int64, error) {
 	return aeron.conductor.AddSubscriptionWithHandlers(channel, streamID,
-		aeron.context.defaultAvailableImageHandler, aeron.context.defaultUnavailableImageHandler)
+		aeron.context.availableImageHandler, aeron.context.unavailableImageHandler)
 }
 
 // AsyncAddSubscriptionWithHandlers will add a new subscription to the driver and return its registration ID.  That ID

@@ -134,8 +134,8 @@ func (c *ClientConductorTestSuite) TestShouldFailToAddSubscriptionOnMediaDriverE
 func (c *ClientConductorTestSuite) TestClientNotifiedOfNewAndInactiveImagesWithDefaultHandler() {
 	var availableHandler = FakeImageHandler{}
 	var unavailableHandler = FakeImageHandler{}
-	c.cc.defaultOnAvailableImageHandler = availableHandler.Handle
-	c.cc.defaultOnUnavailableImageHandler = unavailableHandler.Handle
+	c.cc.onAvailableImageHandler = availableHandler.Handle
+	c.cc.onUnavailableImageHandler = unavailableHandler.Handle
 	c.driverProxy.On("AddSubscription", Channel, StreamId1).
 		Return(CorrelationId1, nil)
 	reg, err := c.cc.AddSubscription(Channel, StreamId1)
@@ -172,8 +172,8 @@ func (c *ClientConductorTestSuite) TestClientNotifiedOfNewAndInactiveImagesWithS
 	var failHandler = func(_ Image) {
 		c.Fail("Default handler called instead of specified handler")
 	}
-	c.cc.defaultOnAvailableImageHandler = failHandler
-	c.cc.defaultOnUnavailableImageHandler = failHandler
+	c.cc.onAvailableImageHandler = failHandler
+	c.cc.onUnavailableImageHandler = failHandler
 
 	var availableHandler = FakeImageHandler{}
 	var unavailableHandler = FakeImageHandler{}
@@ -214,8 +214,8 @@ func (c *ClientConductorTestSuite) TestShouldIgnoreUnknownNewImage() {
 	var failHandler = func(_ Image) {
 		c.Fail("Unknown image should not trigger any handler")
 	}
-	c.cc.defaultOnAvailableImageHandler = failHandler
-	c.cc.defaultOnUnavailableImageHandler = failHandler
+	c.cc.onAvailableImageHandler = failHandler
+	c.cc.onUnavailableImageHandler = failHandler
 
 	c.cc.OnAvailableImage(StreamId1, SessionId1, fmt.Sprintf("%d-log", SessionId1), SourceInfo,
 		SubscriptionPositionId, SubscriptionPositionRegistrationId, CorrelationId1)
@@ -225,8 +225,8 @@ func (c *ClientConductorTestSuite) TestShouldIgnoreUnknownInactiveImage() {
 	var failHandler = func(_ Image) {
 		c.Fail("Unknown image should not trigger any handler")
 	}
-	c.cc.defaultOnAvailableImageHandler = failHandler
-	c.cc.defaultOnUnavailableImageHandler = failHandler
+	c.cc.onAvailableImageHandler = failHandler
+	c.cc.onUnavailableImageHandler = failHandler
 
 	c.cc.OnUnavailableImage(CorrelationId1, SubscriptionPositionRegistrationId)
 }

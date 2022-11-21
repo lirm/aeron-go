@@ -147,6 +147,18 @@ func (sub *Subscription) Close() error {
 	return nil
 }
 
+// AvailableImageHandler returns a callback used to indicate when an Image becomes available under this Subscription.
+// The handler may be nil.
+func (sub *Subscription) AvailableImageHandler() AvailableImageHandler {
+	return sub.availableImageHandler
+}
+
+// UnavailableImageHandler returns a callback used to indicate when an Image goes unavailable under this Subscription.
+// The handler may be nil.
+func (sub *Subscription) UnavailableImageHandler() UnavailableImageHandler {
+	return sub.unavailableImageHandler
+}
+
 // Poll is the primary receive mechanism on subscription.
 func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) (int, error) {
 	img := sub.images.Get()
