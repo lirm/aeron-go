@@ -87,8 +87,8 @@ func Connect(ctx *Context) (*Aeron, error) {
 	aeron.conductor.Init(&aeron.driverProxy, aeron.toClientsCopyReceiver, clientLivenessTo, ctx.mediaDriverTo,
 		ctx.publicationConnectionTo, ctx.resourceLingerTo, aeron.counters)
 
-	aeron.conductor.onAvailableImageHandler = ctx.availableImageHandler
-	aeron.conductor.onUnavailableImageHandler = ctx.unavailableImageHandler
+	aeron.conductor.defaultOnAvailableImageHandler = ctx.defaultAvailableImageHandler
+	aeron.conductor.defaultOnUnavailableImageHandler = ctx.defaultUnavailableImageHandler
 	aeron.conductor.onNewPublicationHandler = ctx.newPublicationHandler
 	aeron.conductor.onNewSubscriptionHandler = ctx.newSubscriptionHandler
 

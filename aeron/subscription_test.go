@@ -56,7 +56,7 @@ func (s *SubscriptionTestSuite) SetupTest() {
 	s.imageOne = NewMockImage(s.T())
 	s.imageTwo = NewMockImage(s.T())
 	s.header = new(logbuffer.Header) // Unused so no need to initialize
-	s.sub = NewSubscription(s.cc, Channel, RegistrationId, StreamId, ChannelStatusId)
+	s.sub = NewSubscription(s.cc, Channel, RegistrationId, StreamId, ChannelStatusId, nil, nil)
 }
 
 func (s *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPolling() {

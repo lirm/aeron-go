@@ -87,22 +87,32 @@ func (pub *publicationStateDefn) Init(channel string, regID int64, streamID int3
 }
 
 type subscriptionStateDefn struct {
-	regID              int64
-	timeOfRegistration int64
-	streamID           int32
-	errorCode          int32
-	status             int
-	channel            string
-	errorMessage       string
-	subscription       *Subscription
+	regID                   int64
+	timeOfRegistration      int64
+	streamID                int32
+	errorCode               int32
+	status                  int
+	channel                 string
+	errorMessage            string
+	availableImageHandler   AvailableImageHandler
+	unavailableImageHandler UnavailableImageHandler
+	subscription            *Subscription
 }
 
-func (sub *subscriptionStateDefn) Init(ch string, regID int64, sID int32, now int64) *subscriptionStateDefn {
+func (sub *subscriptionStateDefn) Init(
+	ch string,
+	regID int64,
+	sID int32,
+	now int64,
+	availableImageHandler AvailableImageHandler,
+	UnavailableImageHandler UnavailableImageHandler) *subscriptionStateDefn {
 	sub.channel = ch
 	sub.regID = regID
 	sub.streamID = sID
 	sub.timeOfRegistration = now
 	sub.status = RegistrationStatus.AwaitingMediaDriver
+	sub.availableImageHandler = availableImageHandler
+	sub.unavailableImageHandler = UnavailableImageHandler
 
 	return sub
 }
@@ -112,11 +122,30 @@ type lingerResourse struct {
 	resource io.Closer
 }
 
+type DriverProxy interface {
+	ClientID() int64
+	TimeOfLastDriverKeepalive() int64
+	AddSubscription(channel string, streamID int32) (int64, error)
+	RemoveSubscription(registrationID int64) error
+	AddPublication(channel string, streamID int32) (int64, error)
+	AddExclusivePublication(channel string, streamID int32) (int64, error)
+	RemovePublication(registrationID int64) error
+	ClientClose() error
+	AddDestination(registrationID int64, channel string) (int64, error)
+	RemoveDestination(registrationID int64, channel string) (int64, error)
+	AddRcvDestination(registrationID int64, channel string) (int64, error)
+	RemoveRcvDestination(registrationID int64, channel string) (int64, error)
+}
+
+// ImageFactory allows tests to use fake Images
+type ImageFactory func(sessionID int32, corrID int64, logFilename string, subRegId int64, sourceIdentity string,
+	counterValuesBuffer *atomic.Buffer, subscriberPositionID int32) Image
+
 type ClientConductor struct {
 	pubs []*publicationStateDefn
 	subs []*subscriptionStateDefn
 
-	driverProxy *driver.Proxy
+	driverProxy DriverProxy
 
 	counterValuesBuffer *atomic.Buffer
 	counterReader       *ctr.Reader
@@ -128,11 +157,12 @@ type ClientConductor struct {
 	pendingCloses      map[int64]chan bool
 	lingeringResources chan lingerResourse
 
-	onNewPublicationHandler   NewPublicationHandler
-	onNewSubscriptionHandler  NewSubscriptionHandler
-	onAvailableImageHandler   AvailableImageHandler
-	onUnavailableImageHandler UnavailableImageHandler
-	errorHandler              func(error)
+	onNewPublicationHandler          NewPublicationHandler
+	onNewSubscriptionHandler         NewSubscriptionHandler
+	defaultOnAvailableImageHandler   AvailableImageHandler
+	defaultOnUnavailableImageHandler UnavailableImageHandler
+	errorHandler                     func(error)
+	imageFactory                     ImageFactory
 
 	running          atomic.Bool
 	conductorRunning atomic.Bool
@@ -150,7 +180,7 @@ type ClientConductor struct {
 }
 
 // Init is the primary initialization method for ClientConductor
-func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.CopyReceiver,
+func (cc *ClientConductor) Init(driverProxy DriverProxy, bcast *broadcast.CopyReceiver,
 	interServiceTo, driverTo, pubConnectionTo, lingerTo time.Duration, counters *ctr.MetaDataFlyweight) *ClientConductor {
 
 	logger.Debugf("Initializing ClientConductor with: %v %v %d %d %d", driverProxy, bcast, interServiceTo,
@@ -170,6 +200,7 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 
 	cc.pendingCloses = make(map[int64]chan bool)
 	cc.lingeringResources = make(chan lingerResourse, 1024)
+	cc.imageFactory = DefaultImageFactory
 
 	cc.pubs = make([]*publicationStateDefn, 0)
 	cc.subs = make([]*subscriptionStateDefn, 0)
@@ -426,7 +457,7 @@ func (cc *ClientConductor) AddSubscription(channel string, streamID int32) (int6
 	}
 
 	subState := new(subscriptionStateDefn)
-	subState.Init(channel, regID, streamID, now)
+	subState.Init(channel, regID, streamID, now, cc.defaultOnAvailableImageHandler, cc.defaultOnUnavailableImageHandler)
 
 	cc.subs = append(cc.subs, subState)
 
@@ -500,11 +531,15 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) erro
 			cc.subs[i] = cc.subs[subcnt-1]
 			cc.subs[subcnt-1] = nil
 			subcnt--
+			var handler func(Image)
+			if sub.subscription != nil {
+				handler = sub.subscription.unavailableImageHandler
+			}
 
 			for i := range images {
 				image := images[i]
-				if cc.onUnavailableImageHandler != nil {
-					cc.onUnavailableImageHandler(image)
+				if handler != nil {
+					handler(image)
 				}
 				cc.lingeringResources <- lingerResourse{now, image}
 			}
@@ -675,7 +710,9 @@ func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatu
 
 		if sub.regID == correlationID {
 			sub.status = RegistrationStatus.RegisteredMediaDriver
-			sub.subscription = NewSubscription(cc, sub.channel, correlationID, sub.streamID, channelStatusIndicatorID)
+			sub.subscription = NewSubscription(
+				cc, sub.channel, correlationID, sub.streamID, channelStatusIndicatorID,
+				sub.availableImageHandler, sub.unavailableImageHandler)
 
 			if cc.onNewSubscriptionHandler != nil {
 				cc.onNewSubscriptionHandler(sub.channel, sub.streamID, correlationID)
@@ -683,6 +720,17 @@ func (cc *ClientConductor) OnSubscriptionReady(correlationID int64, channelStatu
 		}
 	}
 
+}
+
+func DefaultImageFactory(sessionID int32, corrID int64, logFilename string, subRegId int64, sourceIdentity string,
+	counterValuesBuffer *atomic.Buffer, subscriberPositionID int32) Image {
+	image := NewImage(sessionID, corrID, logbuffer.Wrap(logFilename))
+	image.subscriptionRegistrationID = subRegId
+	image.sourceIdentity = sourceIdentity
+	image.subscriberPosition = NewPosition(counterValuesBuffer, subscriberPositionID)
+	logger.Debugf("OnAvailableImage: new image position: %v -> %d",
+		image.subscriberPosition, image.subscriberPosition.get())
+	return image
 }
 
 //go:norace
@@ -700,18 +748,13 @@ func (cc *ClientConductor) OnAvailableImage(streamID int32, sessionID int32, log
 		if sub.subscription != nil {
 			// logger.Debugf("OnAvailableImage: sub.regID=%d subsRegID=%d corrID=%d %#v", sub.regID, subsRegID, corrID, sub)
 			if sub.regID == subsRegID {
-
-				image := NewImage(sessionID, corrID, logbuffer.Wrap(logFilename))
-				image.subscriptionRegistrationID = sub.regID
-				image.sourceIdentity = sourceIdentity
-				image.subscriberPosition = NewPosition(cc.counterValuesBuffer, subscriberPositionID)
-				logger.Debugf("OnAvailableImage: new image position: %v -> %d",
-					image.subscriberPosition, image.subscriberPosition.get())
+				image := cc.imageFactory(sessionID, corrID, logFilename, sub.regID, sourceIdentity,
+					cc.counterValuesBuffer, subscriberPositionID)
 
 				sub.subscription.addImage(image)
 
-				if nil != cc.onAvailableImageHandler {
-					cc.onAvailableImageHandler(image)
+				if handler := sub.subscription.availableImageHandler; handler != nil {
+					handler(image)
 				}
 			}
 		}
@@ -728,8 +771,8 @@ func (cc *ClientConductor) OnUnavailableImage(corrID int64, subscriptionRegistra
 		if sub.regID == subscriptionRegistrationID {
 			if sub.subscription != nil {
 				image := sub.subscription.removeImage(corrID)
-				if cc.onUnavailableImageHandler != nil {
-					cc.onUnavailableImageHandler(image)
+				if handler := sub.subscription.unavailableImageHandler; handler != nil {
+					handler(image)
 				}
 				cc.lingeringResources <- lingerResourse{time.Now().UnixNano(), image}
 				runtime.KeepAlive(image)
