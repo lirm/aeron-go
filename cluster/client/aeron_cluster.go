@@ -179,9 +179,9 @@ func (ac *AeronCluster) Poll() (int, error) {
 	return 0, nil
 }
 
-func (ac *AeronCluster) Offer(buffer *atomic.Buffer, offset, length int32) (int64, error) {
+func (ac *AeronCluster) Offer(buffer *atomic.Buffer, offset, length int32) int64 {
 	if ac.state != clientConnected {
-		return 0, aeron.NotConnectedErr
+		return aeron.NotConnected
 	} else {
 		hdrBuf := ac.sessionMsgHdrBuffer
 		return ac.ingressPub.Offer2(hdrBuf, 0, hdrBuf.Capacity(), buffer, offset, length, nil)
@@ -194,7 +194,7 @@ func (ac *AeronCluster) SendKeepAlive() bool {
 	}
 	buf := ac.keepAliveBuffer
 	for i := 0; i < 3; i++ {
-		if _, err := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); err != nil {
+		if result := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); result >= 0 {
 			return true
 		}
 		ac.opts.IdleStrategy.Idle(0)
@@ -366,13 +366,13 @@ func (ac *AeronCluster) sendConnectRequest(responseChannel string) error {
 		return err
 	}
 	buffer := atomic.MakeBuffer(writer.Bytes())
-	// TODO: Not every Offer() error is temporary.  However, I'm preserving backwards functionality for now.
-	result, err := ac.ingressPub.Offer(buffer, 0, buffer.Capacity(), nil)
-	if err != nil {
-		logger.Debugf("failed to send connect request, channel=%s result=%d", ac.ingressPub.Channel(), result)
-		return fmt.Errorf("%w error: %s", aeron.TemporaryError, err.Error())
+	result := ac.ingressPub.Offer(buffer, 0, buffer.Capacity(), nil)
+	if result >= 0 {
+		return nil
+	} else {
+		return fmt.Errorf("%w, failed to send connect request, channel=%s result=%d",
+			aeron.TemporaryError, ac.ingressPub.Channel(), result)
 	}
-	return nil
 }
 
 func (ac *AeronCluster) pollEgress(fragmentLimit int) (int, error) {
@@ -522,7 +522,7 @@ func (ac *AeronCluster) sendCloseSession() {
 	buf.PutInt64(cluster.SBEHeaderLength, ac.leadershipTermId)
 	buf.PutInt64(cluster.SBEHeaderLength+8, ac.clusterSessionId)
 	for i := 0; i < 3; i++ {
-		if _, err := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); err != nil {
+		if result := ac.ingressPub.Offer(buf, 0, buf.Capacity(), nil); result >= 0 {
 			return
 		}
 		ac.opts.IdleStrategy.Idle(0)

@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -64,12 +63,13 @@ func main() {
 
 	for counter := 0; counter < *examples.ExamplesConfig.Messages; counter++ {
 		message := fmt.Sprintf("this is a message %d", counter)
-		ret, err := publication.TryClaim(int32(len(message)), &claim)
-		if errors.Is(err, aeron.NotConnectedErr) {
+		ret := publication.TryClaim(int32(len(message)), &claim)
+		switch ret {
+		case aeron.NotConnected:
 			log.Printf("%d: not connected yet", counter)
-		} else if errors.Is(err, aeron.BackPressuredErr) {
+		case aeron.BackPressured:
 			log.Printf("%d: back pressured", counter)
-		} else {
+		default:
 			if ret < 0 {
 				log.Printf("%d: Unrecognized code: %d", counter, ret)
 				claim.Abort()

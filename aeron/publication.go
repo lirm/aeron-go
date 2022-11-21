@@ -18,7 +18,6 @@ limitations under the License.
 package aeron
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/lirm/aeron-go/aeron/atomic"
@@ -28,11 +27,18 @@ import (
 	"github.com/lirm/aeron-go/aeron/util"
 )
 
-var NotConnectedErr = errors.New("this Publication is not connected to the driver")
-var BackPressuredErr = errors.New("sending ring buffer is full")
-var AdminActionErr = errors.New("terms needs to be rotated. User should retry the Offer")
-var PublicationClosedErr = errors.New("this Publication is closed and no further Offers shall succeed")
-var MaxPositionExceededErr = errors.New("max position exceeded")
+const (
+	// NotConnected indicates that this Publication is not connected to the driver
+	NotConnected int64 = -1
+	// BackPressured indicates that sending ring buffer is full
+	BackPressured int64 = -2
+	// AdminAction indicates that terms needs to be rotated. User should retry the Offer
+	AdminAction int64 = -3
+	// PublicationClosed indicates that this Publication is closed and no further Offers shall succeed
+	PublicationClosed int64 = -4
+	// MaxPositionExceeded indicates that ...
+	MaxPositionExceeded int64 = -5
+)
 
 // Publication is a sender structure
 type Publication struct {
@@ -143,10 +149,10 @@ func (pub *Publication) Close() error {
 }
 
 // Position returns the current position to which the publication has advanced
-// for this stream or PublicationClosedErr if closed.
-func (pub *Publication) Position() (int64, error) {
+// for this stream or PublicationClosed if closed.
+func (pub *Publication) Position() int64 {
 	if pub.IsClosed() {
-		return 0, PublicationClosedErr
+		return PublicationClosed
 	}
 
 	// Spelled out for clarity, the compiler will optimize
@@ -157,13 +163,13 @@ func (pub *Publication) Position() (int64, error) {
 	termOffset := rawTail & 0xFFFFFFFF
 	termId := logbuffer.TermID(rawTail)
 
-	return computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset, nil
+	return computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
 }
 
 // Offer is the primary send mechanism on Publication
-func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) (int64, error) {
+func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
 	if pub.IsClosed() {
-		return 0, PublicationClosedErr
+		return PublicationClosed
 	}
 
 	if reservedValueSupplier == nil {
@@ -180,22 +186,20 @@ func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32,
 	position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
 
 	if termCount != (termId - pub.metaData.InitTermID.Get()) {
-		return 0, AdminActionErr
+		return AdminAction
 	}
 
 	if logger.IsEnabledFor(logging.DEBUG) {
 		logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
 	}
 	if position >= limit {
-		return 0, pub.backPressureError(position, length)
+		return pub.backPressureStatus(position, length)
 	}
 	var resultingOffset int64
 	if length <= pub.maxPayloadLength {
 		resultingOffset, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, reservedValueSupplier)
 	} else {
-		if err := pub.checkForMaxMessageLength(length); err != nil {
-			return 0, err
-		}
+		pub.checkForMaxMessageLength(length)
 		resultingOffset, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, reservedValueSupplier)
 	}
 
@@ -207,18 +211,20 @@ func (pub *Publication) Offer2(
 	bufferOne *atomic.Buffer, offsetOne int32, lengthOne int32,
 	bufferTwo *atomic.Buffer, offsetTwo int32, lengthTwo int32,
 	reservedValueSupplier term.ReservedValueSupplier,
-) (int64, error) {
+) int64 {
 	if lengthOne < 0 {
-		return 0, fmt.Errorf("offered negative length (lengthOne: %d)", lengthOne)
+		logger.Debugf("Offered negative length (lengthOne: %d)", lengthOne)
+		return 0
 	} else if lengthTwo < 0 {
-		return 0, fmt.Errorf("offered negative length (lengthTwo: %d)", lengthTwo)
+		logger.Debugf("Offered negative length (lengthTwo: %d)", lengthTwo)
+		return 0
 	}
 	length := lengthOne + lengthTwo
 	if length < 0 {
-		return 0, fmt.Errorf("length overflow (lengthOne: %d lengthTwo: %d)", lengthOne, lengthTwo)
+		panic(fmt.Sprintf("Length overflow (lengthOne: %d lengthTwo: %d)", lengthOne, lengthTwo))
 	}
 	if pub.IsClosed() {
-		return 0, PublicationClosedErr
+		return PublicationClosed
 	}
 
 	if reservedValueSupplier == nil {
@@ -235,14 +241,14 @@ func (pub *Publication) Offer2(
 	position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
 
 	if termCount != (termId - pub.metaData.InitTermID.Get()) {
-		return 0, AdminActionErr
+		return AdminAction
 	}
 
 	if logger.IsEnabledFor(logging.DEBUG) {
 		logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
 	}
 	if position >= limit {
-		return 0, pub.backPressureError(position, length)
+		return pub.backPressureStatus(position, length)
 	}
 
 	var resultingOffset int64
@@ -252,9 +258,7 @@ func (pub *Publication) Offer2(
 			bufferTwo, offsetTwo, lengthTwo,
 			reservedValueSupplier)
 	} else {
-		if err := pub.checkForMaxMessageLength(length); err != nil {
-			return 0, err
-		}
+		pub.checkForMaxMessageLength(length)
 		resultingOffset, termId = termAppender.AppendFragmentedMessage2(
 			bufferOne, offsetOne, lengthOne,
 			bufferTwo, offsetTwo, lengthTwo,
@@ -263,38 +267,37 @@ func (pub *Publication) Offer2(
 	return pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
 }
 
-func (pub *Publication) newPosition(termCount int32, termOffset int64, termId int32, position int64, resultingOffset int64) (int64, error) {
+func (pub *Publication) newPosition(termCount int32, termOffset int64, termId int32, position int64, resultingOffset int64) int64 {
 	if resultingOffset > 0 {
-		return (position - termOffset) + resultingOffset, nil
+		return (position - termOffset) + resultingOffset
 	}
 
 	if (position + termOffset) > pub.maxPossiblePosition {
-		return 0, MaxPositionExceededErr
+		return MaxPositionExceeded
 	}
 
 	logbuffer.RotateLog(pub.metaData, termCount, termId)
-	return 0, AdminActionErr
+	return AdminAction
 }
 
-func (pub *Publication) backPressureError(currentPosition int64, messageLength int32) error {
+func (pub *Publication) backPressureStatus(currentPosition int64, messageLength int32) int64 {
+
 	if (currentPosition + int64(messageLength)) >= pub.maxPossiblePosition {
-		return MaxPositionExceededErr
+		return MaxPositionExceeded
 	}
 
 	if pub.metaData.IsConnected.Get() == 1 {
-		return BackPressuredErr
+		return BackPressured
 	}
 
-	return NotConnectedErr
+	return NotConnected
 }
 
-func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) (int64, error) {
+func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) int64 {
 	if pub.IsClosed() {
-		return 0, PublicationClosedErr
+		return PublicationClosed
 	}
-	if err := pub.checkForMaxPayloadLength(length); err != nil {
-		return 0, err
-	}
+	pub.checkForMaxPayloadLength(length)
 
 	limit := pub.pubLimit.get()
 	termCount := pub.metaData.ActiveTermCountOff.Get()
@@ -309,23 +312,19 @@ func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) (in
 
 		return pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
 	} else {
-		return 0, pub.backPressureError(position, length)
+		return pub.backPressureStatus(position, length)
 	}
 }
 
-func (pub *Publication) checkForMaxMessageLength(length int32) error {
+func (pub *Publication) checkForMaxMessageLength(length int32) {
 	if length > pub.maxMessageLength {
-		return fmt.Errorf("encoded message exceeds maxMessageLength of %d, length=%d", pub.maxMessageLength, length)
-	} else {
-		return nil
+		panic(fmt.Sprintf("Encoded message exceeds maxMessageLength of %d, length=%d", pub.maxMessageLength, length))
 	}
 }
 
-func (pub *Publication) checkForMaxPayloadLength(length int32) error {
+func (pub *Publication) checkForMaxPayloadLength(length int32) {
 	if length > pub.maxPayloadLength {
-		return fmt.Errorf("encoded message exceeds maxPayloadLength of %d, length=%d", pub.maxPayloadLength, length)
-	} else {
-		return nil
+		panic(fmt.Sprintf("Encoded message exceeds maxPayloadLength of %d, length=%d", pub.maxPayloadLength, length))
 	}
 }
 

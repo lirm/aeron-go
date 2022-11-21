@@ -669,9 +669,9 @@ func (agent *ClusteredServiceAgent) offerToSession(
 	offset int32,
 	length int32,
 	reservedValueSupplier term.ReservedValueSupplier,
-) (int64, error) {
+) int64 {
 	if agent.role != Leader {
-		return ClientSessionMockedOffer, nil
+		return ClientSessionMockedOffer
 	}
 
 	hdrBuf := agent.sessionMsgHdrBuffer

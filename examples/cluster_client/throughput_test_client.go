@@ -112,7 +112,7 @@ func main() {
 			sendBuf.PutInt32(0, int32(i))
 			sendBuf.PutInt64(8, time.Now().UnixNano())
 			for {
-				if _, err := clusterClient.Offer(sendBuf, 0, sendBuf.Capacity()); err != nil {
+				if r := clusterClient.Offer(sendBuf, 0, sendBuf.Capacity()); r >= 0 {
 					sentCt++
 					break
 				}

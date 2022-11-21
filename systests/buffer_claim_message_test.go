@@ -81,11 +81,7 @@ func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithI
 
 	suite.publishMessage(srcBuffer, *publication)
 
-	for {
-		_, err := publication.TryClaim(messageLength, &bufferClaim)
-		if err == nil {
-			break
-		}
+	for publication.TryClaim(messageLength, &bufferClaim) < 0 {
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -117,11 +113,7 @@ func (suite *BufferClaimMessageTestSuite) TestShouldTransferReservedValue() {
 	suite.Require().NoError(err)
 	defer publication.Close()
 
-	for {
-		_, err := publication.TryClaim(messageLength, &bufferClaim)
-		if err == nil {
-			break
-		}
+	for publication.TryClaim(messageLength, &bufferClaim) < 0 {
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -146,11 +138,7 @@ func (suite *BufferClaimMessageTestSuite) TestShouldTransferReservedValue() {
 }
 
 func (suite *BufferClaimMessageTestSuite) publishMessage(srcBuffer *atomic.Buffer, publication aeron.Publication) {
-	for {
-		_, err := publication.Offer(srcBuffer, 0, messageLength, nil)
-		if err == nil {
-			break
-		}
+	for publication.Offer(srcBuffer, 0, messageLength, nil) < 0 {
 		time.Sleep(50 * time.Millisecond)
 	}
 }

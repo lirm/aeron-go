@@ -112,9 +112,13 @@ func main() {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-		_, err := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
-		if err != nil {
-			panic(fmt.Sprintf("Failed to offer message of %d bytes due to %s", srcBuffer.Capacity(), err))
+		for true {
+			ret := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
+			if ret > 0 {
+				break
+			} else {
+				panic(fmt.Sprintf("Failed to offer message of %d bytes due to %d", srcBuffer.Capacity(), ret))
+			}
 		}
 
 		for true {
@@ -136,11 +140,7 @@ func main() {
 		now := time.Now().UnixNano()
 		srcBuffer.PutInt64(0, now)
 
-		for true {
-			_, err := publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil)
-			if err == nil {
-				break
-			}
+		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
 		}
 
 		for emptyPoll(subscription.Poll(handler, 10)) {

@@ -64,16 +64,13 @@ func (suite *SysTestSuite) send(n int, pub *aeron.Publication) {
 
 	for i := 0; i < n; i++ {
 		timeoutAt := time.Now().Add(time.Second * 5)
-		for {
-			v, err := pub.Offer(srcBuffer, 0, int32(len(message)), nil)
-			suite.Require().NoError(err)
-			if v > 0 {
-				break
-			}
-			time.Sleep(time.Millisecond)
+		var v int64
+		for v <= 0 {
+			v = pub.Offer(srcBuffer, 0, int32(len(message)), nil)
 			if time.Now().After(timeoutAt) {
 				suite.Fail("Send timed out")
 			}
+			time.Sleep(time.Millisecond)
 		}
 	}
 }

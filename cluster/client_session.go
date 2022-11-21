@@ -34,7 +34,7 @@ type ClientSession interface {
 	// I don't understand the closing bool implementation and why it is needed
 	// Leaving out for now unless it is really important
 	// IsClosing() bool
-	Offer(*atomic.Buffer, int32, int32, term.ReservedValueSupplier) (int64, error)
+	Offer(*atomic.Buffer, int32, int32, term.ReservedValueSupplier) int64
 	// TryClaim(...)
 }
 
@@ -95,7 +95,7 @@ func (s *containerClientSession) Offer(
 	offset int32,
 	length int32,
 	reservedValueSupplier term.ReservedValueSupplier,
-) (int64, error) {
+) int64 {
 	return s.agent.offerToSession(
 		s.id,
 		s.response,

@@ -16,7 +16,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -90,12 +89,14 @@ func main() {
 	for counter := 0; counter < *examples.Config.Messages; counter++ {
 		message := fmt.Sprintf("this is a message %d", counter)
 		srcBuffer := atomic.MakeBuffer(([]byte)(message))
-		ret, err := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
-		if errors.Is(err, aeron.NotConnectedErr) {
+		ret := publication.Offer(srcBuffer, 0, int32(len(message)), nil)
+		switch ret {
+		case aeron.NotConnected:
 			logger.Warningf("%d, Not connected (yet)", counter)
-		} else if errors.Is(err, aeron.BackPressuredErr) {
+
+		case aeron.BackPressured:
 			logger.Warningf("%d: back pressured", counter)
-		} else {
+		default:
 			if ret < 0 {
 				logger.Warningf("%d: Unrecognized code: %d", counter, ret)
 			} else {
