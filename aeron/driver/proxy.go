@@ -329,6 +329,20 @@ func (driver *Proxy) RemoveRcvDestination(registrationID int64, channel string) 
 	}
 }
 
+/*
+// AddCounter adds a new counter with a type id and label.  The key will be blank.
+func (driver *Proxy) AddCounter(typeId int32, label string) (int64, error) {
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	filler := func(buffer *atomic.Buffer, length *int32) int32 {
+		var message command.CounterMessage
+		message.Wrap(buffer, 0)
+	}
+
+}
+
+*/
+
 func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int32) error {
 	messageBuffer := make([]byte, 512)
 

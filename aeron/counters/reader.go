@@ -110,7 +110,7 @@ type Counter struct {
 func NewReader(values, metaData *atomic.Buffer) *Reader {
 
 	reader := Reader{metaData: metaData, values: values}
-	reader.maxCounterID = int(values.Capacity() / CounterLength)
+	reader.maxCounterID = int(values.Capacity()/CounterLength) - 1
 
 	return &reader
 }

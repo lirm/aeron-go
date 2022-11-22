@@ -604,6 +604,25 @@ func (cc *ClientConductor) RemoveRcvDestination(registrationID int64, endpointCh
 	return err
 }
 
+/*
+// TODO: Return a Counter
+func (cc *ClientConductor) AddCounter(typeId int32, label string) error {
+	if err := cc.getDriverStatus(); err != nil {
+		return err
+	}
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	now := time.Now().UnixNano()
+
+	registrationId, err := cc.driverProxy.AddCounter(typeId, label)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Add awaiting the response
+}
+*/
+
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
 	channelStatusIndicatorID int32, logFileName string, regID int64, origRegID int64) {
 

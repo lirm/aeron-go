@@ -1,5 +1,6 @@
 /*
 Copyright 2016-2018 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -109,7 +110,7 @@ func (fld *StringField) Wrap(buffer *atomic.Buffer, offset int, fly Flyweight, a
 
 	fld.fly = fly
 	fld.dataOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(off+4))
-	return 4 + int(l)
+	return 4 + int(l) + int(off) - offset
 }
 
 func (fld *StringField) Get() string {
@@ -159,14 +160,28 @@ type Padding struct {
 	raw RawDataField
 }
 
-// Wrap for padding takes size to pas this particular position to and alignment as the
+// Wrap for padding takes size to pass this particular position to.  That size will be rounded down to match alignment.
 func (f *Padding) Wrap(buffer *atomic.Buffer, offset int, size int32, alignment int32) int {
-	maxl := int32(offset) + size
-	newLen := maxl - maxl%alignment - int32(offset)
+	maxLength := int32(offset) + size
+	newLen := maxLength - maxLength%alignment - int32(offset)
+	if newLen < 0 {
+		newLen += alignment
+	}
 
 	return f.raw.Wrap(buffer, offset, newLen)
 }
 
 func (f *Padding) Get() *atomic.Buffer {
 	return f.raw.Get()
+}
+
+type LengthAndRawDataField struct {
+	length Int32Field
+	data   RawDataField
+}
+
+func (fld *LengthAndRawDataField) Wrap(buffer *atomic.Buffer, offset int, length int32) int32 {
+	alignedOffset := util.AlignInt32(int32(offset), 4)
+	fld.length.Wrap(buffer, int(alignedOffset))
+	return -1
 }
