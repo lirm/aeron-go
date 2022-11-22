@@ -20,6 +20,7 @@ package command
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/flyweight"
+	"github.com/lirm/aeron-go/aeron/util"
 )
 
 type CorrelatedMessage struct {
@@ -133,6 +134,32 @@ func (m *DestinationMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyw
 	pos += m.CorrelationID.Wrap(buf, pos)
 	pos += m.RegistrationCorrelationID.Wrap(buf, pos)
 	pos += m.Channel.Wrap(buf, pos, m, true)
+
+	m.SetSize(pos - offset)
+	return m
+}
+
+type CounterMessage struct {
+	flyweight.FWBase
+
+	clientID      flyweight.Int64Field
+	correlationID flyweight.Int64Field
+	counterTypeID flyweight.Int32Field
+	keyLength     flyweight.Int32Field
+	keyValue      flyweight.RawDataField
+	labelLength   flyweight.Int32Field
+	labelValue    flyweight.RawDataField
+}
+
+func (m *CounterMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	pos := offset
+	pos += m.clientID.Wrap(buf, pos)
+	pos += m.correlationID.Wrap(buf, pos)
+	pos += m.counterTypeID.Wrap(buf, pos)
+	pos += m.keyLength.Wrap(buf, pos)
+
+	alignedOffset := util.AlignInt32(int32(offset), 4)
+	atomic.BoundsCheck(alignedOffset, 4, buf.Capacity())
 
 	m.SetSize(pos - offset)
 	return m
