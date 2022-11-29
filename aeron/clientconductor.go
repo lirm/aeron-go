@@ -352,8 +352,7 @@ func (cc *ClientConductor) FindPublication(registrationID int64) (*Publication, 
 		switch pub.status {
 		case RegistrationStatus.AwaitingMediaDriver:
 			if err := timeoutExceeded(pub.timeOfRegistration, cc.driverTimeoutNs); err == nil {
-				return nil, fmt.Errorf("%w: registration at %d exceeded timeout %d",
-					TemporaryError, pub.timeOfRegistration, cc.driverTimeoutNs)
+				return nil, fmt.Errorf("%w: registration not yet available", TemporaryError)
 			} else {
 				return nil, err
 			}
@@ -448,8 +447,7 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) (*Subscription
 		switch sub.status {
 		case RegistrationStatus.AwaitingMediaDriver:
 			if err := timeoutExceeded(sub.timeOfRegistration, cc.driverTimeoutNs); err == nil {
-				return nil, fmt.Errorf("%w: registration at %d exceeded timeout %d",
-					TemporaryError, sub.timeOfRegistration, cc.driverTimeoutNs)
+				return nil, fmt.Errorf("%w: registration not yet available", TemporaryError)
 			} else {
 				return nil, err
 			}
