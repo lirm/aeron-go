@@ -347,7 +347,7 @@ func (cc *ClientConductor) FindPublication(registrationID int64) (*Publication, 
 			continue
 		}
 		if pub.publication != nil {
-			return publication, nil
+			return pub.publication, nil
 		}
 		switch pub.status {
 		case RegistrationStatus.AwaitingMediaDriver:
