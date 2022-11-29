@@ -367,6 +367,7 @@ func (cc *ClientConductor) FindPublication(registrationID int64) (*Publication, 
 			publication.sessionID = pub.sessionID
 			publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
 			publication.channelStatusIndicatorID = pub.channelStatusIndicatorID
+			pub.publication = publication
 			return publication, nil
 		case RegistrationStatus.ErroredMediaDriver:
 			return nil, fmt.Errorf("error on %d: %d: %s", registrationID, pub.errorCode, pub.errorMessage)
