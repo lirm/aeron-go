@@ -132,7 +132,6 @@ func (aeron *Aeron) AddSubscription(channel string, streamID int32) (*Subscripti
 
 // AddSubscriptionDeprecated will add a new subscription to the driver.
 // Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
-// This is the deprecated way to add a subscription.  See AddSubscription for a better supported way.
 func (aeron *Aeron) AddSubscriptionDeprecated(channel string, streamID int32) chan *Subscription {
 	ch := make(chan *Subscription, 1)
 	registrationID, err := aeron.conductor.AddSubscription(channel, streamID)
@@ -179,14 +178,13 @@ func (aeron *Aeron) GetSubscription(registrationID int64) (*Subscription, error)
 // AddPublicationDeprecated will add a new publication to the driver. If such publication already exists within ClientConductor
 // the same instance will be returned.
 // Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
-// This is the deprecated way to add a publication.  See AddPublication for a better supported way.
 func (aeron *Aeron) AddPublicationDeprecated(channel string, streamID int32) chan *Publication {
 	ch := make(chan *Publication, 1)
 
 	registrationID, err := aeron.conductor.AddPublication(channel, streamID)
 	if err != nil {
 		// Preserve the legacy functionality.  The original AddPublication would result in the ClientConductor calling
-		// onError on this, as well as subsequently from the FindSubscription call below.
+		// onError on this, as well as subsequently from the FindPublication call below.
 		aeron.conductor.onError(err)
 	}
 	go func() {
@@ -257,6 +255,41 @@ func (aeron *Aeron) AddExclusivePublication(channel string, streamID int32) (*Pu
 		}
 		aeron.context.idleStrategy.Idle(0)
 	}
+}
+
+// AddExclusivePublicationDeprecated will add a new exclusive publication to the driver. If such publication already
+// exists within ClientConductor the same instance will be returned.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
+func (aeron *Aeron) AddExclusivePublicationDeprecated(channel string, streamID int32) chan *Publication {
+	ch := make(chan *Publication, 1)
+
+	registrationID, err := aeron.conductor.AddExclusivePublication(channel, streamID)
+	if err != nil {
+		// Preserve the legacy functionality.  The original AddExclusivePublication would result in the ClientConductor
+		// calling onError on this, as well as subsequently from the FindPublication call below.
+		aeron.conductor.onError(err)
+	}
+	go func() {
+		for {
+			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
+			// FindPublication can return one of 3 states:
+			// nil, nil: Still waiting, keep polling
+			// publication, nil: Success, return publication
+			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
+			publication, err := aeron.conductor.FindPublication(registrationID)
+			if publication != nil || err != nil {
+				if err != nil {
+					aeron.conductor.onError(err)
+				}
+				ch <- publication
+				close(ch)
+				return
+			}
+			aeron.context.idleStrategy.Idle(0)
+		}
+	}()
+
+	return ch
 }
 
 // AsyncAddExclusivePublication will add a new exclusive publication to the driver and return its registration ID.  That
