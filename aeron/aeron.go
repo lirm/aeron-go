@@ -130,6 +130,39 @@ func (aeron *Aeron) AddSubscription(channel string, streamID int32) (*Subscripti
 	}
 }
 
+// AddSubscriptionDeprecated will add a new subscription to the driver.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
+// This is the deprecated way to add a subscription.  See AddSubscription for a better supported way.
+func (aeron *Aeron) AddSubscriptionDeprecated(channel string, streamID int32) chan *Subscription {
+	ch := make(chan *Subscription, 1)
+	registrationID, err := aeron.conductor.AddSubscription(channel, streamID)
+	if err != nil {
+		// Preserve the legacy functionality.  The original AddSubscription would result in the ClientConductor calling
+		// onError on this, as well as subsequently from the FindSubscription call below.
+		aeron.conductor.onError(err)
+	}
+	go func() {
+		for {
+			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
+			// FindSubscription can return one of 3 states:
+			// nil, nil: Still waiting, keep polling
+			// subscription, nil: Success, return subscription
+			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
+			subscription, err := aeron.conductor.FindSubscription(registrationID)
+			if subscription != nil || err != nil {
+				if err != nil {
+					aeron.conductor.onError(err)
+				}
+				ch <- subscription
+				close(ch)
+				return
+			}
+			aeron.context.idleStrategy.Idle(0)
+		}
+	}()
+	return ch
+}
+
 // AsyncAddSubscription will add a new subscription to the driver and return its registration ID.  That ID can be used
 // to get the Subscription with GetSubscription().
 func (aeron *Aeron) AsyncAddSubscription(channel string, streamID int32) (int64, error) {
@@ -141,6 +174,42 @@ func (aeron *Aeron) AsyncAddSubscription(channel string, streamID int32) (int64,
 // but the timeout hasn't expired yet either, so callers can continue to poll.
 func (aeron *Aeron) GetSubscription(registrationID int64) (*Subscription, error) {
 	return aeron.conductor.FindSubscription(registrationID)
+}
+
+// AddPublicationDeprecated will add a new publication to the driver. If such publication already exists within ClientConductor
+// the same instance will be returned.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
+// This is the deprecated way to add a publication.  See AddPublication for a better supported way.
+func (aeron *Aeron) AddPublicationDeprecated(channel string, streamID int32) chan *Publication {
+	ch := make(chan *Publication, 1)
+
+	registrationID, err := aeron.conductor.AddPublication(channel, streamID)
+	if err != nil {
+		// Preserve the legacy functionality.  The original AddPublication would result in the ClientConductor calling
+		// onError on this, as well as subsequently from the FindSubscription call below.
+		aeron.conductor.onError(err)
+	}
+	go func() {
+		for {
+			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
+			// FindPublication can return one of 3 states:
+			// nil, nil: Still waiting, keep polling
+			// publication, nil: Success, return publication
+			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
+			publication, err := aeron.conductor.FindPublication(registrationID)
+			if publication != nil || err != nil {
+				if err != nil {
+					aeron.conductor.onError(err)
+				}
+				ch <- publication
+				close(ch)
+				return
+			}
+			aeron.context.idleStrategy.Idle(0)
+		}
+	}()
+
+	return ch
 }
 
 // AddPublication will add a new publication to the driver. If such publication already exists within ClientConductor
