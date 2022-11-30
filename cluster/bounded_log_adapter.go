@@ -1,5 +1,3 @@
-// Copyright 2022 Steven Stern
-//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,7 +14,6 @@ package cluster
 
 import (
 	"bytes"
-
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -126,7 +123,7 @@ func (adapter *boundedLogAdapter) onMessage(
 			event.EncodedPrincipal,
 		)
 		if err != nil {
-			logger.Errorf("boundedLogAdapter: session open error: %w", err)
+			panic("boundedLogAdapter: session open error: " + err.Error())
 		}
 	case sessionCloseTemplateId:
 		leadershipTermId := buffer.GetInt64(offset)

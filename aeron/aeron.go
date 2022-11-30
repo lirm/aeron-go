@@ -148,7 +148,7 @@ func (aeron *Aeron) AddSubscriptionDeprecated(channel string, streamID int32) ch
 			// subscription, nil: Success, return subscription
 			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
 			subscription, err := aeron.conductor.FindSubscription(registrationID)
-			if subscription != nil || err != nil {
+			if subscription != nil || (err != nil && !errors.Is(err, TemporaryError)) {
 				if err != nil {
 					aeron.conductor.onError(err)
 				}
@@ -195,7 +195,7 @@ func (aeron *Aeron) AddPublicationDeprecated(channel string, streamID int32) cha
 			// publication, nil: Success, return publication
 			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
 			publication, err := aeron.conductor.FindPublication(registrationID)
-			if publication != nil || err != nil {
+			if publication != nil || (err != nil && !errors.Is(err, TemporaryError)) {
 				if err != nil {
 					aeron.conductor.onError(err)
 				}
@@ -277,7 +277,7 @@ func (aeron *Aeron) AddExclusivePublicationDeprecated(channel string, streamID i
 			// publication, nil: Success, return publication
 			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
 			publication, err := aeron.conductor.FindPublication(registrationID)
-			if publication != nil || err != nil {
+			if publication != nil || (err != nil && !errors.Is(err, TemporaryError)) {
 				if err != nil {
 					aeron.conductor.onError(err)
 				}

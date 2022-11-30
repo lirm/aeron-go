@@ -268,12 +268,9 @@ func (cc *ClientConductor) forceCloseResources() {
 }
 
 func (cc *ClientConductor) doWork() (int, error) {
-	workCount, err := cc.driverListenerAdapter.ReceiveMessages()
-	if err != nil {
-		return workCount, err
-	}
-	heartbeats, err2 := cc.onHeartbeatCheckTimeouts()
-	return workCount + heartbeats, err2
+	workCount := cc.driverListenerAdapter.ReceiveMessages()
+	heartbeats, err := cc.onHeartbeatCheckTimeouts()
+	return workCount + heartbeats, err
 }
 
 func (cc *ClientConductor) getDriverStatus() error {
@@ -370,6 +367,8 @@ func (cc *ClientConductor) FindPublication(registrationID int64) (*Publication, 
 			return publication, nil
 		case RegistrationStatus.ErroredMediaDriver:
 			return nil, fmt.Errorf("error on %d: %d: %s", registrationID, pub.errorCode, pub.errorMessage)
+		default:
+			return nil, errors.New("unknown registration status")
 		}
 	}
 	return nil, fmt.Errorf("registration ID %d cannot be found", registrationID)
@@ -827,10 +826,10 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() (int, error) {
 				return 0, fmt.Errorf("client heartbeat timestamp not active")
 			}
 		} else {
-			counterId, err := cc.counterReader.FindCounter(heartbeatTypeId, func(keyBuffer *atomic.Buffer) bool {
+			counterId := cc.counterReader.FindCounter(heartbeatTypeId, func(keyBuffer *atomic.Buffer) bool {
 				return keyBuffer.GetInt64(heartheatRegistrationIdOffset) == cc.driverProxy.ClientID()
 			})
-			if err != nil {
+			if counterId != ctr.NullCounterId {
 				var ctrErr error
 				if cc.heartbeatTimestamp, ctrErr = ctr.NewAtomicCounter(cc.counterReader, counterId); ctrErr != nil {
 					logger.Warning("unable to allocate heartbeat counter %d", counterId)

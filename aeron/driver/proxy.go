@@ -18,6 +18,7 @@ limitations under the License.
 package driver
 
 import (
+	"errors"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/command"
 	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
@@ -337,5 +338,9 @@ func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int3
 
 	msgTypeID := filler(buffer, &length)
 
-	return driver.toDriverCommandBuffer.Write(int32(msgTypeID), buffer, 0, int32(length))
+	if driver.toDriverCommandBuffer.Write(int32(msgTypeID), buffer, 0, int32(length)) {
+		return nil
+	} else {
+		return errors.New("couldn't write command to driver")
+	}
 }

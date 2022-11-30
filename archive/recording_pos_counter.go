@@ -1,17 +1,3 @@
-// Copyright 2022 Steven Stern
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 // See: ~aeron/aeron-archive/src/main/java/io/aeron/archive/status/RecordingPos.Java
 // for which the below is a subset
 //
@@ -51,7 +37,7 @@ const (
 
 // FindCounterIdByRecording finds the active counter id for a stream based on the recording id.
 // Returns the counter id if found otherwise NullCounterId
-func FindCounterIdByRecording(countersReader *counters.Reader, recordingId int64) (int32, error) {
+func FindCounterIdByRecording(countersReader *counters.Reader, recordingId int64) int32 {
 	return countersReader.FindCounter(RECORDING_POSITION_COUNTER_TYPE_ID, func(keyBuffer *atomic.Buffer) bool {
 		return keyBuffer.GetInt64(RECORDING_ID_OFFSET) == recordingId
 	})
@@ -59,7 +45,7 @@ func FindCounterIdByRecording(countersReader *counters.Reader, recordingId int64
 
 // FindCounterIdBySession finds the active counterID for a stream based on the session id.
 // Returns the counter id if found otherwise NullCounterId
-func FindCounterIdBySession(countersReader *counters.Reader, sessionId int32) (int32, error) {
+func FindCounterIdBySession(countersReader *counters.Reader, sessionId int32) int32 {
 	return countersReader.FindCounter(RECORDING_POSITION_COUNTER_TYPE_ID, func(keyBuffer *atomic.Buffer) bool {
 		return keyBuffer.GetInt32(SESSION_ID_OFFSET) == sessionId
 	})

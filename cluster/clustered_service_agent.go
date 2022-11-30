@@ -1,5 +1,3 @@
-// Copyright 2022 Steven Stern
-//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -174,14 +172,14 @@ func (agent *ClusteredServiceAgent) OnStart() error {
 
 func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
 	for {
-		id, err := agent.counters.FindCounter(commitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id := agent.counters.FindCounter(commitPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			return keyBuffer.GetInt32(0) == agent.opts.ClusterId
 		})
-		if err != nil {
-			commitPos, err2 := counters.NewReadableCounter(agent.counters, id)
+		if id != counters.NullCounterId {
+			commitPos, err := counters.NewReadableCounter(agent.counters, id)
 			logger.Debugf("found commit position counter - id=%d value=%d", id, commitPos.Get())
 			agent.commitPosition = commitPos
-			return err2
+			return err
 		}
 		agent.Idle(0)
 	}
@@ -226,7 +224,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 	for {
 		var leadershipTermId int64
-		id, err := agent.counters.FindCounter(recoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		id := agent.counters.FindCounter(recoveryStateCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(24) == agent.opts.ClusterId {
 				leadershipTermId = keyBuffer.GetInt64(0)
 				agent.logPosition = keyBuffer.GetInt64(8)
@@ -235,7 +233,7 @@ func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
 			}
 			return false
 		})
-		if err != nil {
+		if id != counters.NullCounterId {
 			return id, leadershipTermId
 		}
 		agent.Idle(0)
@@ -625,14 +623,14 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 	start := time.Now()
 	for time.Since(start) < agent.opts.Timeout {
 		recId := int64(NullValue)
-		_, err := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+		counterId := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(8) == sessionId {
 				recId = keyBuffer.GetInt64(0)
 				return true
 			}
 			return false
 		})
-		if err != nil {
+		if counterId != NullValue {
 			return recId, nil
 		}
 		agent.Idle(0)
