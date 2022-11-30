@@ -16,7 +16,6 @@ package cluster
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/lirm/aeron-go/aeron"
@@ -40,9 +39,9 @@ func newSnapshotLoader(agent *ClusteredServiceAgent, img aeron.Image) *snapshotL
 	return &snapshotLoader{agent: agent, img: img, marshaller: codecs.NewSbeGoMarshaller()}
 }
 
-func (loader *snapshotLoader) poll() (int, error) {
+func (loader *snapshotLoader) poll() int {
 	if loader.isDone {
-		return 0, nil
+		return 0
 	}
 	return loader.img.Poll(loader.onFragment, 1)
 }
@@ -52,17 +51,18 @@ func (loader *snapshotLoader) onFragment(
 	offset int32,
 	length int32,
 	header *logbuffer.Header,
-) error {
+) {
 	if length < SBEHeaderLength {
-		return errors.New("fragment is too small to process")
+		return
 	}
 	blockLength := buffer.GetUInt16(offset)
 	templateId := buffer.GetUInt16(offset + 2)
 	schemaId := buffer.GetUInt16(offset + 4)
 	version := buffer.GetUInt16(offset + 6)
 	if schemaId != ClusterSchemaId {
-		return fmt.Errorf("unexpected fragment with schemaId=%d templateId=%d blockLen=%d version=%d",
+		logger.Errorf("SnapshotLoader: unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
+		return
 	}
 	offset += SBEHeaderLength
 	length -= SBEHeaderLength
@@ -70,8 +70,6 @@ func (loader *snapshotLoader) onFragment(
 	buf := &bytes.Buffer{}
 	buffer.WriteBytes(buf, offset, length)
 
-	// TODO Rework loader.err so the error is returned directly.  No need for this fancy error redirection once I make
-	// FragmentHandler and Poll both return errors.
 	switch templateId {
 	case snapshotMarkerTemplateId:
 		marker := &codecs.SnapshotMarker{}
@@ -119,5 +117,4 @@ func (loader *snapshotLoader) onFragment(
 	default:
 		logger.Debugf("SnapshotLoader: unknown templateId=%d at pos=%d", templateId, header.Position())
 	}
-	return nil
 }

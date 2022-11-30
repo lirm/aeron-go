@@ -81,31 +81,27 @@ func main() {
 		}
 	}()
 
-	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
 
 		c, found := clients[header.SessionId()]
 		if !found {
 			pub, err := a.AddExclusivePublication(string(bytes), int32(*examples.ExamplesConfig.StreamID))
 			if err != nil {
-				return err
+				logger.Fatal(err)
 			}
 			c = &client{
 				pub: pub,
 			}
 			clients[header.SessionId()] = c
 		}
-		return nil
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond}
 
 	counter := 0
 	for {
-		fragmentsRead, err := subscription.Poll(handler, 10)
-		if err != nil {
-			logger.Error(err)
-		}
+		fragmentsRead := subscription.Poll(handler, 10)
 
 		if counter > *examples.ExamplesConfig.Messages {
 			break

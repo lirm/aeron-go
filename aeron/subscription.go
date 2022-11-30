@@ -139,11 +139,10 @@ func (sub *Subscription) Close() error {
 }
 
 // Poll is the primary receive mechanism on subscription.
-func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) (int, error) {
+func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) int {
 	img := sub.images.Get()
 	length := len(img)
 	var fragmentsRead int
-	var err error
 
 	if length > 0 {
 		startingIndex := sub.roundRobinIndex
@@ -153,20 +152,20 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) (
 			startingIndex = 0
 		}
 
-		for i := startingIndex; i < length && fragmentsRead < fragmentLimit && err == nil; i++ {
+		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
 			var newFrags int
-			newFrags, err = img[i].Poll(handler, fragmentLimit-fragmentsRead)
+			newFrags = img[i].Poll(handler, fragmentLimit-fragmentsRead)
 			fragmentsRead += newFrags
 		}
 
-		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit && err == nil; i++ {
+		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
 			var newFrags int
-			newFrags, err = img[i].Poll(handler, fragmentLimit-fragmentsRead)
+			newFrags = img[i].Poll(handler, fragmentLimit-fragmentsRead)
 			fragmentsRead += newFrags
 		}
 	}
 
-	return fragmentsRead, err
+	return fragmentsRead
 }
 
 // ControlledPoll polls in a controlled manner the image s under the subscription for available message fragments.
@@ -176,12 +175,11 @@ func (sub *Subscription) Poll(handler term.FragmentHandler, fragmentLimit int) (
 // Each fragment read will be a whole message if it is under MTU length. If larger than MTU then it will come
 // as a series of fragments ordered within a session.
 // Returns the number of fragments received.
-func (sub *Subscription) ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) (int, error) {
+func (sub *Subscription) ControlledPoll(handler term.ControlledFragmentHandler, fragmentLimit int) int {
 
 	img := sub.images.Get()
 	length := len(img)
 	var fragmentsRead int
-	var err error
 
 	if length > 0 {
 		startingIndex := sub.roundRobinIndex
@@ -191,20 +189,20 @@ func (sub *Subscription) ControlledPoll(handler term.ControlledFragmentHandler, 
 			startingIndex = 0
 		}
 
-		for i := startingIndex; i < length && fragmentsRead < fragmentLimit && err == nil; i++ {
+		for i := startingIndex; i < length && fragmentsRead < fragmentLimit; i++ {
 			var newFrags int
-			newFrags, err = img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
+			newFrags = img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
 			fragmentsRead += newFrags
 		}
 
-		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit && err == nil; i++ {
+		for i := 0; i < startingIndex && fragmentsRead < fragmentLimit; i++ {
 			var newFrags int
-			newFrags, err = img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
+			newFrags = img[i].ControlledPoll(handler, fragmentLimit-fragmentsRead)
 			fragmentsRead += newFrags
 		}
 	}
 
-	return fragmentsRead, err
+	return fragmentsRead
 }
 
 //go:norace

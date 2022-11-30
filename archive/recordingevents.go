@@ -37,7 +37,7 @@ type FragmentHandlerWithListeners func(listeners *ArchiveListeners, buffer *atom
 // PollWithContext the aeron subscription handler.
 // If you pass it a nil handler it will use the builtin and call the Listeners
 // If you ask for 0 fragments it will only return one fragment (if available)
-func (rea *RecordingEventsAdapter) PollWithContext(handler FragmentHandlerWithListeners, fragmentLimit int) (int, error) {
+func (rea *RecordingEventsAdapter) PollWithContext(handler FragmentHandlerWithListeners, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = rea.archive.Options.RangeChecking
@@ -49,9 +49,8 @@ func (rea *RecordingEventsAdapter) PollWithContext(handler FragmentHandlerWithLi
 		fragmentLimit = 1
 	}
 	return rea.Subscription.Poll(
-		func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+		func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 			handler(rea.archive.Listeners, buf, offset, length, header)
-			return nil
 		}, fragmentLimit)
 }
 

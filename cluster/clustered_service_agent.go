@@ -271,11 +271,7 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	img := agent.awaitImage(int32(replaySessionId), subscription)
 	loader := newSnapshotLoader(agent, img)
 	for !loader.isDone {
-		fragmentsRead, err := loader.poll()
-		if err != nil {
-			return err
-		}
-		agent.opts.IdleStrategy.Idle(fragmentsRead)
+		agent.opts.IdleStrategy.Idle(loader.poll())
 	}
 	if util.SemanticVersionMajor(uint32(agent.opts.AppVersion)) != util.SemanticVersionMajor(uint32(loader.appVersion)) {
 		panic(fmt.Errorf("incompatible app version: %v snapshot=%v",
@@ -305,11 +301,7 @@ func (agent *ClusteredServiceAgent) checkForClockTick() bool {
 }
 
 func (agent *ClusteredServiceAgent) pollServiceAdapter() {
-	if _, err := agent.serviceAdapter.poll(); err != nil {
-		logger.Error(err)
-		agent.terminate()
-		return
-	}
+	agent.serviceAdapter.poll()
 
 	if agent.activeLogEvent != nil && agent.logAdapter.image == nil {
 		event := agent.activeLogEvent
@@ -346,11 +338,7 @@ func (agent *ClusteredServiceAgent) DoWork() int {
 	}
 
 	if agent.logAdapter.image != nil {
-		polled, err := agent.logAdapter.poll(agent.commitPosition.Get())
-		if err != nil {
-			// TODO: Better way to handle this error?
-			logger.Error(err)
-		}
+		polled := agent.logAdapter.poll(agent.commitPosition.Get())
 		work += polled
 		if polled == 0 && agent.logAdapter.isDone() {
 			agent.closeLog()

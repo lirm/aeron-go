@@ -33,17 +33,8 @@ type MockFragmentHandler struct {
 }
 
 // Execute provides a mock function with given fields: buffer, offset, length, header
-func (_m *MockFragmentHandler) Execute(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
-	ret := _m.Called(buffer, offset, length, header)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*atomic.Buffer, int32, int32, *logbuffer.Header) error); ok {
-		r0 = rf(buffer, offset, length, header)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *MockFragmentHandler) Execute(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	_m.Called(buffer, offset, length, header)
 }
 
 type mockConstructorTestingTNewMockFragmentHandler interface {

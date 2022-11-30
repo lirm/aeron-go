@@ -127,28 +127,23 @@ func main() {
 
 	tmpBuf := &bytes.Buffer{}
 	counter := 1
-	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
 		tmpBuf.Reset()
 		buffer.WriteBytes(tmpBuf, offset, length)
 		fmt.Printf("%8.d: Gots me a fragment offset:%d length: %d payload: %s (buf:%s)\n", counter, offset, length, string(bytes), string(tmpBuf.Next(int(length))))
 
 		counter++
-		return nil
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond}
 
 	for {
-		fragmentsRead, err := subscription.Poll(handler, 10)
-		if err == nil {
-			select {
-			case <-interrupt:
-				return
-			default:
-			}
-		} else {
-			logger.Error(err)
+		fragmentsRead := subscription.Poll(handler, 10)
+		select {
+		case <-interrupt:
+			return
+		default:
 		}
 		idleStrategy.Idle(fragmentsRead)
 

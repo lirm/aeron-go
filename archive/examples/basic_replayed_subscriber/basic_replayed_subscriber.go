@@ -99,19 +99,15 @@ func main() {
 	logger.Infof("Subscription found %v", subscription)
 
 	counter := 0
-	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
 		logger.Infof("%s", bytes)
 		counter++
-		return nil
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 1000}
 	for {
-		fragmentsRead, err := subscription.Poll(printHandler, 10)
-		if err != nil {
-			logger.Fatal(err)
-		}
+		fragmentsRead := subscription.Poll(printHandler, 10)
 		arch.RecordingEventsPoll()
 
 		idleStrategy.Idle(fragmentsRead)

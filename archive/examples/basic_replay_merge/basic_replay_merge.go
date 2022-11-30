@@ -99,11 +99,10 @@ func main() {
 	defer subscription.Close()
 
 	counter := 0
-	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+	printHandler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		bytes := buffer.GetBytesArray(offset, length)
 		logger.Infof("Message: %s", bytes)
 		counter++
-		return nil
 	}
 
 	idleStrategy := idlestrategy.Sleeping{SleepFor: time.Millisecond * 100}
@@ -153,10 +152,7 @@ func main() {
 	merge.Close()
 
 	for {
-		fragmentsRead, err := subscription.Poll(printHandler, 10)
-		if err != nil {
-			logger.Error(err)
-		}
+		fragmentsRead := subscription.Poll(printHandler, 10)
 		arch.RecordingEventsPoll()
 
 		idleStrategy.Idle(fragmentsRead)

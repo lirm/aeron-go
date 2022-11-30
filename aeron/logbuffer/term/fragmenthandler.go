@@ -21,4 +21,4 @@ import (
 )
 
 // FragmentHandler is the main callback interface for received data
-type FragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error
+type FragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)

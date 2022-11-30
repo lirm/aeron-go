@@ -67,10 +67,10 @@ func (f *FragmentAssembler) OnFragment(
 	buffer *atomic.Buffer,
 	offset int32,
 	length int32,
-	header *logbuffer.Header) error {
+	header *logbuffer.Header) {
 	flags := header.Flags()
 	if (flags & unfragmented) == unfragmented {
-		return f.delegate(buffer, offset, length, header)
+		f.delegate(buffer, offset, length, header)
 	} else {
 		if (flags & beginFrag) == beginFrag {
 			builder, ok := f.builderBySessionIdMap[header.SessionId()]
@@ -86,7 +86,7 @@ func (f *FragmentAssembler) OnFragment(
 				buffer.WriteBytes(builder, offset, length)
 				if (flags & endFrag) == endFrag {
 					msgLength := builder.Len()
-					return f.delegate(
+					f.delegate(
 						atomic.MakeBuffer(builder.Bytes(), msgLength),
 						int32(0),
 						int32(msgLength),
@@ -96,5 +96,4 @@ func (f *FragmentAssembler) OnFragment(
 			}
 		}
 	}
-	return nil
 }

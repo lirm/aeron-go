@@ -253,7 +253,7 @@ func (rm *ReplayMerge) Poll(fragmentHandler term.FragmentHandler, fragmentLimit 
 	if rm.image == nil {
 		return
 	}
-	return rm.image.Poll(fragmentHandler, fragmentLimit)
+	return rm.image.Poll(fragmentHandler, fragmentLimit), nil
 }
 
 // IsMerged returns if the live stream merged and the replay stopped?
@@ -485,14 +485,10 @@ func (rm *ReplayMerge) pollForResponse() (bool, error) {
 	correlationId := rm.activeCorrelationId
 	poller := rm.archive.Control
 
-	fragments, err := poller.Poll()
-	if err != nil {
-		return false, err
-	}
-	if fragments > 0 && poller.Results.IsPollComplete {
+	if poller.Poll() > 0 && poller.Results.IsPollComplete {
 		if poller.Results.ControlResponse.ControlSessionId == rm.archive.SessionID {
 			if poller.Results.ErrorResponse != nil {
-				err = fmt.Errorf(
+				err := fmt.Errorf(
 					"archive response for correlationId=%d, error=%s",
 					correlationId,
 					poller.Results.ErrorResponse,

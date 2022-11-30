@@ -77,17 +77,15 @@ func (suite *SysTestSuite) send(n int, pub *aeron.Publication) {
 
 func (suite *SysTestSuite) receive(n int, sub *aeron.Subscription) {
 	counter := 0
-	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		logger.Debugf("    message: %s", string(buffer.GetBytesArray(offset, length)))
 		counter++
-		return nil
 	}
 	var fragmentsRead atomic.Int
 	for int(fragmentsRead.Get()) < n {
 		timeoutAt := time.Now().Add(time.Second)
 		for {
-			recvd, err := sub.Poll(handler, 10)
-			suite.Assert().NoError(err)
+			recvd := sub.Poll(handler, 10)
 			if recvd >= 1 {
 				fragmentsRead.Add(int32(recvd))
 				logger.Debugf("  have %d fragments", fragmentsRead)
