@@ -34,6 +34,8 @@ import (
 var logger = logging.MustGetLogger("cluster-client")
 var marshaller = codecs.NewSbeGoMarshaller()
 
+var TemporaryError = errors.New("temporary error")
+
 type AeronCluster struct {
 	opts                 *Options
 	aeronClient          *aeron.Aeron
@@ -339,7 +341,7 @@ func (ac *AeronCluster) awaitPublicationConnected() (int, error) {
 					ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 					break
 				}
-				if !errors.Is(err, aeron.TemporaryError) {
+				if !errors.Is(err, TemporaryError) {
 					return 0, err
 				}
 			}
@@ -379,7 +381,7 @@ func (ac *AeronCluster) sendConnectRequest(responseChannel string) error {
 		return nil
 	} else {
 		return fmt.Errorf("%w, failed to send connect request, channel=%s result=%d",
-			aeron.TemporaryError, ac.ingressPub.Channel(), result)
+			TemporaryError, ac.ingressPub.Channel(), result)
 	}
 }
 

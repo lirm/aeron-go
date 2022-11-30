@@ -56,8 +56,6 @@ const (
 	heartheatRegistrationIdOffset = int32(0)
 )
 
-var TemporaryError = errors.New("temporary error")
-
 type publicationStateDefn struct {
 	regID                    int64
 	origRegID                int64
@@ -348,11 +346,7 @@ func (cc *ClientConductor) FindPublication(registrationID int64) (*Publication, 
 		}
 		switch pub.status {
 		case RegistrationStatus.AwaitingMediaDriver:
-			if err := timeoutExceeded(pub.timeOfRegistration, cc.driverTimeoutNs); err == nil {
-				return nil, fmt.Errorf("%w: registration not yet available", TemporaryError)
-			} else {
-				return nil, err
-			}
+			return nil, timeoutExceeded(pub.timeOfRegistration, cc.driverTimeoutNs)
 		case RegistrationStatus.RegisteredMediaDriver:
 			publication = NewPublication(pub.buffers)
 			publication.conductor = cc
@@ -433,8 +427,7 @@ func (cc *ClientConductor) AddSubscription(channel string, streamID int32) (int6
 }
 
 // FindSubscription by Registration ID, which is returned by AddSubscription.  Returns the Subscription or an error.
-// Note that callers should call `errors.Is(err, TemporaryError)`.  That error indicates that the subscription is not
-// yet ready, but the timeout hasn't expired yet either, so callers can continue to poll.
+// A pending Subscription will return nil,nil signifying that there is neither a Subscription nor an error.
 func (cc *ClientConductor) FindSubscription(registrationID int64) (*Subscription, error) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
@@ -445,11 +438,7 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) (*Subscription
 		}
 		switch sub.status {
 		case RegistrationStatus.AwaitingMediaDriver:
-			if err := timeoutExceeded(sub.timeOfRegistration, cc.driverTimeoutNs); err == nil {
-				return nil, fmt.Errorf("%w: registration not yet available", TemporaryError)
-			} else {
-				return nil, err
-			}
+			return nil, timeoutExceeded(sub.timeOfRegistration, cc.driverTimeoutNs)
 		case RegistrationStatus.RegisteredMediaDriver:
 			return sub.subscription, nil
 		case RegistrationStatus.ErroredMediaDriver:

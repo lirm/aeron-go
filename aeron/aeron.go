@@ -16,7 +16,6 @@
 package aeron
 
 import (
-	"errors"
 	"time"
 
 	"github.com/lirm/aeron-go/aeron/broadcast"
@@ -122,8 +121,7 @@ func (aeron *Aeron) AddSubscription(channel string, streamID int32) (*Subscripti
 	}
 	for {
 		subscription, err := aeron.conductor.FindSubscription(registrationID)
-		// Retry temporary error.  Any other success or error gets returned.
-		if !errors.Is(err, TemporaryError) {
+		if subscription != nil || err != nil {
 			return subscription, err
 		}
 		aeron.context.idleStrategy.Idle(0)
@@ -142,13 +140,8 @@ func (aeron *Aeron) AddSubscriptionDeprecated(channel string, streamID int32) ch
 	}
 	go func() {
 		for {
-			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
-			// FindSubscription can return one of 3 states:
-			// nil, nil: Still waiting, keep polling
-			// subscription, nil: Success, return subscription
-			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
 			subscription, err := aeron.conductor.FindSubscription(registrationID)
-			if subscription != nil || (err != nil && !errors.Is(err, TemporaryError)) {
+			if subscription != nil || err != nil {
 				if err != nil {
 					aeron.conductor.onError(err)
 				}
@@ -168,9 +161,8 @@ func (aeron *Aeron) AsyncAddSubscription(channel string, streamID int32) (int64,
 	return aeron.conductor.AddSubscription(channel, streamID)
 }
 
-// GetSubscription will attempt to get a Subscription from a registrationID.  See AsyncAddSubscription.  Note that
-// callers should call `errors.Is(err, TemporaryError)`.  That error indicates that the subscription is not yet ready,
-// but the timeout hasn't expired yet either, so callers can continue to poll.
+// GetSubscription will attempt to get a Subscription from a registrationID.  See AsyncAddSubscription.  A pending
+// Subscription will return nil,nil signifying that there is neither a Subscription nor an error.
 func (aeron *Aeron) GetSubscription(registrationID int64) (*Subscription, error) {
 	return aeron.conductor.FindSubscription(registrationID)
 }
@@ -189,13 +181,8 @@ func (aeron *Aeron) AddPublicationDeprecated(channel string, streamID int32) cha
 	}
 	go func() {
 		for {
-			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
-			// FindPublication can return one of 3 states:
-			// nil, nil: Still waiting, keep polling
-			// publication, nil: Success, return publication
-			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
 			publication, err := aeron.conductor.FindPublication(registrationID)
-			if publication != nil || (err != nil && !errors.Is(err, TemporaryError)) {
+			if publication != nil || err != nil {
 				if err != nil {
 					aeron.conductor.onError(err)
 				}
@@ -219,8 +206,7 @@ func (aeron *Aeron) AddPublication(channel string, streamID int32) (*Publication
 	}
 	for {
 		publication, err := aeron.conductor.FindPublication(registrationID)
-		// Retry temporary error.  Any other success or error gets returned.
-		if !errors.Is(err, TemporaryError) {
+		if publication != nil || err != nil {
 			return publication, err
 		}
 		aeron.context.idleStrategy.Idle(0)
@@ -233,9 +219,8 @@ func (aeron *Aeron) AsyncAddPublication(channel string, streamID int32) (int64, 
 	return aeron.conductor.AddPublication(channel, streamID)
 }
 
-// GetPublication will attempt to get a Publication from a registrationID.  See AsyncAddPublication.  Note that callers
-// should call `errors.Is(err, TemporaryError)`.  That error indicates that the publication is not yet ready, but the
-// timeout hasn't expired yet either, so callers can continue to poll.
+// GetPublication will attempt to get a Publication from a registrationID.  See AsyncAddPublication.  A pending
+// Publication will return nil,nil signifying that there is neither a Publication nor an error.
 func (aeron *Aeron) GetPublication(registrationID int64) (*Publication, error) {
 	return aeron.conductor.FindPublication(registrationID)
 }
@@ -249,8 +234,7 @@ func (aeron *Aeron) AddExclusivePublication(channel string, streamID int32) (*Pu
 	}
 	for {
 		publication, err := aeron.conductor.FindPublication(registrationID)
-		// Retry temporary error.  Any other success or error gets returned.
-		if !errors.Is(err, TemporaryError) {
+		if publication != nil || err != nil {
 			return publication, err
 		}
 		aeron.context.idleStrategy.Idle(0)
@@ -271,13 +255,8 @@ func (aeron *Aeron) AddExclusivePublicationDeprecated(channel string, streamID i
 	}
 	go func() {
 		for {
-			// This is a quirk of retrofitting proper error handling onto an API that does not return an error value.
-			// FindPublication can return one of 3 states:
-			// nil, nil: Still waiting, keep polling
-			// publication, nil: Success, return publication
-			// nil, error: Permanent failure, cc.onError() has already been called, exit gracefully
 			publication, err := aeron.conductor.FindPublication(registrationID)
-			if publication != nil || (err != nil && !errors.Is(err, TemporaryError)) {
+			if publication != nil || err != nil {
 				if err != nil {
 					aeron.conductor.onError(err)
 				}
@@ -299,8 +278,8 @@ func (aeron *Aeron) AsyncAddExclusivePublication(channel string, streamID int32)
 }
 
 // GetExclusivePublication will attempt to get an exclusive Publication from a registrationID.  See
-// AsyncAddExclusivePublication.  Note that callers should call `errors.Is(err, TemporaryError)`.  That error indicates
-// that the publication is not yet ready, but the timeout hasn't expired yet either, so callers can continue to poll.
+// AsyncAddExclusivePublication.  A pending Publication will return nil,nil signifying that there is neither a
+// Publication nor an error.
 // Also note that while aeron-go currently handles GetPublication and GetExclusivePublication the same way, they may
 // diverge in the future.  Other Aeron languages already handle these calls differently.
 func (aeron *Aeron) GetExclusivePublication(registrationID int64) (*Publication, error) {
