@@ -1,8 +1,19 @@
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cluster
 
 import (
 	"bytes"
-
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
@@ -19,7 +30,7 @@ type boundedLogAdapter struct {
 	marshaller     *codecs.SbeGoMarshaller
 	options        *Options
 	agent          *ClusteredServiceAgent
-	image          *aeron.Image
+	image          aeron.Image
 	builder        *bytes.Buffer
 	maxLogPosition int64
 }
@@ -102,7 +113,7 @@ func (adapter *boundedLogAdapter) onMessage(
 			return
 		}
 
-		adapter.agent.onSessionOpen(
+		err := adapter.agent.onSessionOpen(
 			event.LeadershipTermId,
 			header.Position(),
 			event.ClusterSessionId,
@@ -111,6 +122,9 @@ func (adapter *boundedLogAdapter) onMessage(
 			string(event.ResponseChannel),
 			event.EncodedPrincipal,
 		)
+		if err != nil {
+			panic("boundedLogAdapter: session open error: " + err.Error())
+		}
 	case sessionCloseTemplateId:
 		leadershipTermId := buffer.GetInt64(offset)
 		clusterSessionId := buffer.GetInt64(offset + 8)

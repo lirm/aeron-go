@@ -8,7 +8,7 @@ import (
 )
 
 type ClusteredService interface {
-	OnStart(cluster Cluster, image *aeron.Image)
+	OnStart(cluster Cluster, image aeron.Image)
 
 	OnSessionOpen(session ClientSession, timestamp int64)
 

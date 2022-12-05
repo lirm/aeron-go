@@ -71,11 +71,11 @@ func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithI
 	arr := make([]byte, messageLength)
 	srcBuffer := atomic.MakeBuffer(arr)
 
-	subscription := <-suite.connection.AddSubscription(suite.channel, streamId)
-	suite.Require().NotNil(subscription)
+	subscription, err := suite.connection.AddSubscription(suite.channel, streamId)
+	suite.Require().NoError(err)
 	defer subscription.Close()
-	publication := <-suite.connection.AddPublication(suite.channel, streamId)
-	suite.Require().NotNil(publication)
+	publication, err := suite.connection.AddPublication(suite.channel, streamId)
+	suite.Require().NoError(err)
 	defer publication.Close()
 
 	suite.publishMessage(srcBuffer, *publication)
@@ -104,11 +104,11 @@ func (suite *BufferClaimMessageTestSuite) TestShouldReceivePublishedMessageWithI
 func (suite *BufferClaimMessageTestSuite) TestShouldTransferReservedValue() {
 	var bufferClaim logbuffer.Claim
 
-	subscription := <-suite.connection.AddSubscription(suite.channel, streamId)
-	suite.Require().NotNil(subscription)
+	subscription, err := suite.connection.AddSubscription(suite.channel, streamId)
+	suite.Require().NoError(err)
 	defer subscription.Close()
-	publication := <-suite.connection.AddPublication(suite.channel, streamId)
-	suite.Require().NotNil(publication)
+	publication, err := suite.connection.AddPublication(suite.channel, streamId)
+	suite.Require().NoError(err)
 	defer publication.Close()
 
 	for publication.TryClaim(messageLength, &bufferClaim) < 0 {

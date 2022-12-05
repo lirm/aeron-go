@@ -71,7 +71,10 @@ func main() {
 	}
 	logger.Infof("StartRecording succeeded\n")
 
-	publication := <-arch.AddPublication(channel, stream)
+	publication, err := arch.AddPublication(channel, stream)
+	if err != nil {
+		logger.Fatal(err)
+	}
 	logger.Infof("Publication found %v", publication)
 	defer publication.Close()
 

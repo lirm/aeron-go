@@ -58,7 +58,7 @@ func TestNumberOfZeros(t *testing.T) {
 
 func TestNewPublication(t *testing.T) {
 	cncName, meta := prepareCnc(t)
-	defer os.Remove(cncName)
+	defer require.NoError(t, os.Remove(cncName))
 
 	var proxy driver.Proxy
 	var rb rb.ManyToOne
@@ -71,10 +71,10 @@ func TestNewPublication(t *testing.T) {
 
 	var cc ClientConductor
 	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, meta)
-	defer cc.Close()
+	defer require.NoError(t, cc.Close())
 
 	lb, err := logbuffer.NewTestingLogbuffer()
-	defer logbuffer.RemoveTestingLogbufferFile()
+	defer require.NoError(t, logbuffer.RemoveTestingLogbufferFile())
 	require.NoError(t, err)
 
 	lb.Meta().MTULen.Set(8192)
@@ -119,7 +119,7 @@ func TestNewPublication(t *testing.T) {
 
 func TestPublication_Offer(t *testing.T) {
 	cncName, meta := prepareCnc(t)
-	defer os.Remove(cncName)
+	defer require.NoError(t, os.Remove(cncName))
 
 	var proxy driver.Proxy
 	var rb rb.ManyToOne
@@ -131,10 +131,10 @@ func TestPublication_Offer(t *testing.T) {
 
 	var cc ClientConductor
 	cc.Init(&proxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, meta)
-	defer cc.Close()
+	defer require.NoError(t, cc.Close())
 
 	lb, err := logbuffer.NewTestingLogbuffer()
-	defer logbuffer.RemoveTestingLogbufferFile()
+	defer require.NoError(t, logbuffer.RemoveTestingLogbufferFile())
 	require.NoError(t, err)
 
 	lb.Meta().MTULen.Set(8192)

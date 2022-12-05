@@ -57,11 +57,17 @@ func main() {
 	}
 	defer a.Close()
 
-	subscription := <-a.AddSubscription(*examples.PingPongConfig.PongChannel, int32(*examples.PingPongConfig.PongStreamID))
+	subscription, err := a.AddSubscription(*examples.PingPongConfig.PongChannel, int32(*examples.PingPongConfig.PongStreamID))
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer subscription.Close()
 	logger.Infof("Subscription found %v", subscription)
 
-	publication := <-a.AddPublication(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamID))
+	publication, err := a.AddPublication(*examples.PingPongConfig.PingChannel, int32(*examples.PingPongConfig.PingStreamID))
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer publication.Close()
 	logger.Infof("Publication found %v", publication)
 

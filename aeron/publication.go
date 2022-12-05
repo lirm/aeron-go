@@ -1,5 +1,6 @@
 /*
 Copyright 2016-2018 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -141,7 +142,7 @@ func (pub *Publication) IsOriginal() bool {
 func (pub *Publication) Close() error {
 	// FIXME Why can pub be nil?!
 	if pub != nil && pub.isClosed.CompareAndSet(false, true) {
-		pub.conductor.releasePublication(pub.regID)
+		return pub.conductor.releasePublication(pub.regID)
 	}
 
 	return nil
@@ -167,49 +168,42 @@ func (pub *Publication) Position() int64 {
 
 // Offer is the primary send mechanism on Publication
 func (pub *Publication) Offer(buffer *atomic.Buffer, offset int32, length int32, reservedValueSupplier term.ReservedValueSupplier) int64 {
-
-	newPosition := PublicationClosed
+	if pub.IsClosed() {
+		return PublicationClosed
+	}
 
 	if reservedValueSupplier == nil {
 		reservedValueSupplier = term.DefaultReservedValueSupplier
 	}
 
-	if !pub.IsClosed() {
+	limit := pub.pubLimit.get()
+	termCount := pub.metaData.ActiveTermCountOff.Get()
+	termIndex := termCount % logbuffer.PartitionCount
+	termAppender := pub.appenders[termIndex]
+	rawTail := termAppender.RawTail()
+	termOffset := rawTail & 0xFFFFFFFF
+	termId := logbuffer.TermID(rawTail)
+	position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
 
-		limit := pub.pubLimit.get()
-		termCount := pub.metaData.ActiveTermCountOff.Get()
-		termIndex := termCount % logbuffer.PartitionCount
-		termAppender := pub.appenders[termIndex]
-		rawTail := termAppender.RawTail()
-		termOffset := rawTail & 0xFFFFFFFF
-		termId := logbuffer.TermID(rawTail)
-		position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
-
-		if termCount != (termId - pub.metaData.InitTermID.Get()) {
-			return AdminAction
-		}
-
-		if logger.IsEnabledFor(logging.DEBUG) {
-			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
-		}
-		if position < limit {
-			var resultingOffset int64
-			var termId int32
-			if length <= pub.maxPayloadLength {
-				resultingOffset, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, reservedValueSupplier)
-			} else {
-				pub.checkForMaxMessageLength(length)
-				resultingOffset, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, reservedValueSupplier)
-			}
-
-			newPosition = pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
-
-		} else {
-			newPosition = pub.backPressureStatus(position, length)
-		}
+	if termCount != (termId - pub.metaData.InitTermID.Get()) {
+		return AdminAction
 	}
 
-	return newPosition
+	if logger.IsEnabledFor(logging.DEBUG) {
+		logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
+	}
+	if position >= limit {
+		return pub.backPressureStatus(position, length)
+	}
+	var resultingOffset int64
+	if length <= pub.maxPayloadLength {
+		resultingOffset, termId = termAppender.AppendUnfragmentedMessage(buffer, offset, length, reservedValueSupplier)
+	} else {
+		pub.checkForMaxMessageLength(length)
+		resultingOffset, termId = termAppender.AppendFragmentedMessage(buffer, offset, length, pub.maxPayloadLength, reservedValueSupplier)
+	}
+
+	return pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
 }
 
 // Offer2 attempts to publish a message composed of two parts, e.g. a header and encapsulated payload.
@@ -229,52 +223,48 @@ func (pub *Publication) Offer2(
 	if length < 0 {
 		panic(fmt.Sprintf("Length overflow (lengthOne: %d lengthTwo: %d)", lengthOne, lengthTwo))
 	}
-	newPosition := PublicationClosed
+	if pub.IsClosed() {
+		return PublicationClosed
+	}
 
 	if reservedValueSupplier == nil {
 		reservedValueSupplier = term.DefaultReservedValueSupplier
 	}
 
-	if !pub.IsClosed() {
+	limit := pub.pubLimit.get()
+	termCount := pub.metaData.ActiveTermCountOff.Get()
+	termIndex := termCount % logbuffer.PartitionCount
+	termAppender := pub.appenders[termIndex]
+	rawTail := termAppender.RawTail()
+	termOffset := rawTail & 0xFFFFFFFF
+	termId := logbuffer.TermID(rawTail)
+	position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
 
-		limit := pub.pubLimit.get()
-		termCount := pub.metaData.ActiveTermCountOff.Get()
-		termIndex := termCount % logbuffer.PartitionCount
-		termAppender := pub.appenders[termIndex]
-		rawTail := termAppender.RawTail()
-		termOffset := rawTail & 0xFFFFFFFF
-		termId := logbuffer.TermID(rawTail)
-		position := computeTermBeginPosition(termId, pub.positionBitsToShift, pub.initialTermID) + termOffset
-
-		if termCount != (termId - pub.metaData.InitTermID.Get()) {
-			return AdminAction
-		}
-
-		if logger.IsEnabledFor(logging.DEBUG) {
-			logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
-		}
-		if position < limit {
-			var resultingOffset int64
-			var termId int32
-			if length <= pub.maxPayloadLength {
-				resultingOffset, termId = termAppender.AppendUnfragmentedMessage2(
-					bufferOne, offsetOne, lengthOne,
-					bufferTwo, offsetTwo, lengthTwo,
-					reservedValueSupplier)
-			} else {
-				pub.checkForMaxMessageLength(length)
-				resultingOffset, termId = termAppender.AppendFragmentedMessage2(
-					bufferOne, offsetOne, lengthOne,
-					bufferTwo, offsetTwo, lengthTwo,
-					pub.maxPayloadLength, reservedValueSupplier)
-			}
-			newPosition = pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
-		} else {
-			newPosition = pub.backPressureStatus(position, length)
-		}
+	if termCount != (termId - pub.metaData.InitTermID.Get()) {
+		return AdminAction
 	}
 
-	return newPosition
+	if logger.IsEnabledFor(logging.DEBUG) {
+		logger.Debugf("Offering at %d of %d (pubLmt: %v)", position, limit, pub.pubLimit)
+	}
+	if position >= limit {
+		return pub.backPressureStatus(position, length)
+	}
+
+	var resultingOffset int64
+	if length <= pub.maxPayloadLength {
+		resultingOffset, termId = termAppender.AppendUnfragmentedMessage2(
+			bufferOne, offsetOne, lengthOne,
+			bufferTwo, offsetTwo, lengthTwo,
+			reservedValueSupplier)
+	} else {
+		pub.checkForMaxMessageLength(length)
+		resultingOffset, termId = termAppender.AppendFragmentedMessage2(
+			bufferOne, offsetOne, lengthOne,
+			bufferTwo, offsetTwo, lengthTwo,
+			pub.maxPayloadLength, reservedValueSupplier)
+	}
+	return pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
 }
 
 func (pub *Publication) newPosition(termCount int32, termOffset int64, termId int32, position int64, resultingOffset int64) int64 {
@@ -304,29 +294,26 @@ func (pub *Publication) backPressureStatus(currentPosition int64, messageLength 
 }
 
 func (pub *Publication) TryClaim(length int32, bufferClaim *logbuffer.Claim) int64 {
-	newPosition := PublicationClosed
-
-	if !pub.IsClosed() {
-		pub.checkForMaxPayloadLength(length)
-
-		limit := pub.pubLimit.get()
-		termCount := pub.metaData.ActiveTermCountOff.Get()
-		termIndex := termCount % logbuffer.PartitionCount
-		termAppender := pub.appenders[termIndex]
-		rawTail := termAppender.RawTail()
-		termOffset := rawTail & 0xFFFFFFFF
-		position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
-
-		if position < limit {
-			resultingOffset, termId := termAppender.Claim(length, bufferClaim)
-
-			newPosition = pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
-		} else {
-			newPosition = pub.backPressureStatus(position, length)
-		}
-
+	if pub.IsClosed() {
+		return PublicationClosed
 	}
-	return newPosition
+	pub.checkForMaxPayloadLength(length)
+
+	limit := pub.pubLimit.get()
+	termCount := pub.metaData.ActiveTermCountOff.Get()
+	termIndex := termCount % logbuffer.PartitionCount
+	termAppender := pub.appenders[termIndex]
+	rawTail := termAppender.RawTail()
+	termOffset := rawTail & 0xFFFFFFFF
+	position := computeTermBeginPosition(logbuffer.TermID(rawTail), pub.positionBitsToShift, pub.initialTermID) + termOffset
+
+	if position < limit {
+		resultingOffset, termId := termAppender.Claim(length, bufferClaim)
+
+		return pub.newPosition(termCount, termOffset, termId, position, resultingOffset)
+	} else {
+		return pub.backPressureStatus(position, length)
+	}
 }
 
 func (pub *Publication) checkForMaxMessageLength(length int32) {

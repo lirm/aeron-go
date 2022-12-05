@@ -40,13 +40,14 @@ func NewTestingLogbuffer() (*LogBuffers, error) {
 
 	meta.TermLen.Set(1024)
 
-	mmap.Close()
+	if err := mmap.Close(); err != nil {
+		return nil, err
+	}
 
 	return Wrap(Filename), nil
 }
 
 // RemoveTestingLogbufferFile is meant to be called by defer immediately after creating it above.
-func RemoveTestingLogbufferFile() {
-	os.Remove(Filename)
-
+func RemoveTestingLogbufferFile() error {
+	return os.Remove(Filename)
 }

@@ -45,10 +45,10 @@ func main() {
 	context := aeron.NewContext().
 		AeronDir(*examples.Config.AeronPrefix).
 		MediaDriverTimeout(timeout).
-		AvailableImageHandler(func(image *aeron.Image) {
+		AvailableImageHandler(func(image aeron.Image) {
 			logger.Infof("Image available: %+v", image)
 		}).
-		UnavailableImageHandler(func(image *aeron.Image) {
+		UnavailableImageHandler(func(image aeron.Image) {
 			logger.Infof("Image unavailable: %+v", image)
 		}).
 		ErrorHandler(func(err error) {
@@ -92,7 +92,10 @@ func main() {
 	subChannel := subChannelUri.String()
 
 	logger.Infof("Subscribing to channel:%s, stream:%d", subChannel, sampleStream)
-	subscription := <-arch.AddSubscription(subChannel, sampleStream)
+	subscription, err := arch.AddSubscription(subChannel, sampleStream)
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer subscription.Close()
 
 	counter := 0

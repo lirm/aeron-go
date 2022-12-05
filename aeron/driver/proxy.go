@@ -18,6 +18,7 @@ limitations under the License.
 package driver
 
 import (
+	"errors"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/command"
 	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
@@ -53,7 +54,7 @@ func (driver *Proxy) NextCorrelationID() int64 {
 }
 
 // AddSubscription sends driver command to add new subscription
-func (driver *Proxy) AddSubscription(channel string, streamID int32) int64 {
+func (driver *Proxy) AddSubscription(channel string, streamID int32) (int64, error) {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -75,14 +76,15 @@ func (driver *Proxy) AddSubscription(channel string, streamID int32) int64 {
 		return command.AddSubscription
 	}
 
-	driver.writeCommandToDriver(filler)
-
-	return correlationID
-
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
 // RemoveSubscription sends driver command to remove subscription
-func (driver *Proxy) RemoveSubscription(registrationID int64) {
+func (driver *Proxy) RemoveSubscription(registrationID int64) error {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
 	logger.Debugf("driver.RemoveSubscription: correlationId=%d (subId=%d)", correlationID, registrationID)
@@ -101,11 +103,11 @@ func (driver *Proxy) RemoveSubscription(registrationID int64) {
 		return command.RemoveSubscription
 	}
 
-	driver.writeCommandToDriver(filler)
+	return driver.writeCommandToDriver(filler)
 }
 
 // AddPublication sends driver command to add new publication
-func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
+func (driver *Proxy) AddPublication(channel string, streamID int32) (int64, error) {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -126,13 +128,15 @@ func (driver *Proxy) AddPublication(channel string, streamID int32) int64 {
 		return command.AddPublication
 	}
 
-	driver.writeCommandToDriver(filler)
-
-	return correlationID
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
 // AddExclusivePublication sends driver command to add new publication
-func (driver *Proxy) AddExclusivePublication(channel string, streamID int32) int64 {
+func (driver *Proxy) AddExclusivePublication(channel string, streamID int32) (int64, error) {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -153,13 +157,15 @@ func (driver *Proxy) AddExclusivePublication(channel string, streamID int32) int
 		return command.AddExclusivePublication
 	}
 
-	driver.writeCommandToDriver(filler)
-
-	return correlationID
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
 // RemovePublication sends driver command to remove publication
-func (driver *Proxy) RemovePublication(registrationID int64) {
+func (driver *Proxy) RemovePublication(registrationID int64) error {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
 	logger.Debugf("driver.RemovePublication: clientId=%d correlationId=%d (regId=%d)",
@@ -179,11 +185,11 @@ func (driver *Proxy) RemovePublication(registrationID int64) {
 		return command.RemovePublication
 	}
 
-	driver.writeCommandToDriver(filler)
+	return driver.writeCommandToDriver(filler)
 }
 
 // ClientClose sends a client close to the driver.
-func (driver *Proxy) ClientClose() {
+func (driver *Proxy) ClientClose() error {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
 	logger.Debugf("driver.ClientClose: clientId=%d correlationId=%d",
@@ -202,11 +208,11 @@ func (driver *Proxy) ClientClose() {
 		return command.ClientClose
 	}
 
-	driver.writeCommandToDriver(filler)
+	return driver.writeCommandToDriver(filler)
 }
 
 // AddDestination sends driver command to add a destination to an existing Publication.
-func (driver *Proxy) AddDestination(registrationID int64, channel string) int64 {
+func (driver *Proxy) AddDestination(registrationID int64, channel string) (int64, error) {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -227,13 +233,15 @@ func (driver *Proxy) AddDestination(registrationID int64, channel string) int64 
 		return command.AddDestination
 	}
 
-	driver.writeCommandToDriver(filler)
-
-	return correlationID
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
 // RemoveDestination sends driver command to remove a destination from an existing Publication.
-func (driver *Proxy) RemoveDestination(registrationID int64, channel string) int64 {
+func (driver *Proxy) RemoveDestination(registrationID int64, channel string) (int64, error) {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -254,14 +262,16 @@ func (driver *Proxy) RemoveDestination(registrationID int64, channel string) int
 		return command.RemoveDestination
 	}
 
-	driver.writeCommandToDriver(filler)
-
-	return correlationID
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
 // AddRcvDestination sends driver command to add a destination to the receive
 // channel of an existing MDS Subscription.
-func (driver *Proxy) AddRcvDestination(registrationID int64, channel string) int64 {
+func (driver *Proxy) AddRcvDestination(registrationID int64, channel string) (int64, error) {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -282,14 +292,16 @@ func (driver *Proxy) AddRcvDestination(registrationID int64, channel string) int
 		return command.AddRcvDestination
 	}
 
-	driver.writeCommandToDriver(filler)
-
-	return correlationID
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, nil
+	}
 }
 
 // RemoveRcvDestination sends driver command to remove a destination from the
 // receive channel of an existing MDS Subscription.
-func (driver *Proxy) RemoveRcvDestination(registrationID int64, channel string) int64 {
+func (driver *Proxy) RemoveRcvDestination(registrationID int64, channel string) (int64, error) {
 
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
@@ -310,12 +322,14 @@ func (driver *Proxy) RemoveRcvDestination(registrationID int64, channel string) 
 		return command.RemoveRcvDestination
 	}
 
-	driver.writeCommandToDriver(filler)
-
-	return correlationID
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
-func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int32) {
+func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int32) error {
 	messageBuffer := make([]byte, 512)
 
 	buffer := atomic.MakeBuffer(messageBuffer)
@@ -324,7 +338,9 @@ func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int3
 
 	msgTypeID := filler(buffer, &length)
 
-	if !driver.toDriverCommandBuffer.Write(int32(msgTypeID), buffer, 0, int32(length)) {
-		panic("couldn't write command to driver")
+	if driver.toDriverCommandBuffer.Write(int32(msgTypeID), buffer, 0, int32(length)) {
+		return nil
+	} else {
+		return errors.New("couldn't write command to driver")
 	}
 }

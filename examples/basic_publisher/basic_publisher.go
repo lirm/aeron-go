@@ -65,7 +65,10 @@ func main() {
 	}
 	defer a.Close()
 
-	publication := <-a.AddPublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	publication, err := a.AddPublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	if err != nil {
+		logger.Fatalf(err.Error())
+	}
 	defer publication.Close()
 	log.Printf("Publication found %v", publication)
 

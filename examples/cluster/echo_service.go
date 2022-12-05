@@ -17,7 +17,7 @@ type EchoService struct {
 	messageCount int32
 }
 
-func (s *EchoService) OnStart(cluster cluster.Cluster, image *aeron.Image) {
+func (s *EchoService) OnStart(cluster cluster.Cluster, image aeron.Image) {
 	s.cluster = cluster
 	if image == nil {
 		fmt.Printf("OnStart with no image\n")
@@ -55,9 +55,8 @@ func (s *EchoService) OnSessionMessage(
 	header *logbuffer.Header,
 ) {
 	s.messageCount++
-	var result int64
 	for offerCnt := 1; ; offerCnt++ {
-		result = session.Offer(buffer, offset, length, nil)
+		result := session.Offer(buffer, offset, length, nil)
 		if result >= 0 {
 			return
 		} else if result == aeron.BackPressured || result == aeron.AdminAction {
@@ -137,5 +136,7 @@ func main() {
 		panic(err)
 	}
 
-	agent.StartAndRun()
+	if err := agent.StartAndRun(); err != nil {
+		panic(err)
+	}
 }

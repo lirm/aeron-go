@@ -54,7 +54,10 @@ func main() {
 	}
 	defer a.Close()
 
-	subscription := <-a.AddSubscription(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	subscription, err := a.AddSubscription(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
 

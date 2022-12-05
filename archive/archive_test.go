@@ -477,7 +477,11 @@ func TestListRecordings(t *testing.T) {
 	t.Logf("SubscriptionID is %d", subscriptionID)
 
 	// Add a publication on that
-	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	publication, err := archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
 	if testing.Verbose() && DEBUG {
 		t.Logf("Publication is %#v", publication)
 	}
@@ -537,7 +541,11 @@ func TestStartStopReplay(t *testing.T) {
 	t.Logf("SubscriptionID is %d", subscriptionID)
 
 	// Add a publication on that
-	publication := <-archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	publication, err := archive.AddPublication(testCases[0].sampleChannel, testCases[0].sampleStream)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
 	t.Logf("Publication found %v", publication)
 
 	recordings, err := archive.ListRecordingsForUri(0, 100, "aeron", testCases[0].sampleStream)

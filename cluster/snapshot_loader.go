@@ -1,3 +1,15 @@
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cluster
 
 import (
@@ -12,7 +24,7 @@ import (
 
 type snapshotLoader struct {
 	agent      *ClusteredServiceAgent
-	img        *aeron.Image
+	img        aeron.Image
 	marshaller *codecs.SbeGoMarshaller
 	isDone     bool
 	inSnapshot bool
@@ -21,7 +33,7 @@ type snapshotLoader struct {
 	err        error
 }
 
-func newSnapshotLoader(agent *ClusteredServiceAgent, img *aeron.Image) *snapshotLoader {
+func newSnapshotLoader(agent *ClusteredServiceAgent, img aeron.Image) *snapshotLoader {
 	return &snapshotLoader{agent: agent, img: img, marshaller: codecs.NewSbeGoMarshaller()}
 }
 
@@ -91,8 +103,14 @@ func (loader *snapshotLoader) onFragment(
 			loader.err = err
 			loader.isDone = true
 		} else {
-			loader.agent.addSessionFromSnapshot(newContainerClientSession(s.ClusterSessionId,
-				s.ResponseStreamId, string(s.ResponseChannel), s.EncodedPrincipal, loader.agent))
+			container, err := newContainerClientSession(
+				s.ClusterSessionId, s.ResponseStreamId, string(s.ResponseChannel), s.EncodedPrincipal, loader.agent)
+			if err == nil {
+				loader.agent.addSessionFromSnapshot(container)
+			} else {
+				loader.err = err
+				loader.isDone = true
+			}
 		}
 	default:
 		logger.Debugf("SnapshotLoader: unknown templateId=%d at pos=%d", templateId, header.Position())

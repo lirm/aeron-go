@@ -1,3 +1,15 @@
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package replaymerge
 
 import (
@@ -55,7 +67,7 @@ type ReplayMerge struct {
 	isLiveAdded            bool
 	isReplayActive         bool
 	state                  State
-	image                  *aeron.Image
+	image                  aeron.Image
 
 	archive           *archive.Archive
 	subscription      *aeron.Subscription
@@ -253,7 +265,7 @@ func (rm *ReplayMerge) HasFailed() bool {
 }
 
 // Image returns the image which is a merge of the replay and live stream.
-func (rm *ReplayMerge) Image() *aeron.Image {
+func (rm *ReplayMerge) Image() aeron.Image {
 	return rm.image
 }
 
@@ -466,14 +478,15 @@ func (rm *ReplayMerge) checkProgress(nowMs int64) error {
 	return nil
 }
 
-func (rm *ReplayMerge) pollForResponse() (success bool, err error) {
+// Returns whether this succeeded, and what the error is.
+func (rm *ReplayMerge) pollForResponse() (bool, error) {
 	correlationId := rm.activeCorrelationId
 	poller := rm.archive.Control
 
 	if poller.Poll() > 0 && poller.Results.IsPollComplete {
 		if poller.Results.ControlResponse.ControlSessionId == rm.archive.SessionID {
 			if poller.Results.ErrorResponse != nil {
-				err = fmt.Errorf(
+				err := fmt.Errorf(
 					"archive response for correlationId=%d, error=%s",
 					correlationId,
 					poller.Results.ErrorResponse,
@@ -483,7 +496,9 @@ func (rm *ReplayMerge) pollForResponse() (success bool, err error) {
 		}
 		return poller.Results.CorrelationId == correlationId, nil
 	}
-	return
+	// TODO: (false, nil) is what was here before, but I suspect that (true, nil) is more accurate?
+	// Check this when revamping archive code.
+	return false, nil
 }
 
 func (rm *ReplayMerge) polledRelevantId() int64 {

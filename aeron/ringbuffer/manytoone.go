@@ -152,9 +152,8 @@ func (buf *ManyToOne) checkMsgLength(length int32) {
 	}
 }
 
-// Write will attempt to append the bytes from srcBuffer to this rinf buffer
+// Write will attempt to append the bytes from srcBuffer to this ring buffer
 func (buf *ManyToOne) Write(msgTypeID int32, srcBuffer *atomic.Buffer, srcIndex int32, length int32) bool {
-
 	isSuccessful := false
 
 	checkMsgTypeID(msgTypeID)

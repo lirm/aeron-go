@@ -67,7 +67,10 @@ func main() {
 	}
 	defer a.Close()
 
-	subscription := <-a.AddSubscription(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	subscription, err := a.AddSubscription(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer subscription.Close()
 	log.Printf("Subscription found %v", subscription)
 
@@ -83,8 +86,12 @@ func main() {
 
 		c, found := clients[header.SessionId()]
 		if !found {
+			pub, err := a.AddExclusivePublication(string(bytes), int32(*examples.ExamplesConfig.StreamID))
+			if err != nil {
+				logger.Fatal(err)
+			}
 			c = &client{
-				pub: <-a.AddExclusivePublication(string(bytes), int32(*examples.ExamplesConfig.StreamID)),
+				pub: pub,
 			}
 			clients[header.SessionId()] = c
 		}

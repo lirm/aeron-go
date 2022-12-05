@@ -102,7 +102,8 @@ func (suite *SysTestSuite) receive(n int, sub *aeron.Subscription) {
 }
 
 func (suite *SysTestSuite) subAndSend(n int, a *aeron.Aeron, pub *aeron.Publication) {
-	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	sub, err := a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	suite.Require().NoError(err)
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
@@ -144,7 +145,8 @@ func (suite *SysTestSuite) TestAeronBasics() {
 	}
 	defer a.Close()
 
-	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	pub, err := a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	suite.Require().NoError(err)
 	defer pub.Close()
 	//logger.Debugf("Added publication: %v\n", pub)
 
@@ -164,10 +166,12 @@ func (suite *SysTestSuite) TestAeronSendMultipleMessages() {
 	}
 	suite.Require().NotEqual(a.NextCorrelationID(), 0, "invalid zero NextCorrelationID")
 
-	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	pub, err := a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	suite.Require().NoError(err)
 	defer pub.Close()
 
-	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	sub, err := a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	suite.Require().NoError(err)
 	defer sub.Close()
 
 	// This is basically a requirement since we need to wait
@@ -206,13 +210,15 @@ func (suite *SysTestSuite) NotTestedYet_TestAeronSendMultiplePublications() {
 	pubCount := 10
 	itCount := 100
 
-	sub := <-a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	sub, err := a.AddSubscription(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	suite.Require().NoError(err)
 	defer sub.Close()
 
 	pubs := make([]*aeron.Publication, pubCount)
 
 	for i := 0; i < pubCount; i++ {
-		pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+		pub, err := a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+		suite.Require().NoError(err)
 		defer pub.Close()
 
 		pubs[i] = pub
@@ -245,12 +251,11 @@ func (suite *SysTestSuite) NotTestedYet_TestAeronResubscribe() {
 	logger.Debug("Started TestAeronResubscribe")
 
 	a, err := aeron.Connect(aeron.NewContext())
-	if err != nil {
-		logger.Fatal("Failed to connect to driver")
-	}
+	suite.Require().NoError(err)
 	defer a.Close()
 
-	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	pub, err := a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	suite.Require().NoError(err)
 
 	suite.subAndSend(1, a, pub)
 	suite.subAndSend(1, a, pub)
@@ -261,12 +266,11 @@ func (suite *SysTestSuite) NotTestedYet_TestResubStress() {
 	logger.Debug("Started TestAeronResubscribe")
 
 	a, err := aeron.Connect(aeron.NewContext())
-	if err != nil {
-		logger.Fatalf("Failed to connect to driver: %s\n", err.Error())
-	}
+	suite.Require().NoError(err)
 	defer a.Close()
 
-	pub := <-a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	pub, err := a.AddPublication(*ExamplesConfig.TestChannel, int32(*ExamplesConfig.TestStreamID))
+	suite.Require().NoError(err)
 	for i := 0; i < 100; i++ {
 		suite.subAndSend(1, a, pub)
 		logger.Debugf("bounce %d", i)

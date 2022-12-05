@@ -1,7 +1,22 @@
+// Copyright 2022 Steven Stern
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package client
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -18,6 +33,8 @@ import (
 
 var logger = logging.MustGetLogger("cluster-client")
 var marshaller = codecs.NewSbeGoMarshaller()
+
+var TemporaryError = errors.New("temporary error")
 
 type AeronCluster struct {
 	opts                 *Options
@@ -86,7 +103,10 @@ func NewAeronCluster(
 		return nil, err
 	}
 
-	egressSub := <-aeronClient.AddSubscription(options.EgressChannel, options.EgressStreamId)
+	egressSub, err := aeronClient.AddSubscription(options.EgressChannel, options.EgressStreamId)
+	if err != nil {
+		return nil, err
+	}
 
 	sessionMsgHdrBuf := codecs.MakeClusterMessageBuffer(cluster.SessionMessageHeaderTemplateId, cluster.SessionMessageHdrBlockLength)
 
@@ -137,9 +157,17 @@ func (ac *AeronCluster) Poll() int {
 			ac.state = clientCreatePublications
 		}
 	case clientCreatePublications:
-		return ac.createPublications()
+		ret, err := ac.createPublications()
+		if err != nil {
+			logger.Warningf("error from createPublications %w", err)
+		}
+		return ret
 	case clientAwaitPublicationConnected:
-		return ac.awaitPublicationConnected()
+		ret, err := ac.awaitPublicationConnected()
+		if err != nil {
+			logger.Warningf("error from awaitPublicationConnected %w", err)
+		}
+		return ret
 	case clientAwaitConnectReply:
 		now := time.Now().UnixMilli()
 		if ac.ingressPub.IsConnected() && now < ac.awaitTimeoutTime {
@@ -234,7 +262,12 @@ func (ac *AeronCluster) updateMemberEndpoints(endpoints string) {
 			}
 			if member.memberId == ac.leaderMemberId {
 				if member.publication == nil {
-					member.publication = ac.createIngressPublication(address)
+					pub, err := ac.createIngressPublication(address)
+					if err == nil {
+						member.publication = pub
+					} else {
+						logger.Warning(err)
+					}
 				}
 				ac.ingressPub = member.publication
 				ac.fragmentAssembler.Clear()
@@ -245,22 +278,30 @@ func (ac *AeronCluster) updateMemberEndpoints(endpoints string) {
 	}
 }
 
-func (ac *AeronCluster) createPublications() int {
+func (ac *AeronCluster) createPublications() (int, error) {
 	if len(ac.memberByIdMap) > 0 {
 		for _, member := range ac.memberByIdMap {
 			if member.publication == nil {
-				member.publication = ac.createIngressPublication(member.endpoint)
+				pub, err := ac.createIngressPublication(member.endpoint)
+				if err != nil {
+					return 0, err
+				}
+				member.publication = pub
 			}
 		}
 	} else if ac.ingressPub == nil {
-		ac.ingressPub = ac.createIngressPublication(ac.opts.IngressChannel)
+		pub, err := ac.createIngressPublication(ac.opts.IngressChannel)
+		if err != nil {
+			return 0, err
+		}
+		ac.ingressPub = pub
 	}
 	ac.state = clientAwaitPublicationConnected
 	ac.awaitTimeoutTime = time.Now().UnixMilli() + (5 * time.Second).Milliseconds()
-	return 1
+	return 1, nil
 }
 
-func (ac *AeronCluster) createIngressPublication(endpoint string) *aeron.Publication {
+func (ac *AeronCluster) createIngressPublication(endpoint string) (*aeron.Publication, error) {
 	if ac.ingressChannel.IsUdp() {
 		ac.ingressChannel.Set("endpoint", endpoint)
 	}
@@ -268,46 +309,52 @@ func (ac *AeronCluster) createIngressPublication(endpoint string) *aeron.Publica
 	logger.Debugf("createIngressPublication - endpoint=%s isUdp=%v isExclusive=%v",
 		endpoint, ac.ingressChannel.IsUdp(), ac.opts.IsIngressExclusive)
 	if ac.opts.IsIngressExclusive {
-		return <-ac.aeronClient.AddExclusivePublication(channel, ac.opts.IngressStreamId)
+		return ac.aeronClient.AddExclusivePublication(channel, ac.opts.IngressStreamId)
 	} else {
-		return <-ac.aeronClient.AddPublication(channel, ac.opts.IngressStreamId)
+		return ac.aeronClient.AddPublication(channel, ac.opts.IngressStreamId)
 	}
 }
 
-func (ac *AeronCluster) awaitPublicationConnected() int {
+func (ac *AeronCluster) awaitPublicationConnected() (int, error) {
 	responseChannel := ac.egressSub.TryResolveChannelEndpointPort()
 	if responseChannel == "" {
-		return 0
+		// TODO: Is this an error or success condition?
+		return 0, nil
 	}
 	now := time.Now().UnixMilli()
 	if now > ac.awaitTimeoutTime {
-		logger.Warningf("timed out waiting for connected publication")
 		ac.state = clientDisconnected
 		// close publications? shouldn't be necessary unless we've hit some bug
 		ac.nextRetryConnectTime = now + (30 * time.Second).Milliseconds()
+		return 0, errors.New("timed out waiting for connected publication")
 	}
 	if len(ac.memberByIdMap) > 0 {
 		for _, member := range ac.memberByIdMap {
 			if member.publication != nil && member.publication.IsConnected() {
 				ac.ingressPub = member.publication
 				ac.fragmentAssembler.Clear()
-				if ac.sendConnectRequest(responseChannel) {
+				err := ac.sendConnectRequest(responseChannel)
+				if err == nil {
 					logger.Debugf("sent connect request to memberId=%d correlationId=%d channel=%s",
 						member.memberId, ac.correlationId, member.publication.Channel())
 					ac.state = clientAwaitConnectReply
 					ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 					break
 				}
+				if !errors.Is(err, TemporaryError) {
+					return 0, err
+				}
 			}
 		}
-	} else if ac.ingressPub.IsConnected() && ac.sendConnectRequest(responseChannel) {
+	} else if ac.ingressPub.IsConnected() && ac.sendConnectRequest(responseChannel) == nil {
 		ac.state = clientAwaitConnectReply
 		ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 	}
-	return 0
+	return 0, nil
 }
 
-func (ac *AeronCluster) sendConnectRequest(responseChannel string) bool {
+// Returns nil on success, TemporaryError, or any other error is a permanent error.
+func (ac *AeronCluster) sendConnectRequest(responseChannel string) error {
 	ac.correlationId = ac.aeronClient.NextCorrelationID()
 	req := codecs.SessionConnectRequest{
 		CorrelationId:    ac.correlationId,
@@ -323,18 +370,18 @@ func (ac *AeronCluster) sendConnectRequest(responseChannel string) bool {
 	}
 	writer := new(bytes.Buffer)
 	if err := header.Encode(marshaller, writer); err != nil {
-		panic(err)
+		return err
 	}
 	if err := req.Encode(marshaller, writer, true); err != nil {
-		panic(err)
+		return err
 	}
 	buffer := atomic.MakeBuffer(writer.Bytes())
 	result := ac.ingressPub.Offer(buffer, 0, buffer.Capacity(), nil)
 	if result >= 0 {
-		return true
+		return nil
 	} else {
-		logger.Debugf("failed to send connect request, channel=%s result=%d", ac.ingressPub.Channel(), result)
-		return false
+		return fmt.Errorf("%w, failed to send connect request, channel=%s result=%d",
+			TemporaryError, ac.ingressPub.Channel(), result)
 	}
 }
 

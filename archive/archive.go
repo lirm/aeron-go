@@ -86,8 +86,8 @@ type ArchiveListeners struct {
 	// Async events from the underlying Aeron instance
 	NewSubscriptionListener  func(string, int32, int64)
 	NewPublicationListener   func(string, int32, int32, int64)
-	AvailableImageListener   func(*aeron.Image)
-	UnavailableImageListener func(*aeron.Image)
+	AvailableImageListener   func(aeron.Image)
+	UnavailableImageListener func(aeron.Image)
 }
 
 // LoggingErrorListener is set by default and will report internal failures when
@@ -127,12 +127,12 @@ func LoggingNewPublicationListener(channel string, stream int32, session int32, 
 }
 
 // LoggingAvailableImageListener from underlying aeron (called by default only in DEBUG)
-func LoggingAvailableImageListener(image *aeron.Image) {
+func LoggingAvailableImageListener(image aeron.Image) {
 	logger.Infof("NewAvailableImageListener, sessionId is %d", image.SessionID())
 }
 
 // LoggingUnavailableImageListener from underlying aeron (called by default only in DEBUG)
-func LoggingUnavailableImageListener(image *aeron.Image) {
+func LoggingUnavailableImageListener(image aeron.Image) {
 	logger.Infof("NewUnavalableImageListener, sessionId is %d", image.SessionID())
 }
 
@@ -266,7 +266,11 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	}
 
 	// and then the subscription, it's poller and initiate a connection
-	archive.Control.Subscription = <-archive.aeron.AddSubscription(archive.Options.ResponseChannel, archive.Options.ResponseStream)
+	sub, err := archive.aeron.AddSubscription(archive.Options.ResponseChannel, archive.Options.ResponseStream)
+	if err != nil {
+		return nil, err
+	}
+	archive.Control.Subscription = sub
 	logger.Debugf("Control response subscription: %#v", archive.Control.Subscription)
 
 	start := time.Now()
@@ -282,7 +286,11 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	}
 
 	// Create the publication half for the proxy that looks after sending requests on that
-	archive.Proxy.Publication = <-archive.aeron.AddExclusivePublication(archive.Options.RequestChannel, archive.Options.RequestStream)
+	pub, err := archive.aeron.AddExclusivePublication(archive.Options.RequestChannel, archive.Options.RequestStream)
+	if err != nil {
+		return nil, err
+	}
+	archive.Proxy.Publication = pub
 	logger.Debugf("Proxy request publication: %#v", archive.Proxy.Publication)
 
 	// And intitiate the connection
@@ -398,10 +406,15 @@ func (archive *Archive) AeronCncFileName() string {
 // EnableRecordingEvents starts recording events flowing
 // Events are returned via the three callbacks which should be
 // overridden from the default logging listeners defined in the Listeners
-func (archive *Archive) EnableRecordingEvents() {
-	archive.Events.Subscription = <-archive.aeron.AddSubscription(archive.Options.RecordingEventsChannel, archive.Options.RecordingEventsStream)
+func (archive *Archive) EnableRecordingEvents() error {
+	sub, err := archive.aeron.AddSubscription(archive.Options.RecordingEventsChannel, archive.Options.RecordingEventsStream)
+	if err != nil {
+		return err
+	}
+	archive.Events.Subscription = sub
 	archive.Events.Enabled = true
 	logger.Debugf("RecordingEvents subscription: %#v", archive.Events.Subscription)
+	return nil
 }
 
 // IsRecordingEventsConnected returns true if the recording events subscription
@@ -444,7 +457,7 @@ func (archive *Archive) PollForErrorResponse() (int, error) {
 // AddSubscription will add a new subscription to the driver.
 //
 // Returns a channel, which can be used for either blocking or non-blocking wait for media driver confirmation
-func (archive *Archive) AddSubscription(channel string, streamID int32) chan *aeron.Subscription {
+func (archive *Archive) AddSubscription(channel string, streamID int32) (*aeron.Subscription, error) {
 	return archive.aeron.AddSubscription(channel, streamID)
 }
 
@@ -455,7 +468,7 @@ func (archive *Archive) AddSubscription(channel string, streamID int32) chan *ae
 //
 // Returns a channel, which can be used for either blocking or
 // non-blocking want for media driver confirmation
-func (archive *Archive) AddPublication(channel string, streamID int32) chan *aeron.Publication {
+func (archive *Archive) AddPublication(channel string, streamID int32) (*aeron.Publication, error) {
 	return archive.aeron.AddPublication(channel, streamID)
 }
 
@@ -466,7 +479,7 @@ func (archive *Archive) AddPublication(channel string, streamID int32) chan *aer
 //
 // Returns a channel, which can be used for either blocking or
 // non-blocking want for media driver confirmation
-func (archive *Archive) AddExclusivePublication(channel string, streamID int32) chan *aeron.Publication {
+func (archive *Archive) AddExclusivePublication(channel string, streamID int32) (*aeron.Publication, error) {
 	return archive.aeron.AddExclusivePublication(channel, streamID)
 }
 
@@ -590,7 +603,10 @@ func (archive *Archive) StopRecordingByPublication(publication aeron.Publication
 func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*aeron.Publication, error) {
 
 	// This can fail in aeron via log.Fatalf(), not much we can do
-	publication := <-archive.AddPublication(channel, stream)
+	publication, err := archive.AddPublication(channel, stream)
+	if err != nil {
+		return nil, err
+	}
 	if !publication.IsOriginal() {
 		return nil, fmt.Errorf("publication already added for channel=%s stream=%d", channel, stream)
 	}

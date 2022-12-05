@@ -17,8 +17,7 @@ limitations under the License.
 package broadcast
 
 import (
-	"log"
-
+	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	rb "github.com/lirm/aeron-go/aeron/ringbuffer"
 	"github.com/lirm/aeron-go/aeron/util"
@@ -36,9 +35,11 @@ var BufferDescriptor = struct {
 	util.CacheLineLength * 2,
 }
 
-func checkCapacity(capacity int32) {
-	if !util.IsPowerOfTwo(int64(capacity)) {
-		log.Fatalf("Capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=%d", capacity)
+func checkCapacity(capacity int32) error {
+	if util.IsPowerOfTwo(int64(capacity)) {
+		return nil
+	} else {
+		return fmt.Errorf("capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=%d", capacity)
 	}
 }
 
@@ -57,7 +58,7 @@ type Receiver struct {
 	lappedCount atomic.Long
 }
 
-func NewReceiver(buffer *atomic.Buffer) *Receiver {
+func NewReceiver(buffer *atomic.Buffer) (*Receiver, error) {
 	recv := new(Receiver)
 	recv.buffer = buffer
 	recv.capacity = buffer.Capacity() - BufferDescriptor.trailerLength
@@ -67,9 +68,11 @@ func NewReceiver(buffer *atomic.Buffer) *Receiver {
 	recv.latestCounterIndex = recv.capacity + BufferDescriptor.latestCounterOffset
 	recv.lappedCount.Set(0)
 
-	checkCapacity(recv.capacity)
+	if err := checkCapacity(recv.capacity); err != nil {
+		return nil, err
+	}
 
-	return recv
+	return recv, nil
 }
 
 func (recv *Receiver) Validate() bool {

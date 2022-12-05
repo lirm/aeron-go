@@ -373,9 +373,10 @@ func (control *Control) PollForErrorResponse() (int, error) {
 
 // errorResponseFragmentHandler is used to check for errors and async events on an idle control
 // session. Essentially:
-//    ignore messages not on our session ID
-//    process recordingSignalEvents
-//    Log a warning if we have interrupted a synchronous event
+//
+//	ignore messages not on our session ID
+//	process recordingSignalEvents
+//	Log a warning if we have interrupted a synchronous event
 func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	pollContext, ok := context.(*PollContext)
 	if !ok {

@@ -68,7 +68,10 @@ func main() {
 	}
 	defer a.Close()
 
-	subscription := <-a.AddSubscription("aeron:udp?endpoint=localhost:0", int32(*examples.ExamplesConfig.StreamID))
+	subscription, err := a.AddSubscription("aeron:udp?endpoint=localhost:0", int32(*examples.ExamplesConfig.StreamID))
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer subscription.Close()
 
 	var subChannel string
@@ -85,7 +88,10 @@ func main() {
 	subChannel = "aeron:udp?endpoint=" + subChannel
 	log.Printf("Using resolved subscription address %s", subChannel)
 
-	publication := <-a.AddExclusivePublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	publication, err := a.AddExclusivePublication(*examples.ExamplesConfig.Channel, int32(*examples.ExamplesConfig.StreamID))
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer publication.Close()
 
 	for {

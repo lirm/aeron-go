@@ -24,6 +24,7 @@ import (
 
 // Read will attempt to read the next frame from the term and invoke the callback if successful.
 // Method will return a tuple of new term offset and number of fragments read
+//
 //go:norace
 func Read(termBuffer *atomic.Buffer, termOffset int32, handler FragmentHandler, fragmentLimit int,
 	header *logbuffer.Header) (int32, int) {

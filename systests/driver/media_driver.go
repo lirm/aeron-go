@@ -146,15 +146,14 @@ func waitForStartup(tempDir string) (*aeron.Aeron, error) {
 			time.Sleep(sleepDuration)
 			continue
 		}
-		pubc := cxn.AddPublication(channel, streamID)
-		timeout := time.After(5 * time.Second)
-		select {
-		case <-timeout:
-			return nil, errors.New("timed out waiting for Media Driver publication")
-		case pub := <-pubc:
-			_ = pub.Close()
-			return cxn, nil
+		pub, err := cxn.AddPublication(channel, streamID)
+		if err != nil {
+			return nil, err
 		}
+		if err := pub.Close(); err != nil {
+			return nil, err
+		}
+		return cxn, nil
 	}
 	return nil, errors.New("timed out waiting for Media Driver connection")
 }
