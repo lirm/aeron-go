@@ -15,7 +15,6 @@
 package aeron
 
 import (
-	"errors"
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/counters"
@@ -62,7 +61,7 @@ func (c *ClientConductorTestSuite) TestAddPublicationShouldTimeoutWithoutReadyMe
 
 	// First a temporary error.
 	pub, err := c.cc.FindPublication(CorrelationId1)
-	c.Assert().True(errors.Is(err, TemporaryError))
+	c.Require().NoError(err)
 	c.Assert().Nil(pub)
 
 	// Then a permanent error.
@@ -70,7 +69,7 @@ func (c *ClientConductorTestSuite) TestAddPublicationShouldTimeoutWithoutReadyMe
 	c.cc.driverTimeoutNs = 1
 	defer func() { c.cc.driverTimeoutNs = oldTimeout }()
 	pub, err = c.cc.FindPublication(CorrelationId1)
-	c.Assert().False(errors.Is(err, TemporaryError))
+	c.Assert().Error(err)
 	c.Assert().Nil(pub)
 }
 
@@ -85,7 +84,6 @@ func (c *ClientConductorTestSuite) TestShouldFailToAddPublicationOnMediaDriverEr
 	pub, err := c.cc.FindPublication(CorrelationId1)
 	c.Assert().Nil(pub)
 	c.Assert().Error(err)
-	c.Assert().False(errors.Is(err, TemporaryError))
 }
 
 func (c *ClientConductorTestSuite) TestAddSubscriptionShouldNotifyMediaDriver() {
@@ -105,7 +103,7 @@ func (c *ClientConductorTestSuite) TestAddSubscriptionShouldTimeoutWithoutOperat
 
 	// First a temporary error.
 	sub, err := c.cc.FindSubscription(CorrelationId1)
-	c.Assert().True(errors.Is(err, TemporaryError))
+	c.Assert().NoError(err)
 	c.Assert().Nil(sub)
 
 	// Then a permanent error.
@@ -113,7 +111,7 @@ func (c *ClientConductorTestSuite) TestAddSubscriptionShouldTimeoutWithoutOperat
 	c.cc.driverTimeoutNs = 1
 	defer func() { c.cc.driverTimeoutNs = oldTimeout }()
 	sub, err = c.cc.FindSubscription(CorrelationId1)
-	c.Assert().False(errors.Is(err, TemporaryError))
+	c.Assert().Error(err)
 	c.Assert().Nil(sub)
 }
 
@@ -128,7 +126,6 @@ func (c *ClientConductorTestSuite) TestShouldFailToAddSubscriptionOnMediaDriverE
 	sub, err := c.cc.FindSubscription(CorrelationId1)
 	c.Assert().Nil(sub)
 	c.Assert().Error(err)
-	c.Assert().False(errors.Is(err, TemporaryError))
 }
 
 func (c *ClientConductorTestSuite) TestClientNotifiedOfNewAndInactiveImagesWithDefaultHandler() {
