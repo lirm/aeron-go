@@ -16,7 +16,6 @@
 package aeron
 
 import (
-	"errors"
 	"time"
 
 	"github.com/lirm/aeron-go/aeron/broadcast"
@@ -131,12 +130,38 @@ func (aeron *Aeron) AddSubscriptionWithHandlers(channel string, streamID int32,
 	}
 	for {
 		subscription, err := aeron.conductor.FindSubscription(registrationID)
-		// Retry temporary error.  Any other success or error gets returned.
-		if !errors.Is(err, TemporaryError) {
+		if subscription != nil || err != nil {
 			return subscription, err
 		}
 		aeron.context.idleStrategy.Idle(0)
 	}
+}
+
+// AddSubscriptionDeprecated will add a new subscription to the driver.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
+func (aeron *Aeron) AddSubscriptionDeprecated(channel string, streamID int32) chan *Subscription {
+	ch := make(chan *Subscription, 1)
+	registrationID, err := aeron.conductor.AddSubscription(channel, streamID)
+	if err != nil {
+		// Preserve the legacy functionality.  The original AddSubscription would result in the ClientConductor calling
+		// onError on this, as well as subsequently from the FindSubscription call below.
+		aeron.conductor.onError(err)
+	}
+	go func() {
+		for {
+			subscription, err := aeron.conductor.FindSubscription(registrationID)
+			if subscription != nil || err != nil {
+				if err != nil {
+					aeron.conductor.onError(err)
+				}
+				ch <- subscription
+				close(ch)
+				return
+			}
+			aeron.context.idleStrategy.Idle(0)
+		}
+	}()
+	return ch
 }
 
 // AsyncAddSubscription will add a new subscription to the driver and return its registration ID.  That ID can be used
@@ -154,11 +179,40 @@ func (aeron *Aeron) AsyncAddSubscriptionWithHandlers(channel string, streamID in
 	return aeron.conductor.AddSubscriptionWithHandlers(channel, streamID, onAvailableImage, onUnavailableImage)
 }
 
-// GetSubscription will attempt to get a Subscription from a registrationID.  See AsyncAddSubscription.  Note that
-// callers should call `errors.Is(err, TemporaryError)`.  That error indicates that the subscription is not yet ready,
-// but the timeout hasn't expired yet either, so callers can continue to poll.
+// GetSubscription will attempt to get a Subscription from a registrationID.  See AsyncAddSubscription.  A pending
+// Subscription will return nil,nil signifying that there is neither a Subscription nor an error.
 func (aeron *Aeron) GetSubscription(registrationID int64) (*Subscription, error) {
 	return aeron.conductor.FindSubscription(registrationID)
+}
+
+// AddPublicationDeprecated will add a new publication to the driver. If such publication already exists within ClientConductor
+// the same instance will be returned.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
+func (aeron *Aeron) AddPublicationDeprecated(channel string, streamID int32) chan *Publication {
+	ch := make(chan *Publication, 1)
+
+	registrationID, err := aeron.conductor.AddPublication(channel, streamID)
+	if err != nil {
+		// Preserve the legacy functionality.  The original AddPublication would result in the ClientConductor calling
+		// onError on this, as well as subsequently from the FindPublication call below.
+		aeron.conductor.onError(err)
+	}
+	go func() {
+		for {
+			publication, err := aeron.conductor.FindPublication(registrationID)
+			if publication != nil || err != nil {
+				if err != nil {
+					aeron.conductor.onError(err)
+				}
+				ch <- publication
+				close(ch)
+				return
+			}
+			aeron.context.idleStrategy.Idle(0)
+		}
+	}()
+
+	return ch
 }
 
 // AddPublication will add a new publication to the driver. If such publication already exists within ClientConductor
@@ -170,8 +224,7 @@ func (aeron *Aeron) AddPublication(channel string, streamID int32) (*Publication
 	}
 	for {
 		publication, err := aeron.conductor.FindPublication(registrationID)
-		// Retry temporary error.  Any other success or error gets returned.
-		if !errors.Is(err, TemporaryError) {
+		if publication != nil || err != nil {
 			return publication, err
 		}
 		aeron.context.idleStrategy.Idle(0)
@@ -184,9 +237,8 @@ func (aeron *Aeron) AsyncAddPublication(channel string, streamID int32) (int64, 
 	return aeron.conductor.AddPublication(channel, streamID)
 }
 
-// GetPublication will attempt to get a Publication from a registrationID.  See AsyncAddPublication.  Note that callers
-// should call `errors.Is(err, TemporaryError)`.  That error indicates that the publication is not yet ready, but the
-// timeout hasn't expired yet either, so callers can continue to poll.
+// GetPublication will attempt to get a Publication from a registrationID.  See AsyncAddPublication.  A pending
+// Publication will return nil,nil signifying that there is neither a Publication nor an error.
 func (aeron *Aeron) GetPublication(registrationID int64) (*Publication, error) {
 	return aeron.conductor.FindPublication(registrationID)
 }
@@ -200,12 +252,41 @@ func (aeron *Aeron) AddExclusivePublication(channel string, streamID int32) (*Pu
 	}
 	for {
 		publication, err := aeron.conductor.FindPublication(registrationID)
-		// Retry temporary error.  Any other success or error gets returned.
-		if !errors.Is(err, TemporaryError) {
+		if publication != nil || err != nil {
 			return publication, err
 		}
 		aeron.context.idleStrategy.Idle(0)
 	}
+}
+
+// AddExclusivePublicationDeprecated will add a new exclusive publication to the driver. If such publication already
+// exists within ClientConductor the same instance will be returned.
+// Returns a channel, which can be used for either blocking or non-blocking want for media driver confirmation
+func (aeron *Aeron) AddExclusivePublicationDeprecated(channel string, streamID int32) chan *Publication {
+	ch := make(chan *Publication, 1)
+
+	registrationID, err := aeron.conductor.AddExclusivePublication(channel, streamID)
+	if err != nil {
+		// Preserve the legacy functionality.  The original AddExclusivePublication would result in the ClientConductor
+		// calling onError on this, as well as subsequently from the FindPublication call below.
+		aeron.conductor.onError(err)
+	}
+	go func() {
+		for {
+			publication, err := aeron.conductor.FindPublication(registrationID)
+			if publication != nil || err != nil {
+				if err != nil {
+					aeron.conductor.onError(err)
+				}
+				ch <- publication
+				close(ch)
+				return
+			}
+			aeron.context.idleStrategy.Idle(0)
+		}
+	}()
+
+	return ch
 }
 
 // AsyncAddExclusivePublication will add a new exclusive publication to the driver and return its registration ID.  That
@@ -215,8 +296,8 @@ func (aeron *Aeron) AsyncAddExclusivePublication(channel string, streamID int32)
 }
 
 // GetExclusivePublication will attempt to get an exclusive Publication from a registrationID.  See
-// AsyncAddExclusivePublication.  Note that callers should call `errors.Is(err, TemporaryError)`.  That error indicates
-// that the publication is not yet ready, but the timeout hasn't expired yet either, so callers can continue to poll.
+// AsyncAddExclusivePublication.  A pending Publication will return nil,nil signifying that there is neither a
+// Publication nor an error.
 // Also note that while aeron-go currently handles GetPublication and GetExclusivePublication the same way, they may
 // diverge in the future.  Other Aeron languages already handle these calls differently.
 func (aeron *Aeron) GetExclusivePublication(registrationID int64) (*Publication, error) {

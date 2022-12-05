@@ -67,34 +67,32 @@ func (s *SubscriptionTestSuite) TestShouldEnsureTheSubscriptionIsOpenWhenPolling
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadNothingWhenNoImages() {
-	fragments, err := s.sub.Poll(s.fragmentHandler, 1)
+	fragments := s.sub.Poll(s.fragmentHandler, 1)
 	s.Assert().Equal(0, fragments)
-	s.Assert().NoError(err)
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadNothingWhenThereIsNoData() {
 	s.sub.addImage(s.imageOne)
 	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(0, nil)
 
-	fragments, err := s.sub.Poll(s.fragmentHandler, 1)
+	fragments := s.sub.Poll(s.fragmentHandler, 1)
 	s.Assert().Equal(0, fragments)
-	s.Assert().NoError(err)
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadData() {
 	s.sub.addImage(s.imageOne)
 
+	// TODO: NO RETURN HERE?  remove callback below this
 	s.fragmentHandlerMock.On("Execute",
 		s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header).Return(nil)
 
 	s.imageOne.On("Poll", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		handler := args.Get(0).(term.FragmentHandler)
-		s.Assert().NoError(handler(s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header))
+		handler(s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header)
 	}).Return(1, nil)
 
-	fragments, err := s.sub.Poll(s.fragmentHandler, FragmentCountLimit)
+	fragments := s.sub.Poll(s.fragmentHandler, FragmentCountLimit)
 	s.Assert().Equal(1, fragments)
-	s.Assert().NoError(err)
 }
 
 func (s *SubscriptionTestSuite) TestShouldReadDataFromMultipleSources() {
@@ -104,9 +102,8 @@ func (s *SubscriptionTestSuite) TestShouldReadDataFromMultipleSources() {
 	s.imageOne.On("Poll", mock.Anything, mock.Anything).Return(1, nil)
 	s.imageTwo.On("Poll", mock.Anything, mock.Anything).Return(1, nil)
 
-	fragments, err := s.sub.Poll(s.fragmentHandler, FragmentCountLimit)
+	fragments := s.sub.Poll(s.fragmentHandler, FragmentCountLimit)
 	s.Assert().Equal(2, fragments)
-	s.Assert().NoError(err)
 }
 
 // TODO: Implement resolveChannel set of tests.

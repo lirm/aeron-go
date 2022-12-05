@@ -67,7 +67,6 @@ limitations under the License.
 package counters
 
 import (
-	"errors"
 	"fmt"
 	"unsafe"
 
@@ -88,8 +87,11 @@ const TypeIdOffset = util.SizeOfInt32
 const FreeForReuseDeadlineOffset = TypeIdOffset + util.SizeOfInt32
 const KeyOffset = FreeForReuseDeadlineOffset + util.SizeOfInt64
 
+const RecordReclaimed int32 = -1
 const RecordUnused int32 = 0
 const RecordAllocated int32 = 1
+
+const NullCounterId = int32(-1)
 
 type Reader struct {
 	metaData *atomic.Buffer
@@ -160,7 +162,7 @@ func (reader *Reader) ScanForType(typeId int32, callback func(counterId int32, k
 	}
 }
 
-func (reader *Reader) FindCounter(typeId int32, keyFilter func(keyBuffer *atomic.Buffer) bool) (int32, error) {
+func (reader *Reader) FindCounter(typeId int32, keyFilter func(keyBuffer *atomic.Buffer) bool) int32 {
 	var keyBuf atomic.Buffer
 	for id := 0; id < reader.maxCounterID; id++ {
 		metaDataOffset := int32(id) * MetadataLength
@@ -174,12 +176,12 @@ func (reader *Reader) FindCounter(typeId int32, keyFilter func(keyBuffer *atomic
 				keyPtr := unsafe.Pointer(uintptr(reader.metaData.Ptr()) + uintptr(metaDataOffset+KeyOffset))
 				keyBuf.Wrap(keyPtr, MaxKeyLength)
 				if keyFilter == nil || keyFilter(&keyBuf) {
-					return int32(id), nil
+					return int32(id)
 				}
 			}
 		}
 	}
-	return 0, errors.New("null counter ID")
+	return NullCounterId
 }
 
 // GetKeyPartInt32 returns an int32 portion of the key at the specified offset

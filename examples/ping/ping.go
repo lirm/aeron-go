@@ -91,7 +91,7 @@ func main() {
 
 	hist := hdrhistogram.New(1, 1000000000, 3)
 
-	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error {
+	handler := func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 		sent := buffer.GetInt64(offset)
 		now := time.Now().UnixNano()
 
@@ -101,7 +101,6 @@ func main() {
 			logger.Debugf("Received message at offset %d, length %d, position %d, termId %d, frame len %d",
 				offset, length, header.Offset(), header.TermId(), header.FrameLength())
 		}
-		return nil
 	}
 
 	srcBuffer := atomic.MakeBuffer(make([]byte, *examples.ExamplesConfig.Size))
@@ -122,12 +121,11 @@ func main() {
 		}
 
 		for true {
-			ret, err := subscription.Poll(handler, 10)
-			if err != nil {
-				panic(fmt.Sprintf("Failed to poll due to %s", err))
-			}
+			ret := subscription.Poll(handler, 10)
 			if ret > 0 {
 				break
+			} else if ret < 0 {
+				panic(fmt.Sprintf("Failed to poll due to %d", ret))
 			}
 		}
 	}
@@ -143,15 +141,11 @@ func main() {
 		for publication.Offer(srcBuffer, 0, srcBuffer.Capacity(), nil) < 0 {
 		}
 
-		for emptyPoll(subscription.Poll(handler, 10)) {
+		for subscription.Poll(handler, 10) <= 0 {
 		}
 	}
 
 	OutputPercentileDistribution(os.Stdout, hist, 1000.0)
-}
-
-func emptyPoll(fragments int, err error) bool {
-	return fragments <= 0 || err != nil
 }
 
 func OutputPercentileDistribution(out io.Writer, h *hdrhistogram.Histogram, scalingFactor float64) {

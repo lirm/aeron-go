@@ -56,8 +56,6 @@ const (
 	heartheatRegistrationIdOffset = int32(0)
 )
 
-var TemporaryError = errors.New("temporary error")
-
 type publicationStateDefn struct {
 	regID                    int64
 	origRegID                int64
@@ -299,12 +297,9 @@ func (cc *ClientConductor) forceCloseResources() {
 }
 
 func (cc *ClientConductor) doWork() (int, error) {
-	workCount, err := cc.driverListenerAdapter.ReceiveMessages()
-	if err != nil {
-		return workCount, err
-	}
-	heartbeats, err2 := cc.onHeartbeatCheckTimeouts()
-	return workCount + heartbeats, err2
+	workCount := cc.driverListenerAdapter.ReceiveMessages()
+	heartbeats, err := cc.onHeartbeatCheckTimeouts()
+	return workCount + heartbeats, err
 }
 
 func (cc *ClientConductor) getDriverStatus() error {
@@ -378,16 +373,11 @@ func (cc *ClientConductor) FindPublication(registrationID int64) (*Publication, 
 			continue
 		}
 		if pub.publication != nil {
-			return publication, nil
+			return pub.publication, nil
 		}
 		switch pub.status {
 		case RegistrationStatus.AwaitingMediaDriver:
-			if err := timeoutExceeded(pub.timeOfRegistration, cc.driverTimeoutNs); err == nil {
-				return nil, fmt.Errorf("%w: registration at %d exceeded timeout %d",
-					TemporaryError, pub.timeOfRegistration, cc.driverTimeoutNs)
-			} else {
-				return nil, err
-			}
+			return nil, timeoutExceeded(pub.timeOfRegistration, cc.driverTimeoutNs)
 		case RegistrationStatus.RegisteredMediaDriver:
 			publication = NewPublication(pub.buffers)
 			publication.conductor = cc
@@ -398,9 +388,12 @@ func (cc *ClientConductor) FindPublication(registrationID int64) (*Publication, 
 			publication.sessionID = pub.sessionID
 			publication.pubLimit = NewPosition(cc.counterValuesBuffer, pub.posLimitCounterID)
 			publication.channelStatusIndicatorID = pub.channelStatusIndicatorID
+			pub.publication = publication
 			return publication, nil
 		case RegistrationStatus.ErroredMediaDriver:
 			return nil, fmt.Errorf("error on %d: %d: %s", registrationID, pub.errorCode, pub.errorMessage)
+		default:
+			return nil, errors.New("unknown registration status")
 		}
 	}
 	return nil, fmt.Errorf("registration ID %d cannot be found", registrationID)
@@ -473,8 +466,7 @@ func (cc *ClientConductor) AddSubscriptionWithHandlers(channel string, streamID 
 }
 
 // FindSubscription by Registration ID, which is returned by AddSubscription.  Returns the Subscription or an error.
-// Note that callers should call `errors.Is(err, TemporaryError)`.  That error indicates that the subscription is not
-// yet ready, but the timeout hasn't expired yet either, so callers can continue to poll.
+// A pending Subscription will return nil,nil signifying that there is neither a Subscription nor an error.
 func (cc *ClientConductor) FindSubscription(registrationID int64) (*Subscription, error) {
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
@@ -485,12 +477,7 @@ func (cc *ClientConductor) FindSubscription(registrationID int64) (*Subscription
 		}
 		switch sub.status {
 		case RegistrationStatus.AwaitingMediaDriver:
-			if err := timeoutExceeded(sub.timeOfRegistration, cc.driverTimeoutNs); err == nil {
-				return nil, fmt.Errorf("%w: registration at %d exceeded timeout %d",
-					TemporaryError, sub.timeOfRegistration, cc.driverTimeoutNs)
-			} else {
-				return nil, err
-			}
+			return nil, timeoutExceeded(sub.timeOfRegistration, cc.driverTimeoutNs)
 		case RegistrationStatus.RegisteredMediaDriver:
 			return sub.subscription, nil
 		case RegistrationStatus.ErroredMediaDriver:
@@ -879,10 +866,10 @@ func (cc *ClientConductor) onHeartbeatCheckTimeouts() (int, error) {
 				return 0, fmt.Errorf("client heartbeat timestamp not active")
 			}
 		} else {
-			counterId, err := cc.counterReader.FindCounter(heartbeatTypeId, func(keyBuffer *atomic.Buffer) bool {
+			counterId := cc.counterReader.FindCounter(heartbeatTypeId, func(keyBuffer *atomic.Buffer) bool {
 				return keyBuffer.GetInt64(heartheatRegistrationIdOffset) == cc.driverProxy.ClientID()
 			})
-			if err != nil {
+			if counterId != ctr.NullCounterId {
 				var ctrErr error
 				if cc.heartbeatTimestamp, ctrErr = ctr.NewAtomicCounter(cc.counterReader, counterId); ctrErr != nil {
 					logger.Warning("unable to allocate heartbeat counter %d", counterId)

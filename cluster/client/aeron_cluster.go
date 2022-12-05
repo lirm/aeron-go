@@ -34,6 +34,8 @@ import (
 var logger = logging.MustGetLogger("cluster-client")
 var marshaller = codecs.NewSbeGoMarshaller()
 
+var TemporaryError = errors.New("temporary error")
+
 type AeronCluster struct {
 	opts                 *Options
 	aeronClient          *aeron.Aeron
@@ -148,16 +150,24 @@ func (ac *AeronCluster) IsClosed() bool {
 	return ac.state == clientClosed
 }
 
-func (ac *AeronCluster) Poll() (int, error) {
+func (ac *AeronCluster) Poll() int {
 	switch ac.state {
 	case clientDisconnected:
 		if time.Now().UnixMilli() > ac.nextRetryConnectTime {
 			ac.state = clientCreatePublications
 		}
 	case clientCreatePublications:
-		return ac.createPublications()
+		ret, err := ac.createPublications()
+		if err != nil {
+			logger.Warningf("error from createPublications %w", err)
+		}
+		return ret
 	case clientAwaitPublicationConnected:
-		return ac.awaitPublicationConnected()
+		ret, err := ac.awaitPublicationConnected()
+		if err != nil {
+			logger.Warningf("error from awaitPublicationConnected %w", err)
+		}
+		return ret
 	case clientAwaitConnectReply:
 		now := time.Now().UnixMilli()
 		if ac.ingressPub.IsConnected() && now < ac.awaitTimeoutTime {
@@ -176,7 +186,7 @@ func (ac *AeronCluster) Poll() (int, error) {
 			ac.state = clientCreatePublications
 		}
 	}
-	return 0, nil
+	return 0
 }
 
 func (ac *AeronCluster) Offer(buffer *atomic.Buffer, offset, length int32) int64 {
@@ -331,7 +341,7 @@ func (ac *AeronCluster) awaitPublicationConnected() (int, error) {
 					ac.awaitTimeoutTime = now + (3 * time.Second).Milliseconds()
 					break
 				}
-				if !errors.Is(err, aeron.TemporaryError) {
+				if !errors.Is(err, TemporaryError) {
 					return 0, err
 				}
 			}
@@ -371,25 +381,26 @@ func (ac *AeronCluster) sendConnectRequest(responseChannel string) error {
 		return nil
 	} else {
 		return fmt.Errorf("%w, failed to send connect request, channel=%s result=%d",
-			aeron.TemporaryError, ac.ingressPub.Channel(), result)
+			TemporaryError, ac.ingressPub.Channel(), result)
 	}
 }
 
-func (ac *AeronCluster) pollEgress(fragmentLimit int) (int, error) {
+func (ac *AeronCluster) pollEgress(fragmentLimit int) int {
 	return ac.egressSub.Poll(ac.fragmentAssembler.OnFragment, fragmentLimit)
 }
 
-func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, header *logbuffer.Header) error {
+func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, header *logbuffer.Header) {
 	if length < cluster.SBEHeaderLength {
-		return errors.New("length is too small")
+		return
 	}
 	blockLength := buffer.GetUInt16(offset)
 	templateId := buffer.GetUInt16(offset + 2)
 	schemaId := buffer.GetUInt16(offset + 4)
 	version := buffer.GetUInt16(offset + 6)
 	if schemaId != cluster.ClusterSchemaId {
-		return fmt.Errorf("unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
+		logger.Errorf("unexpected schemaId=%d templateId=%d blockLen=%d version=%d",
 			schemaId, templateId, blockLength, version)
+		return
 	}
 	offset += cluster.SBEHeaderLength
 	length -= cluster.SBEHeaderLength
@@ -411,7 +422,6 @@ func (ac *AeronCluster) onFragment(buffer *atomic.Buffer, offset, length int32, 
 			logger.Warningf("received challenge, corrId=%d clusterSessionId=%d", e.CorrelationId, e.ClusterSessionId)
 		}
 	}
-	return nil
 }
 
 func (ac *AeronCluster) onNewLeaderEvent(buffer *atomic.Buffer, offset, length int32, version, blockLength uint16) {

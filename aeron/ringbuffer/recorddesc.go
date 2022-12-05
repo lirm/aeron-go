@@ -52,10 +52,8 @@ func makeHeader(length, msgTypeID int32) int64 {
 	return ((int64(msgTypeID) & 0xFFFFFFFF) << 32) | (int64(length) & 0xFFFFFFFF)
 }
 
-func checkMsgTypeID(msgTypeID int32) error {
+func checkMsgTypeID(msgTypeID int32) {
 	if msgTypeID < 1 {
-		return fmt.Errorf("message type id must be greater than zero, msgTypeId=%d", msgTypeID)
-	} else {
-		return nil
+		panic(fmt.Sprintf("Message type id must be greater than zero, msgTypeId=%d", msgTypeID))
 	}
 }

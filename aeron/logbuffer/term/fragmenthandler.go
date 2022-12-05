@@ -1,5 +1,4 @@
 // Copyright 2016 Stanislav Liberman
-// Copyright 2022 Steven Stern
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,4 +20,4 @@ import (
 )
 
 // FragmentHandler is the main callback interface for received data
-type FragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) error
+type FragmentHandler func(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header)
