@@ -105,14 +105,53 @@ func (sub *subscriptionStateDefn) Init(ch string, regID int64, sID int32, now in
 	return sub
 }
 
+type counterStateDefn struct {
+	timeOfRegistration int64
+	counterId          int32
+	errorCode          int32
+	errorMessage       string
+	status             int
+	counter            *Counter
+}
+
+func (c *counterStateDefn) Init(time int64) {
+	c.timeOfRegistration = time
+	c.status = RegistrationStatus.AwaitingMediaDriver
+}
+
 type lingerResourse struct {
 	lastTime int64
 	resource io.Closer
 }
 
+type IdAndAvailableCounterHandler struct {
+	registrationId int64
+	handler        AvailableCounterHandler
+}
+
+func NewIdAndAvailablePair(registrationId int64, handler AvailableCounterHandler) *IdAndAvailableCounterHandler {
+	ret := new(IdAndAvailableCounterHandler)
+	ret.registrationId = registrationId
+	ret.handler = handler
+	return ret
+}
+
+type IdAndUnavailableCounterHandler struct {
+	registrationId int64
+	handler        UnavailableCounterHandler
+}
+
+func NewIdAndUnavailablePair(registrationId int64, handler UnavailableCounterHandler) *IdAndUnavailableCounterHandler {
+	ret := new(IdAndUnavailableCounterHandler)
+	ret.registrationId = registrationId
+	ret.handler = handler
+	return ret
+}
+
 type ClientConductor struct {
-	pubs []*publicationStateDefn
-	subs []*subscriptionStateDefn
+	pubs     []*publicationStateDefn
+	subs     []*subscriptionStateDefn
+	counters map[int64]*counterStateDefn
 
 	driverProxy *driver.Proxy
 
@@ -130,7 +169,12 @@ type ClientConductor struct {
 	onNewSubscriptionHandler  NewSubscriptionHandler
 	onAvailableImageHandler   AvailableImageHandler
 	onUnavailableImageHandler UnavailableImageHandler
-	errorHandler              func(error)
+
+	// Ordering is only important in that the 0-index element must be called first on [un]available counters.
+	availableCounterHandlers   []*IdAndAvailableCounterHandler
+	unavailableCounterHandlers []*IdAndUnavailableCounterHandler
+
+	errorHandler func(error)
 
 	running          atomic.Bool
 	conductorRunning atomic.Bool
@@ -171,7 +215,9 @@ func (cc *ClientConductor) Init(driverProxy *driver.Proxy, bcast *broadcast.Copy
 
 	cc.pubs = make([]*publicationStateDefn, 0)
 	cc.subs = make([]*subscriptionStateDefn, 0)
-
+	cc.counters = make(map[int64]*counterStateDefn)
+	cc.availableCounterHandlers = make([]*IdAndAvailableCounterHandler, 0)
+	cc.unavailableCounterHandlers = make([]*IdAndUnavailableCounterHandler, 0)
 	return cc
 }
 
@@ -501,6 +547,25 @@ func (cc *ClientConductor) releaseSubscription(regID int64, images []Image) erro
 	return nil
 }
 
+func (cc *ClientConductor) releaseCounter(counter Counter) error {
+	logger.Debugf("releaseCounter: regId=%d", counter.RegistrationId())
+
+	if err := cc.getDriverStatus(); err != nil {
+		return err
+	}
+
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	registrationId := counter.RegistrationId()
+	if _, ok := cc.counters[registrationId]; ok {
+		delete(cc.counters, registrationId)
+		_, err := cc.driverProxy.RemoveCounter(registrationId)
+		return err
+	}
+	return nil
+}
+
 // AddDestination sends the add destination command through the driver proxy
 func (cc *ClientConductor) AddDestination(registrationID int64, endpointChannel string) error {
 	logger.Debugf("AddDestination: regID=%d endpointChannel=%s", registrationID, endpointChannel)
@@ -561,24 +626,137 @@ func (cc *ClientConductor) RemoveRcvDestination(registrationID int64, endpointCh
 	return err
 }
 
-/*
-// TODO: Return a Counter
-func (cc *ClientConductor) AddCounter(typeId int32, label string) error {
+func (cc *ClientConductor) AddCounter(typeId int32, keyBuffer *atomic.Buffer, keyOffset int32, keyLength int32,
+	labelBuffer *atomic.Buffer, labelOffset int32, labelLength int32) (int64, error) {
+	logger.Debugf("AddCounter: typeId=%d", typeId)
+
 	if err := cc.getDriverStatus(); err != nil {
-		return err
+		return 0, err
+	}
+	if keyLength < 0 || keyLength > ctr.MaxKeyLength {
+		return 0, fmt.Errorf("key length out of bounds: %d", keyLength)
+	}
+	if labelLength < 0 || labelLength > ctr.MaxLabelLength {
+		return 0, fmt.Errorf("label length out of bounds: %d", labelLength)
 	}
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
+
 	now := time.Now().UnixNano()
 
-	registrationId, err := cc.driverProxy.AddCounter(typeId, label)
+	registrationId, err := cc.driverProxy.AddCounter(
+		typeId, keyBuffer, keyOffset, keyLength, labelBuffer, labelOffset, labelLength)
 	if err != nil {
-		return err
+		return 0, err
+	}
+	counterState := new(counterStateDefn)
+	counterState.Init(now)
+	cc.counters[registrationId] = counterState
+
+	return registrationId, nil
+}
+
+func (cc *ClientConductor) AddCounterByLabel(typeId int32, label string) (int64, error) {
+	logger.Debugf("AddCounterByLabel: typeId=%d, label=%s", typeId, label)
+	return 0, errors.New("unimplemented")
+}
+
+func (cc *ClientConductor) FindCounter(registrationID int64) (*Counter, error) {
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	counterDef, ok := cc.counters[registrationID]
+	if !ok {
+		return nil, fmt.Errorf("registration ID %d cannot be found", registrationID)
+	}
+	if counterDef.counter != nil {
+		return counterDef.counter, nil
+	}
+	switch counterDef.status {
+	case RegistrationStatus.AwaitingMediaDriver:
+		return nil, timeoutExceeded(counterDef.timeOfRegistration, cc.driverTimeoutNs)
+	case RegistrationStatus.RegisteredMediaDriver:
+		counter, err := NewCounter(registrationID, cc, counterDef.counterId)
+		if err != nil {
+			return nil, err
+		}
+		counterDef.counter = counter
+		return counter, nil
+	case RegistrationStatus.ErroredMediaDriver:
+		return nil, fmt.Errorf("error on %d: %d: %s",
+			registrationID, counterDef.errorCode, counterDef.errorMessage)
+	default:
+		return nil, errors.New("unknown registration status")
 	}
 
-	// TODO: Add awaiting the response
 }
-*/
+
+func (cc *ClientConductor) AddAvailableCounterHandler(handler AvailableCounterHandler) int64 {
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	registrationID := cc.driverProxy.NextCorrelationID()
+	cc.availableCounterHandlers = append(cc.availableCounterHandlers, NewIdAndAvailablePair(registrationID, handler))
+	return registrationID
+}
+
+func (cc *ClientConductor) RemoveAvailableCounterHandlerById(registrationId int64) bool {
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	for i, pair := range cc.availableCounterHandlers {
+		if pair.registrationId == registrationId {
+			cc.availableCounterHandlers[i] = cc.availableCounterHandlers[len(cc.availableCounterHandlers)-1]
+			cc.availableCounterHandlers = cc.availableCounterHandlers[:len(cc.availableCounterHandlers)-1]
+			return true
+		}
+	}
+	return false
+}
+
+func (cc *ClientConductor) RemoveAvailableCounterHandler(handler AvailableCounterHandler) bool {
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	for i, pair := range cc.availableCounterHandlers {
+		if pair.handler == handler {
+			cc.availableCounterHandlers[i] = cc.availableCounterHandlers[len(cc.availableCounterHandlers)-1]
+			cc.availableCounterHandlers = cc.availableCounterHandlers[:len(cc.availableCounterHandlers)-1]
+			return true
+		}
+	}
+	return false
+}
+
+func (cc *ClientConductor) AddUnavailableCounterHandler(handler UnavailableCounterHandler) int64 {
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	registrationID := cc.driverProxy.NextCorrelationID()
+	cc.unavailableCounterHandlers = append(cc.unavailableCounterHandlers, NewIdAndUnavailablePair(registrationID, handler))
+	return registrationID
+}
+
+func (cc *ClientConductor) RemoveUnavailableCounterHandlerById(registrationId int64) bool {
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	for i, pair := range cc.unavailableCounterHandlers {
+		if pair.registrationId == registrationId {
+			cc.unavailableCounterHandlers[i] = cc.unavailableCounterHandlers[len(cc.unavailableCounterHandlers)-1]
+			cc.unavailableCounterHandlers = cc.unavailableCounterHandlers[:len(cc.unavailableCounterHandlers)-1]
+			return true
+		}
+	}
+	return false
+}
+
+func (cc *ClientConductor) RemoveUnavailableCounterHandler(handler UnavailableCounterHandler) bool {
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+	for i, pair := range cc.unavailableCounterHandlers {
+		if &pair.handler == &handler {
+			cc.unavailableCounterHandlers[i] = cc.unavailableCounterHandlers[len(cc.unavailableCounterHandlers)-1]
+			cc.unavailableCounterHandlers = cc.unavailableCounterHandlers[:len(cc.unavailableCounterHandlers)-1]
+			return true
+		}
+	}
+	return false
+}
 
 func (cc *ClientConductor) OnNewPublication(streamID int32, sessionID int32, posLimitCounterID int32,
 	channelStatusIndicatorID int32, logFileName string, regID int64, origRegID int64) {
@@ -637,24 +815,33 @@ func (cc *ClientConductor) OnNewExclusivePublication(streamID int32, sessionID i
 	}
 }
 
-func (cc *ClientConductor) OnAvailableCounter(correlationID int64, counterID int32) {
-	logger.Debugf("OnAvailableCounter: correlationID=%d, counterID=%d",
-		correlationID, counterID)
+func (cc *ClientConductor) OnAvailableCounter(registrationId int64, counterId int32) {
+	logger.Debugf("OnAvailableCounter: registrationId=%d, counterId=%d",
+		registrationId, counterId)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	logger.Debug("OnAvailableCounter: Not supported yet")
+	counterDef, ok := cc.counters[registrationId]
+	if ok && counterDef.status == RegistrationStatus.AwaitingMediaDriver {
+		counterDef.counterId = counterId
+		counterDef.status = RegistrationStatus.RegisteredMediaDriver
+	}
+	for _, handler := range cc.availableCounterHandlers {
+		handler.handler.Handle(cc.counterReader, registrationId, counterId)
+	}
 }
 
-func (cc *ClientConductor) OnUnavailableCounter(correlationID int64, counterID int32) {
-	logger.Debugf("OnUnavailableCounter: correlationID=%d, counterID=%d",
-		correlationID, counterID)
+func (cc *ClientConductor) OnUnavailableCounter(registrationId int64, counterId int32) {
+	logger.Debugf("OnUnavailableCounter: registrationId=%d, counterId=%d",
+		registrationId, counterId)
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
 
-	logger.Debug("OnUnavailableCounter: Not supported yet")
+	for _, handler := range cc.unavailableCounterHandlers {
+		handler.handler.Handle(cc.counterReader, registrationId, counterId)
+	}
 }
 
 func (cc *ClientConductor) OnClientTimeout(clientID int64) {
@@ -778,6 +965,13 @@ func (cc *ClientConductor) OnErrorResponse(corrID int64, errorCode int32, errorM
 
 	cc.adminLock.Lock()
 	defer cc.adminLock.Unlock()
+
+	if counterDef, ok := cc.counters[corrID]; ok {
+		counterDef.status = RegistrationStatus.ErroredMediaDriver
+		counterDef.errorCode = errorCode
+		counterDef.errorMessage = errorMessage
+		return
+	}
 
 	for _, pubDef := range cc.pubs {
 		if pubDef.regID == corrID {
@@ -919,6 +1113,16 @@ func (cc *ClientConductor) closeAllResources(now int64) {
 			}
 		}
 		cc.subs = nil
+
+		for _, counterDef := range cc.counters {
+			if counterDef != nil && counterDef.counter != nil {
+				err = counterDef.counter.Close()
+				if err != nil {
+					cc.onError(err)
+				}
+			}
+		}
+		cc.counters = nil
 	}
 }
 

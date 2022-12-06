@@ -329,19 +329,66 @@ func (driver *Proxy) RemoveRcvDestination(registrationID int64, channel string) 
 	}
 }
 
-/*
-// AddCounter adds a new counter with a type id and label.  The key will be blank.
-func (driver *Proxy) AddCounter(typeId int32, label string) (int64, error) {
+// AddCounter adds a new counter with a type id plus the label and key are provided in buffers.
+func (driver *Proxy) AddCounter(typeId int32, keyBuffer *atomic.Buffer, keyOffset int32, keyLength int32,
+	labelBuffer *atomic.Buffer, labelOffset int32, labelLength int32) (int64, error) {
 	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
 
-	filler := func(buffer *atomic.Buffer, length *int32) int32 {
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
 		var message command.CounterMessage
 		message.Wrap(buffer, 0)
+		message.ClientID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationID)
+		message.CounterTypeID.Set(typeId)
+		message.CopyKeyBuffer(keyBuffer, keyOffset, keyLength)
+		message.CopyLabelBuffer(labelBuffer, labelOffset, labelLength)
+
+		*length = message.Size()
+
+		return command.AddCounter
 	}
 
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
-*/
+// AddCounterByLabel adds a new counter with a type id and label.  The key will be blank.
+func (driver *Proxy) AddCounterByLabel(typeId int32, label string) (int64, error) {
+	return 0, errors.New("unimplemented")
+}
+
+// RemoveCounter instructs the media driver to remove an existing counter by its registration id.  Returns the
+// correlation id for the command.
+
+// RemoveCounter instructs the media driver to remove an existing counter by its registration id.  Returns the
+// correlation id for the command.
+func (driver *Proxy) RemoveCounter(registrationId int64) (int64, error) {
+	correlationId := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	logger.Debugf("driver.RemoveCounter: correlationId=%d (counter registrationId=%d)", correlationId, registrationId)
+
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
+		var message command.RemoveMessage
+		message.Wrap(buffer, 0)
+
+		message.ClientID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationId)
+		message.RegistrationID.Set(registrationId)
+
+		*length = message.Size()
+
+		return command.RemoveCounter
+	}
+
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationId, nil
+	} else {
+		return 0, err
+	}
+}
 
 func (driver *Proxy) writeCommandToDriver(filler func(*atomic.Buffer, *int) int32) error {
 	messageBuffer := make([]byte, 512)

@@ -20,7 +20,6 @@ package command
 import (
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/flyweight"
-	"github.com/lirm/aeron-go/aeron/util"
 )
 
 type CorrelatedMessage struct {
@@ -139,28 +138,57 @@ func (m *DestinationMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyw
 	return m
 }
 
+// CounterMessage has to violate the pattern above.  The existing pattern only works either without any variable fields,
+// or with exactly one variable field at the end of the message.  CounterMessage has 2 variable fields, requiring
+// realignment of the second anytime there are changes to the first.  This pattern is somewhere between the Go pattern
+// and the Java impl's pattern.  At some point, we may want to refactor all the flyweights to match the Java pattern.
 type CounterMessage struct {
 	flyweight.FWBase
 
-	clientID      flyweight.Int64Field
-	correlationID flyweight.Int64Field
-	counterTypeID flyweight.Int32Field
-	keyLength     flyweight.Int32Field
-	keyValue      flyweight.RawDataField
-	labelLength   flyweight.Int32Field
-	labelValue    flyweight.RawDataField
+	buf           *atomic.Buffer
+	offset        int
+	ClientID      flyweight.Int64Field
+	CorrelationID flyweight.Int64Field
+	CounterTypeID flyweight.Int32Field
+	key           flyweight.LengthAndRawDataField
+	label         flyweight.LengthAndRawDataField
 }
 
 func (m *CounterMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyweight {
+	m.buf = buf
+	m.offset = offset
 	pos := offset
-	pos += m.clientID.Wrap(buf, pos)
-	pos += m.correlationID.Wrap(buf, pos)
-	pos += m.counterTypeID.Wrap(buf, pos)
-	pos += m.keyLength.Wrap(buf, pos)
+	pos += m.ClientID.Wrap(buf, pos)
+	pos += m.CorrelationID.Wrap(buf, pos)
+	pos += m.CounterTypeID.Wrap(buf, pos)
+	pos += m.key.Wrap(buf, pos)
+	m.wrapLabel()
+	m.setSize()
 
-	alignedOffset := util.AlignInt32(int32(offset), 4)
-	atomic.BoundsCheck(alignedOffset, 4, buf.Capacity())
-
-	m.SetSize(pos - offset)
 	return m
+}
+
+func (m *CounterMessage) getLabelOffset() int {
+	// Size of the first 3 fixed fields, the length field of the key, and the key buffer itself.
+	return 8 + 8 + 4 + 4 + int(m.key.Length())
+}
+
+func (m *CounterMessage) setSize() {
+	m.SetSize(m.getLabelOffset() + 4 + int(m.label.Length()))
+}
+
+func (m *CounterMessage) wrapLabel() {
+	m.label.Wrap(m.buf, m.offset+m.getLabelOffset())
+}
+
+// Note: If you call this with a buffer that's a different length than the prior buffer, and you don't also call
+// CopyLabelBuffer, the underlying data will be corrupt.  This matches the Java impl.
+func (m *CounterMessage) CopyKeyBuffer(buffer *atomic.Buffer, offset int32, length int32) {
+	m.key.CopyBuffer(buffer, offset, length)
+}
+
+func (m *CounterMessage) CopyLabelBuffer(buffer *atomic.Buffer, offset int32, length int32) {
+	m.wrapLabel()
+	m.label.CopyBuffer(buffer, offset, length)
+	m.setSize()
 }

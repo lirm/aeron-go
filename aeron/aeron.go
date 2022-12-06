@@ -16,6 +16,8 @@
 package aeron
 
 import (
+	"errors"
+	"github.com/lirm/aeron-go/aeron/atomic"
 	"time"
 
 	"github.com/lirm/aeron-go/aeron/broadcast"
@@ -40,6 +42,20 @@ type AvailableImageHandler func(Image)
 
 // UnavailableImageHandler is the handler type for image unavailable notification from the media driver
 type UnavailableImageHandler func(Image)
+
+// AvailableCounterHandler is the function called by Aeron to deliver notification of a Counter being available.
+// Implementations should do the minimum work for passing off state to another thread for later processing and should
+// not make a reentrant call back into the Aeron instance.  Note that this is an interface instead of a function in
+// order to support RemoveAvailableCounterHandler.
+type AvailableCounterHandler interface {
+	Handle(countersReader *counters.Reader, registrationId int64, counterId int32)
+}
+
+// UnavailableCounterHandler is for notification of Counters being removed via an Aeron client.  Note that this is an
+// interface instead of a function in order to support RemoveAvailableCounterHandler.
+type UnavailableCounterHandler interface {
+	Handle(countersReader *counters.Reader, registrationId int64, counterId int32)
+}
 
 // Aeron is the primary interface to the media driver for managing subscriptions and publications
 type Aeron struct {
@@ -90,6 +106,13 @@ func Connect(ctx *Context) (*Aeron, error) {
 	aeron.conductor.onUnavailableImageHandler = ctx.unavailableImageHandler
 	aeron.conductor.onNewPublicationHandler = ctx.newPublicationHandler
 	aeron.conductor.onNewSubscriptionHandler = ctx.newSubscriptionHandler
+
+	if ctx.availableCounterHandler != nil {
+		aeron.conductor.AddAvailableCounterHandler(ctx.availableCounterHandler)
+	}
+	if ctx.unavailableCounterHandler != nil {
+		aeron.conductor.AddUnavailableCounterHandler(ctx.unavailableCounterHandler)
+	}
 
 	aeron.conductor.errorHandler = ctx.errorHandler
 
@@ -303,6 +326,72 @@ func (aeron *Aeron) ClientID() int64 {
 // CounterReader returns Aeron's clientconductor's counterReader
 func (aeron *Aeron) CounterReader() *counters.Reader {
 	return aeron.conductor.CounterReader()
+}
+
+// AddCounter allocates a counter on the media driver and returns its registrationId.  The Counter should be freed by
+// calling Counter.Close().
+func (aeron *Aeron) AddCounter(
+	typeId int32,
+	keyBuffer *atomic.Buffer,
+	keyOffset int32,
+	keyLength int32,
+	labelBuffer *atomic.Buffer,
+	labelOffset int32,
+	labelLength int32) (int64, error) {
+	return aeron.conductor.AddCounter(typeId, keyBuffer, keyOffset, keyLength, labelBuffer, labelOffset, labelLength)
+}
+
+// AddCounterByLabel allocates a counter on the media driver and returns its registrationId.  The Counter should be
+// freed by calling Counter.Close().
+func (aeron *Aeron) AddCounterByLabel(typeId int32, label string) (int64, error) {
+	return 0, errors.New("unimplemented")
+}
+
+// FindCounter retrieves the Counter associated with the given registrationID.  This function is non-blocking.  The
+// value returned is dependent on what has occurred with respect to the media driver:
+//
+// - If the registrationID is unknown, an error is returned.
+// - If the media driver has not answered the command, (nil,nil) is returned.
+// - If the media driver has successfully added the Counter then what is returned is the Counter.
+// - If the media driver has returned an error, that error will be returned.
+func (aeron *Aeron) FindCounter(registrationID int64) (*Counter, error) {
+	return aeron.conductor.FindCounter(registrationID)
+}
+
+// AddAvailableCounterHandler adds a handler to the list to be called when a counter becomes available.  Return the
+// registrationID to use to remove the handler.
+func (aeron *Aeron) AddAvailableCounterHandler(handler AvailableCounterHandler) int64 {
+	return aeron.conductor.AddAvailableCounterHandler(handler)
+}
+
+// RemoveAvailableCounterHandlerById removes a previously added handler from the list to be called when Counters become
+// available.  Returns true iff the handler was found and removed.
+func (aeron *Aeron) RemoveAvailableCounterHandlerById(registrationId int64) bool {
+	return aeron.conductor.RemoveAvailableCounterHandlerById(registrationId)
+}
+
+// RemoveAvailableCounterHandler removes a previously added handler from the list to be called when Counters become
+// available.  Returns true iff the handler was found and removed.
+func (aeron *Aeron) RemoveAvailableCounterHandler(handler AvailableCounterHandler) bool {
+	return aeron.conductor.RemoveAvailableCounterHandler(handler)
+}
+
+// AddUnavailableCounterHandler adds a handler to the list to be called when Counters become unavailable.  Return the
+// registrationID to use to remove the handler.
+func (aeron *Aeron) AddUnavailableCounterHandler(handler UnavailableCounterHandler) int64 {
+	return aeron.conductor.AddUnavailableCounterHandler(handler)
+}
+
+// RemoveUnavailableCounterHandlerById removes a previously added handler from the list to be called when Counters
+// become unavailable.  Returns true iff the handler was found and removed.
+func (aeron *Aeron) RemoveUnavailableCounterHandlerById(registrationId int64) bool {
+	return aeron.conductor.RemoveUnavailableCounterHandlerById(registrationId)
+}
+
+// RemoveUnavailableCounterHandler removes a previously added handler from the list to be called when Counters become
+// unavailable.  Returns true iff the handler was found and removed.
+func (aeron *Aeron) RemoveUnavailableCounterHandler(handler UnavailableCounterHandler) bool {
+	return aeron.conductor.RemoveUnavailableCounterHandler(handler)
 }
 
 // IsClosed returns true if this connection is closed.

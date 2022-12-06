@@ -97,8 +97,10 @@ type StringField struct {
 func (fld *StringField) Wrap(buffer *atomic.Buffer, offset int, fly Flyweight, align bool) int {
 
 	off := int32(offset)
+	offsetAdjustment := 0
 	if align {
 		off = util.AlignInt32(int32(offset), 4)
+		offsetAdjustment = int(off) - offset
 	}
 
 	atomic.BoundsCheck(off, 4, buffer.Capacity())
@@ -110,7 +112,7 @@ func (fld *StringField) Wrap(buffer *atomic.Buffer, offset int, fly Flyweight, a
 
 	fld.fly = fly
 	fld.dataOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(off+4))
-	return 4 + int(l) + int(off) - offset
+	return 4 + int(l) + offsetAdjustment
 }
 
 func (fld *StringField) Get() string {
@@ -176,12 +178,43 @@ func (f *Padding) Get() *atomic.Buffer {
 }
 
 type LengthAndRawDataField struct {
-	length Int32Field
-	data   RawDataField
+	lenOffset unsafe.Pointer
+	buf       atomic.Buffer
 }
 
-func (fld *LengthAndRawDataField) Wrap(buffer *atomic.Buffer, offset int, length int32) int32 {
-	alignedOffset := util.AlignInt32(int32(offset), 4)
-	fld.length.Wrap(buffer, int(alignedOffset))
-	return -1
+func (fld *LengthAndRawDataField) Length() int32 {
+	return *(*int32)(fld.lenOffset)
+}
+
+func (fld *LengthAndRawDataField) SetLength(length int32) {
+	*(*int32)(fld.lenOffset) = length
+}
+
+func (fld *LengthAndRawDataField) Wrap(buffer *atomic.Buffer, rawOffset int) int {
+	offset := util.AlignInt32(int32(rawOffset), 4)
+	offsetAdjustment := int(offset) - rawOffset
+
+	atomic.BoundsCheck(offset, 4, buffer.Capacity())
+	fld.lenOffset = unsafe.Pointer(uintptr(buffer.Ptr()) + uintptr(offset))
+
+	atomic.BoundsCheck(offset+4, fld.Length(), buffer.Capacity())
+	ptr := uintptr(buffer.Ptr()) + uintptr(offset+4)
+	fld.buf.Wrap(unsafe.Pointer(ptr), buffer.Capacity()-offset)
+
+	return 4 + int(fld.Length()) + offsetAdjustment
+}
+
+func (fld *LengthAndRawDataField) CopyBuffer(buffer *atomic.Buffer, offset int32, length int32) {
+	fld.SetLength(length)
+	fld.buf.PutBytes(0, buffer, offset, length)
+}
+
+func (fld *LengthAndRawDataField) GetAsBuffer() *atomic.Buffer {
+	return &fld.buf
+}
+
+func (fld *LengthAndRawDataField) GetAsASCII() string {
+	bArr := make([]byte, fld.Length())
+	fld.buf.GetBytes(0, bArr)
+	return string(bArr)
 }

@@ -82,9 +82,8 @@ func (s *SubscriptionTestSuite) TestShouldReadNothingWhenThereIsNoData() {
 func (s *SubscriptionTestSuite) TestShouldReadData() {
 	s.sub.addImage(s.imageOne)
 
-	// TODO: NO RETURN HERE?  remove callback below this
 	s.fragmentHandlerMock.On("Execute",
-		s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header).Return(nil)
+		s.atomicReadBuffer, s.headerLength, ReadBufferCapacity-s.headerLength, s.header)
 
 	s.imageOne.On("Poll", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		handler := args.Get(0).(term.FragmentHandler)
