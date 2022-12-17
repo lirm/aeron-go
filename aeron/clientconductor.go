@@ -161,6 +161,7 @@ func NewIdAndUnavailablePair(registrationId int64, handler UnavailableCounterHan
 type DriverProxy interface {
 	ClientID() int64
 	TimeOfLastDriverKeepalive() int64
+	NextCorrelationID() int64
 	AddSubscription(channel string, streamID int32) (int64, error)
 	RemoveSubscription(registrationID int64) error
 	AddPublication(channel string, streamID int32) (int64, error)
@@ -171,6 +172,10 @@ type DriverProxy interface {
 	RemoveDestination(registrationID int64, channel string) (int64, error)
 	AddRcvDestination(registrationID int64, channel string) (int64, error)
 	RemoveRcvDestination(registrationID int64, channel string) (int64, error)
+	AddCounter(typeId int32, keyBuffer *atomic.Buffer, keyOffset int32, keyLength int32,
+		labelBuffer *atomic.Buffer, labelOffset int32, labelLength int32) (int64, error)
+	AddCounterByLabel(typeId int32, label string) (int64, error)
+	RemoveCounter(registrationId int64) (int64, error)
 }
 
 // ImageFactory allows tests to use fake Images
@@ -203,8 +208,8 @@ type ClientConductor struct {
 	availableCounterHandlers   []*IdAndAvailableCounterHandler
 	unavailableCounterHandlers []*IdAndUnavailableCounterHandler
 
-	errorHandler              func(error)
-	imageFactory              ImageFactory
+	errorHandler func(error)
+	imageFactory ImageFactory
 
 	running          atomic.Bool
 	conductorRunning atomic.Bool

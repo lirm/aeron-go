@@ -141,7 +141,8 @@ func (m *DestinationMessage) Wrap(buf *atomic.Buffer, offset int) flyweight.Flyw
 // CounterMessage has to violate the pattern above.  The existing pattern only works either without any variable fields,
 // or with exactly one variable field at the end of the message.  CounterMessage has 2 variable fields, requiring
 // realignment of the second anytime there are changes to the first.  This pattern is somewhere between the Go pattern
-// and the Java impl's pattern.  At some point, we may want to refactor all the flyweights to match the Java pattern.
+// and the Java/C++ impls' pattern.  At some point, we may want to refactor all the flyweights to match the Java/C++
+// pattern.
 type CounterMessage struct {
 	flyweight.FWBase
 
