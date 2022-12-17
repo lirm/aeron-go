@@ -68,20 +68,27 @@ type ReceivingConductor interface {
 // Subscription is the object responsible for receiving messages from media driver. It is specific to a channel and
 // stream ID combination.
 type Subscription struct {
-	conductor       ReceivingConductor
-	channel         string
-	roundRobinIndex int
-	registrationID  int64
-	streamID        int32
-	channelStatusID int32
-
-	images *ImageList
-
-	isClosed atomic.Bool
+	conductor               ReceivingConductor
+	channel                 string
+	roundRobinIndex         int
+	registrationID          int64
+	streamID                int32
+	channelStatusID         int32
+	images                  *ImageList
+	isClosed                atomic.Bool
+	availableImageHandler   AvailableImageHandler
+	unavailableImageHandler UnavailableImageHandler
 }
 
 // NewSubscription is a factory method to create new subscription to be added to the media driver
-func NewSubscription(conductor ReceivingConductor, channel string, registrationID int64, streamID int32, channelStatusID int32) *Subscription {
+func NewSubscription(
+	conductor ReceivingConductor,
+	channel string,
+	registrationID int64,
+	streamID int32,
+	channelStatusID int32,
+	availableImagehandler AvailableImageHandler,
+	unavailableImageHandler UnavailableImageHandler) *Subscription {
 	sub := new(Subscription)
 	sub.images = NewImageList()
 	sub.conductor = conductor
@@ -91,6 +98,8 @@ func NewSubscription(conductor ReceivingConductor, channel string, registrationI
 	sub.channelStatusID = channelStatusID
 	sub.roundRobinIndex = 0
 	sub.isClosed.Set(false)
+	sub.availableImageHandler = availableImagehandler
+	sub.unavailableImageHandler = unavailableImageHandler
 
 	return sub
 }
@@ -136,6 +145,18 @@ func (sub *Subscription) Close() error {
 	}
 
 	return nil
+}
+
+// AvailableImageHandler returns a callback used to indicate when an Image becomes available under this Subscription.
+// The handler may be nil.
+func (sub *Subscription) AvailableImageHandler() AvailableImageHandler {
+	return sub.availableImageHandler
+}
+
+// UnavailableImageHandler returns a callback used to indicate when an Image goes unavailable under this Subscription.
+// The handler may be nil.
+func (sub *Subscription) UnavailableImageHandler() UnavailableImageHandler {
+	return sub.unavailableImageHandler
 }
 
 // Poll is the primary receive mechanism on subscription.

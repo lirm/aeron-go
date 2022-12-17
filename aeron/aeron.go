@@ -115,7 +115,16 @@ func (aeron *Aeron) Close() error {
 
 // AddSubscription will add a new subscription to the driver and wait until it is ready.
 func (aeron *Aeron) AddSubscription(channel string, streamID int32) (*Subscription, error) {
-	registrationID, err := aeron.conductor.AddSubscription(channel, streamID)
+	return aeron.AddSubscriptionWithHandlers(channel, streamID,
+		aeron.context.availableImageHandler, aeron.context.unavailableImageHandler)
+}
+
+// AddSubscriptionWithHandlers will add a new subscription to the driver and wait until it is ready.  It will use the
+// specified Handlers for available/unavailable Images instead of the default handlers.
+func (aeron *Aeron) AddSubscriptionWithHandlers(channel string, streamID int32,
+	onAvailableImage AvailableImageHandler, onUnavailableImage UnavailableImageHandler) (*Subscription, error) {
+	registrationID, err :=
+		aeron.conductor.AddSubscriptionWithHandlers(channel, streamID, onAvailableImage, onUnavailableImage)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +167,16 @@ func (aeron *Aeron) AddSubscriptionDeprecated(channel string, streamID int32) ch
 // AsyncAddSubscription will add a new subscription to the driver and return its registration ID.  That ID can be used
 // to get the Subscription with GetSubscription().
 func (aeron *Aeron) AsyncAddSubscription(channel string, streamID int32) (int64, error) {
-	return aeron.conductor.AddSubscription(channel, streamID)
+	return aeron.conductor.AddSubscriptionWithHandlers(channel, streamID,
+		aeron.context.availableImageHandler, aeron.context.unavailableImageHandler)
+}
+
+// AsyncAddSubscriptionWithHandlers will add a new subscription to the driver and return its registration ID.  That ID
+// can be used to get the Subscription with GetSubscription().  This call will use the specified Handlers for
+// available/unavailable Images instead of the default handlers.
+func (aeron *Aeron) AsyncAddSubscriptionWithHandlers(channel string, streamID int32,
+	onAvailableImage AvailableImageHandler, onUnavailableImage UnavailableImageHandler) (int64, error) {
+	return aeron.conductor.AddSubscriptionWithHandlers(channel, streamID, onAvailableImage, onUnavailableImage)
 }
 
 // GetSubscription will attempt to get a Subscription from a registrationID.  See AsyncAddSubscription.  A pending

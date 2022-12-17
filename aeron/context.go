@@ -112,13 +112,13 @@ func (ctx *Context) NewPublicationHandler(handler func(string, int32, int32, int
 	return ctx
 }
 
-// AvailableImageHandler sets an optional callback for available image notifications
+// AvailableImageHandler sets an optional default callback for available image notifications
 func (ctx *Context) AvailableImageHandler(handler func(Image)) *Context {
 	ctx.availableImageHandler = handler
 	return ctx
 }
 
-// UnavailableImageHandler sets an optional callback for unavailable image notification
+// UnavailableImageHandler sets an optional default callback for unavailable image notification
 func (ctx *Context) UnavailableImageHandler(handler func(Image)) *Context {
 	ctx.unavailableImageHandler = handler
 	return ctx

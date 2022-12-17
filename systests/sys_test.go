@@ -48,13 +48,13 @@ type SysTestSuite struct {
 	mediaDriver *driver.MediaDriver
 }
 
-func (suite *SysTestSuite) SetupSuite() {
+func (suite *SysTestSuite) SetupTest() {
 	mediaDriver, err := driver.StartMediaDriver()
 	suite.Require().NoError(err, "Couldn't start Media Driver: ")
 	suite.mediaDriver = mediaDriver
 }
 
-func (suite *SysTestSuite) TearDownSuite() {
+func (suite *SysTestSuite) TearDownTest() {
 	suite.mediaDriver.StopMediaDriver()
 }
 
