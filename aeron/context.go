@@ -1,5 +1,6 @@
 /*
 Copyright 2016 Stanislav Liberman
+Copyright 2022 Steven Stern
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,10 +31,12 @@ type Context struct {
 
 	errorHandler func(error)
 
-	newPublicationHandler   NewPublicationHandler
-	newSubscriptionHandler  NewSubscriptionHandler
-	availableImageHandler   AvailableImageHandler
-	unavailableImageHandler UnavailableImageHandler
+	newPublicationHandler     NewPublicationHandler
+	newSubscriptionHandler    NewSubscriptionHandler
+	availableImageHandler     AvailableImageHandler
+	unavailableImageHandler   UnavailableImageHandler
+	availableCounterHandler   AvailableCounterHandler
+	unavailableCounterHandler UnavailableCounterHandler
 
 	resourceLingerTo        time.Duration
 	publicationConnectionTo time.Duration
@@ -134,4 +137,25 @@ func (ctx *Context) CncFileName() string {
 func (ctx *Context) IdleStrategy(idleStrategy idlestrategy.Idler) *Context {
 	ctx.idleStrategy = idleStrategy
 	return ctx
+}
+
+// AvailableCounterHandler sets up a callback for when a Counter is available.  This will be added to the list before
+// additional handlers are added with Aeron.AddAvailableCounterHandler.
+func (ctx *Context) AvailableCounterHandler(handler AvailableCounterHandler) {
+	ctx.availableCounterHandler = handler
+}
+
+// GetAvailableCounterHandler gets the callback handler for when a counter is available.
+func (ctx *Context) GetAvailableCounterHandler() AvailableCounterHandler {
+	return ctx.availableCounterHandler
+}
+
+// UnavailableCounterHandler sets up a callback for when a Counter is unavailable.  This will be added to the list first
+// before additional handlers are added with Aeron.AddUnavailableCounterHandler.
+func (ctx *Context) UnavailableCounterHandler(handler UnavailableCounterHandler) {
+	ctx.unavailableCounterHandler = handler
+}
+
+func (ctx *Context) GetUnavailableCounterHandler() UnavailableCounterHandler {
+	return ctx.unavailableCounterHandler
 }

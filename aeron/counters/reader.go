@@ -79,6 +79,7 @@ const CounterLength = util.CacheLineLength * 2
 const FullLabelLength = util.CacheLineLength * 6
 const LabelOffset = util.CacheLineLength * 2
 const MetadataLength = LabelOffset + FullLabelLength
+const MaxLabelLength = FullLabelLength - util.SizeOfInt32
 const MaxKeyLength = (util.CacheLineLength * 2) - (util.SizeOfInt32 * 2) - util.SizeOfInt64
 
 const TypeIdOffset = util.SizeOfInt32
@@ -92,6 +93,9 @@ const RecordUnused int32 = 0
 const RecordAllocated int32 = 1
 
 const NullCounterId = int32(-1)
+
+const RegistrationIdOffset = util.SizeOfInt64
+const OwnerIdOffset = RegistrationIdOffset + util.SizeOfInt64
 
 type Reader struct {
 	metaData *atomic.Buffer
@@ -110,9 +114,13 @@ type Counter struct {
 func NewReader(values, metaData *atomic.Buffer) *Reader {
 
 	reader := Reader{metaData: metaData, values: values}
-	reader.maxCounterID = int(values.Capacity() / CounterLength)
+	reader.maxCounterID = int(values.Capacity()/CounterLength) - 1
 
 	return &reader
+}
+
+func counterOffset(counterId int32) int32 {
+	return counterId * CounterLength
 }
 
 func (reader *Reader) Scan(cb func(Counter)) {
@@ -130,7 +138,7 @@ func (reader *Reader) Scan(cb func(Counter)) {
 
 			// TODO Get the key buffer
 
-			value := reader.values.GetInt64Volatile(id * CounterLength)
+			value := reader.values.GetInt64Volatile(counterOffset(id))
 
 			// fmt.Printf("Reading at offset %d; counterState=%d; typeId=%d\n", i, recordStatus, typeId)
 
@@ -234,7 +242,21 @@ func (reader *Reader) GetCounterValue(counterId int32) int64 {
 	if counterId < 0 || counterId >= int32(reader.maxCounterID) {
 		return 0
 	}
-	return reader.values.GetInt64Volatile(counterId * CounterLength)
+	return reader.values.GetInt64Volatile(counterOffset(counterId))
+}
+
+func (reader *Reader) GetCounterRegistrationId(counterId int32) int64 {
+	if counterId < 0 || counterId >= int32(reader.maxCounterID) {
+		return 0
+	}
+	return reader.values.GetInt64Volatile(counterOffset(counterId) + RegistrationIdOffset)
+}
+
+func (reader *Reader) GetCounterOwnerId(counterId int32) int64 {
+	if counterId < 0 || counterId >= int32(reader.maxCounterID) {
+		return 0
+	}
+	return reader.values.GetInt64Volatile(counterOffset(counterId) + OwnerIdOffset)
 }
 
 // GetCounterTypeId returns the type id for a counter.
