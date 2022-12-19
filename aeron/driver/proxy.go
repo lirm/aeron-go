@@ -357,7 +357,26 @@ func (driver *Proxy) AddCounter(typeId int32, keyBuffer *atomic.Buffer, keyOffse
 
 // AddCounterByLabel adds a new counter with a type id and label.  The key will be blank.
 func (driver *Proxy) AddCounterByLabel(typeId int32, label string) (int64, error) {
-	return 0, errors.New("unimplemented")
+	correlationID := driver.toDriverCommandBuffer.NextCorrelationID()
+
+	filler := func(buffer *atomic.Buffer, length *int) int32 {
+		var message command.CounterMessage
+		message.Wrap(buffer, 0)
+		message.ClientID.Set(driver.clientID)
+		message.CorrelationID.Set(correlationID)
+		message.CounterTypeID.Set(typeId)
+		message.CopyLabelString(label)
+
+		*length = message.Size()
+
+		return command.AddCounter
+	}
+
+	if err := driver.writeCommandToDriver(filler); err == nil {
+		return correlationID, nil
+	} else {
+		return 0, err
+	}
 }
 
 // RemoveCounter instructs the media driver to remove an existing counter by its registration id.  Returns the

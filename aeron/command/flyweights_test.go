@@ -28,7 +28,7 @@ type FlyweightsTestSuite struct {
 	flyweight CounterMessage
 }
 
-func (s *FlyweightsTestSuite) SetupSuite() {
+func (s *FlyweightsTestSuite) SetupTest() {
 	s.byteSlice = make([]byte, 128)
 	s.buffer = atomic.MakeBuffer(s.byteSlice)
 }
@@ -61,11 +61,30 @@ func (s *FlyweightsTestSuite) TestCounterMessageLabelBuffer() {
 	labelCopySize := int32(21)
 	s.flyweight.CopyLabelBuffer(labelBuffer, 2, labelCopySize)
 
+	s.Assert().EqualValues(9, s.flyweight.key.Length())
 	s.Assert().EqualValues(21, s.flyweight.label.Length())
 	// Expected is sizes of: long, long, int, length field, keyCopySize
 	s.Assert().EqualValues(8+8+4+4+keyCopySize, s.flyweight.getLabelOffset())
 	// Above, plus label length and size
 	s.Assert().EqualValues(8+8+4+4+keyCopySize+4+labelCopySize, s.flyweight.Size())
+}
+
+func (s *FlyweightsTestSuite) TestCounterMessageLabelString() {
+	offset := 40
+	for i := 0; i <= offset; i++ {
+		s.byteSlice[i] = byte(255)
+	}
+	s.flyweight.Wrap(s.buffer, offset)
+
+	label := "Steve loves Aeron"
+	s.flyweight.CopyLabelString(label)
+
+	s.Assert().EqualValues(0, s.flyweight.key.Length())
+	s.Assert().EqualValues(len(label), s.flyweight.label.Length())
+	// Expected is sizes of: long, long, int, length field (key is empty)
+	s.Assert().EqualValues(8+8+4+4, s.flyweight.getLabelOffset())
+	// Above, plus label length and size
+	s.Assert().EqualValues(8+8+4+4+4+len(label), s.flyweight.Size())
 }
 
 func TestFlyweights(t *testing.T) {

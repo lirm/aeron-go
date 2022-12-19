@@ -37,17 +37,11 @@ func prepareCnc(t *testing.T) (string, *counters.MetaDataFlyweight) {
 	require.NoError(t, err)
 
 	cncBuffer := atomic.MakeBuffer(mmap.GetMemoryPtr(), mmap.GetMemorySize())
-	var meta counters.MetaDataFlyweight
-	meta.Wrap(cncBuffer, 0)
-	meta.CncVersion.Set(counters.CurrentCncVersion)
-	meta.ToDriverBufLen.Set(1024)
-	meta.ToClientBufLen.Set(1024)
+	meta := counters.InitAndWrapMetaData(cncBuffer, 0, 1024, 1024, 0, 0, 0)
 
-	// Rewrap to pick up the new length
-	meta.Wrap(cncBuffer, 0)
 	t.Logf("meta data: %v", meta)
 
-	return counterFileName, &meta
+	return counterFileName, meta
 }
 
 func TestNumberOfZeros(t *testing.T) {

@@ -706,7 +706,27 @@ func (cc *ClientConductor) AddCounter(typeId int32, keyBuffer *atomic.Buffer, ke
 
 func (cc *ClientConductor) AddCounterByLabel(typeId int32, label string) (int64, error) {
 	logger.Debugf("AddCounterByLabel: typeId=%d, label=%s", typeId, label)
-	return 0, errors.New("unimplemented")
+
+	if err := cc.getDriverStatus(); err != nil {
+		return 0, err
+	}
+	if int32(len(label)) > ctr.MaxLabelLength {
+		return 0, fmt.Errorf("label length out of bounds: %d", len(label))
+	}
+	cc.adminLock.Lock()
+	defer cc.adminLock.Unlock()
+
+	now := time.Now().UnixNano()
+
+	registrationId, err := cc.driverProxy.AddCounterByLabel(typeId, label)
+	if err != nil {
+		return 0, err
+	}
+	counterState := new(counterStateDefn)
+	counterState.Init(now)
+	cc.counters[registrationId] = counterState
+
+	return registrationId, nil
 }
 
 func (cc *ClientConductor) FindCounter(registrationID int64) (*Counter, error) {

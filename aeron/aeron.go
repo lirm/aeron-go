@@ -16,7 +16,6 @@
 package aeron
 
 import (
-	"errors"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"time"
 
@@ -362,7 +361,7 @@ func (aeron *Aeron) AddCounter(
 // AddCounterByLabel allocates a counter on the media driver and returns its registrationId.  The Counter should be
 // freed by calling Counter.Close().
 func (aeron *Aeron) AddCounterByLabel(typeId int32, label string) (int64, error) {
-	return 0, errors.New("unimplemented")
+	return aeron.conductor.AddCounterByLabel(typeId, label)
 }
 
 // FindCounter retrieves the Counter associated with the given registrationID.  This function is non-blocking.  The
