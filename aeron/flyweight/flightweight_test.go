@@ -174,7 +174,29 @@ func (f *FlyweightTestSuite) TestMinimumPaddingWrap() {
 	f.Assert().Equal(fw.Size(), 256)
 }
 
-func (f *FlyweightTestSuite) TestLengthAndRawDataField() {
+func (f *FlyweightTestSuite) TestLengthAndRawDataFieldCopyString() {
+	testString := "Talos loves Aeron"
+	buf := atomic.MakeBuffer(make([]byte, 128), 128)
+	field := LengthAndRawDataField{}
+	field.Wrap(buf, 0)
+	field.CopyString(testString)
+	f.Require().Equal(field.GetAsASCII(), testString)
+	f.Require().Equal(field.GetAsBuffer().GetBytesArray(0, int32(len(testString))), []byte(testString))
+	f.Require().EqualValues(field.Length(), len(testString))
+}
+
+func (f *FlyweightTestSuite) TestLengthAndRawDataFieldCopyBytes() {
+	testString := "Talos loves Aeron"
+	buf := atomic.MakeBuffer(make([]byte, 128), 128)
+	field := LengthAndRawDataField{}
+	field.Wrap(buf, 0)
+	field.CopyBuffer(atomic.MakeBuffer([]byte(testString)), 0, int32(len(testString)))
+	f.Require().Equal(field.GetAsASCII(), testString)
+	f.Require().Equal(field.GetAsBuffer().GetBytesArray(0, int32(len(testString))), []byte(testString))
+	f.Require().EqualValues(field.Length(), len(testString))
+}
+
+func (f *FlyweightTestSuite) TestLengthAndRawDataFieldGetFields() {
 	testString := "Talos loves Aeron"
 	bufferBytes := append([]byte{byte(len(testString)), 0, 0, 0},
 		[]byte(testString)...)

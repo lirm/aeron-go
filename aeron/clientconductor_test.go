@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/counters"
+	"github.com/lirm/aeron-go/aeron/testdata"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -31,17 +32,26 @@ const (
 	SourceInfo                         = "127.0.0.1:40789"
 	SubscriptionPositionId             = int32(2)
 	SubscriptionPositionRegistrationId = int64(4001)
+	CounterTypeId                      = int32(102)
+	CounterLabel                       = "counter label"
+	CounterRegId                       = int64(42)
+	CounterRegId2                      = int64(43)
+	CounterId                          = int32(3)
 )
 
 type ClientConductorTestSuite struct {
 	suite.Suite
 	cc          ClientConductor
-	driverProxy MockDriverProxy
+	driverProxy *MockDriverProxy
 }
 
 func (c *ClientConductorTestSuite) SetupTest() {
-	var meta counters.MetaDataFlyweight
-	c.cc.Init(&c.driverProxy, nil, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100, &meta)
+	metaBuf := atomic.MakeBuffer(make([]byte, 256*1024))
+	meta := counters.InitAndWrapMetaData(metaBuf, 0, 0, 0, 24*1024, 24*1024, 0)
+	c.driverProxy = new(MockDriverProxy)
+	c.cc.Init(c.driverProxy, nil, time.Millisecond*100, time.Millisecond*100,
+		time.Millisecond*100, time.Millisecond*100, meta)
+	c.driverProxy.On("NextCorrelationID").Return(int64(123))
 }
 
 func (c *ClientConductorTestSuite) TestAddPublicationShouldNotifyMediaDriver() {
@@ -226,6 +236,177 @@ func (c *ClientConductorTestSuite) TestShouldIgnoreUnknownInactiveImage() {
 	c.cc.onUnavailableImageHandler = failHandler
 
 	c.cc.OnUnavailableImage(CorrelationId1, SubscriptionPositionRegistrationId)
+}
+
+func (c *ClientConductorTestSuite) TestShouldReturnNullForUnknownCounter() {
+	counter, err := c.cc.FindCounter(100)
+	c.Assert().Nil(counter)
+	c.Assert().Error(err)
+}
+
+// Also indirectly tests C++'s shouldSendAddCounterToDriver.  We mock out driverProxy.  They check that driverProxy
+// wrote the correct data to a test ring buffer.
+func (c *ClientConductorTestSuite) TestShouldReturnNullForCounterWithoutOnAvailableCounter() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Return(CounterRegId, nil)
+
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+	c.Require().NoError(err)
+	c.Require().Equal(id, CounterRegId)
+
+	counter, err := c.cc.FindCounter(id)
+	c.Assert().Nil(counter)
+	c.Assert().NoError(err)
+}
+
+func (c *ClientConductorTestSuite) TestShouldReturnCounterAfterOnAvailableCounter() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Return(CounterRegId, nil)
+	handler := testdata.NewMockAvailableCounterHandler(c.T())
+	handler.On("Handle", mock.Anything, CounterRegId, CounterId).Once()
+	c.cc.AddAvailableCounterHandler(handler)
+
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+	c.Require().NoError(err)
+	c.Require().Equal(id, CounterRegId)
+
+	c.cc.OnAvailableCounter(CounterRegId, CounterId)
+
+	counter, err := c.cc.FindCounter(id)
+	c.Require().NotNil(counter)
+	c.Require().NoError(err)
+	c.Assert().Equal(counter.RegistrationId(), CounterRegId)
+	c.Assert().Equal(counter.counterId, CounterId)
+}
+
+// C++ uses a shared_ptr's implicit destructor to call Close().  Here we just call Close() manually.
+func (c *ClientConductorTestSuite) TestShouldReleaseCounterAfterGoingOutOfScope() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Return(CounterRegId, nil)
+
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+	c.Require().NoError(err)
+	c.Require().Equal(id, CounterRegId)
+
+	c.cc.OnAvailableCounter(CounterRegId, CounterId)
+
+	counter, err := c.cc.FindCounter(id)
+	c.Require().NotNil(counter)
+	c.Require().NoError(err)
+
+	c.driverProxy.On("RemoveCounter", CounterRegId).
+		Return(int64(123), nil)
+	counter.Close()
+
+	counter, err = c.cc.FindCounter(id)
+	c.Require().Nil(counter)
+	c.Require().Error(err)
+}
+
+func (c *ClientConductorTestSuite) TestShouldReturnDifferentIdsForDuplicateAddCounter() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Once().Return(CounterRegId, nil)
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+	c.Require().NoError(err)
+	c.Require().Equal(id, CounterRegId)
+
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Once().Return(CounterRegId2, nil)
+	id, err = c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+	c.Require().NoError(err)
+	c.Require().Equal(id, CounterRegId2)
+}
+
+func (c *ClientConductorTestSuite) TestShouldReturnSameFindCounterAfterOnAvailableCounter() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Return(CounterRegId, nil)
+
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+
+	c.cc.OnAvailableCounter(CounterRegId, CounterId)
+
+	counter1, err := c.cc.FindCounter(id)
+	c.Require().NotNil(counter1)
+	c.Require().NoError(err)
+	counter2, err := c.cc.FindCounter(id)
+	c.Require().NotNil(counter2)
+	c.Require().NoError(err)
+	c.Require().Equal(counter1, counter2)
+}
+
+func (c *ClientConductorTestSuite) TestShouldReturnDifferentCounterAfterOnAvailableCounter() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Once().Return(CounterRegId, nil)
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Once().Return(CounterRegId2, nil)
+	handler := testdata.NewMockAvailableCounterHandler(c.T())
+	handler.On("Handle", mock.Anything, CounterRegId, CounterId).Once()
+	handler.On("Handle", mock.Anything, CounterRegId2, CounterId).Once()
+	c.cc.AddAvailableCounterHandler(handler)
+
+	id1, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+	c.Require().Equal(id1, CounterRegId)
+	id2, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+	c.Require().Equal(id2, CounterRegId2)
+
+	c.cc.OnAvailableCounter(CounterRegId, CounterId)
+	c.cc.OnAvailableCounter(CounterRegId2, CounterId)
+
+	counter1, err := c.cc.FindCounter(id1)
+	c.Require().NotNil(counter1)
+	c.Require().NoError(err)
+	counter2, err := c.cc.FindCounter(id2)
+	c.Require().NotNil(counter2)
+	c.Require().NoError(err)
+	c.Require().NotEqual(counter1, counter2)
+}
+
+func (c *ClientConductorTestSuite) TestShouldNotFindCounterOnAvailableCounterForUnknownCorrelationId() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Return(CounterRegId, nil)
+	handler := testdata.NewMockAvailableCounterHandler(c.T())
+	handler.On("Handle", mock.Anything, CounterRegId2, CounterId).Once()
+	c.cc.AddAvailableCounterHandler(handler)
+
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+
+	c.cc.OnAvailableCounter(CounterRegId2, CounterId)
+
+	counter1, err := c.cc.FindCounter(id)
+	c.Require().Nil(counter1)
+	c.Require().NoError(err)
+}
+
+func (c *ClientConductorTestSuite) TestShouldTimeoutAddCounterWithoutOnAvailableCounter() {
+	c.cc.driverTimeoutNs = 1
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Return(CounterRegId, nil)
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+
+	counter, err := c.cc.FindCounter(id)
+	c.Require().Nil(counter)
+	c.Require().Error(err)
+}
+
+func (c *ClientConductorTestSuite) TestShouldErrorOnFindWhenReceivingErrorResponseOnAddCounter() {
+	c.driverProxy.On("AddCounterByLabel", CounterTypeId, CounterLabel).
+		Return(CounterRegId, nil)
+	id, err := c.cc.AddCounterByLabel(CounterTypeId, CounterLabel)
+
+	c.cc.OnErrorResponse(id, 123, "can't add counter")
+
+	counter, err := c.cc.FindCounter(id)
+	c.Require().Nil(counter)
+	c.Require().ErrorContains(err, "can't add counter")
+}
+
+func (c *ClientConductorTestSuite) TestShouldCallOnUnavailableCounter() {
+	id := int64(101)
+	handler := testdata.NewMockUnavailableCounterHandler(c.T())
+	handler.On("Handle", mock.Anything, id, CounterId).Once()
+	c.cc.AddUnavailableCounterHandler(handler)
+
+	c.cc.OnUnavailableCounter(id, CounterId)
 }
 
 func TestClientConductor(t *testing.T) {

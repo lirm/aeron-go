@@ -193,3 +193,9 @@ func (m *CounterMessage) CopyLabelBuffer(buffer *atomic.Buffer, offset int32, le
 	m.label.CopyBuffer(buffer, offset, length)
 	m.setSize()
 }
+
+func (m *CounterMessage) CopyLabelString(label string) {
+	m.wrapLabel()
+	m.label.CopyString(label)
+	m.setSize()
+}
