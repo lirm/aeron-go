@@ -310,9 +310,8 @@ func (cc *ClientConductor) run(idleStrategy idlestrategy.Idler) {
 			cc.onError(errors.New(errStr))
 			cc.running.Set(false)
 		}
-		cc.conductorRunning.Set(false)
-
 		cc.forceCloseResources()
+		cc.conductorRunning.Set(false)
 
 		logger.Infof("ClientConductor done")
 	}()
