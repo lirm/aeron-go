@@ -21,6 +21,7 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/archive/codecs"
 )
 
@@ -29,6 +30,12 @@ type RecordingEventsAdapter struct {
 	Subscription *aeron.Subscription
 	Enabled      bool
 	archive      *Archive // link to parent
+
+	pollFunc              term.FragmentHandler
+	handlerWithListeners  FragmentHandlerWithListeners
+	reFragmentHandlerFunc FragmentHandlerWithListeners
+	buf                   *bytes.Buffer
+	marshaller            *codecs.SbeGoMarshaller
 }
 
 // FragmentHandlerWithListeners provides a FragmentHandler with ArchiveListeners
@@ -38,29 +45,45 @@ type FragmentHandlerWithListeners func(listeners *ArchiveListeners, buffer *atom
 // If you pass it a nil handler it will use the builtin and call the Listeners
 // If you ask for 0 fragments it will only return one fragment (if available)
 func (rea *RecordingEventsAdapter) PollWithContext(handler FragmentHandlerWithListeners, fragmentLimit int) int {
+	if rea.pollFunc == nil {
+		rea.prealloc()
+	}
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = rea.archive.Options.RangeChecking
 
-	if handler == nil {
-		handler = reFragmentHandler
+	if handler != nil {
+		rea.handlerWithListeners = handler
+	} else {
+		rea.handlerWithListeners = rea.reFragmentHandlerFunc
 	}
 	if fragmentLimit == 0 {
 		fragmentLimit = 1
 	}
-	return rea.Subscription.Poll(
-		func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-			handler(rea.archive.Listeners, buf, offset, length, header)
-		}, fragmentLimit)
+	return rea.Subscription.Poll(rea.pollFunc, fragmentLimit)
 }
 
-func reFragmentHandler(listeners *ArchiveListeners, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func (rea *RecordingEventsAdapter) prealloc() {
+	rea.pollFunc = func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+		rea.handlerWithListeners(rea.archive.Listeners, buf, offset, length, header)
+	}
+	rea.reFragmentHandlerFunc = rea.reFragmentHandler
+}
+
+func (rea *RecordingEventsAdapter) reFragmentHandler(listeners *ArchiveListeners, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
 	var hdr codecs.SbeGoMessageHeader
 
-	buf := new(bytes.Buffer)
-	buffer.WriteBytes(buf, offset, length)
+	if rea.buf == nil {
+		rea.buf = new(bytes.Buffer)
+	}
+	buf := rea.buf
+	rea.buf.Reset()
+	buffer.WriteBytes(rea.buf, offset, length)
 
-	marshaller := codecs.NewSbeGoMarshaller()
+	if rea.marshaller == nil {
+		rea.marshaller = codecs.NewSbeGoMarshaller()
+	}
+	marshaller := rea.marshaller
 
 	if err := hdr.Decode(marshaller, buf); err != nil {
 		// Not much to be done here as we can't correlate
