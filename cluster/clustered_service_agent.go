@@ -726,6 +726,10 @@ func (agent *ClusteredServiceAgent) Time() int64 {
 	return agent.clusterTime
 }
 
+func (agent *ClusteredServiceAgent) TimeUnit() codecs.ClusterTimeUnitEnum {
+	return agent.timeUnit
+}
+
 func (agent *ClusteredServiceAgent) IdleStrategy() idlestrategy.Idler {
 	return agent
 }
@@ -736,6 +740,10 @@ func (agent *ClusteredServiceAgent) ScheduleTimer(correlationId int64, deadline 
 
 func (agent *ClusteredServiceAgent) CancelTimer(correlationId int64) bool {
 	return agent.proxy.cancelTimer(correlationId)
+}
+
+func (agent *ClusteredServiceAgent) Offer(buffer *atomic.Buffer, offset, length int32) int64 {
+	return agent.proxy.Offer(buffer, offset, length)
 }
 
 // END CLUSTER IMPLEMENTATION
