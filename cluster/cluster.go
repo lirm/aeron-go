@@ -8,7 +8,7 @@ import (
 
 type Cluster interface {
 
-	// Position returns the position the log has reached in bytes as of the current message.
+	// LogPosition returns the position the log has reached in bytes as of the current message.
 	LogPosition() int64
 
 	// MemberId returns the unique id for the hosting member of the cluster. Useful only for debugging purposes.
@@ -27,7 +27,7 @@ type Cluster interface {
 	// closing sessions, making timer requests, or any long-running actions.
 	IdleStrategy() idlestrategy.Idler
 
-	// Schedule a timer for a given deadline and provide a correlation id to identify the timer when it expires or
+	// ScheduleTimer schedules a timer for a given deadline and provide a correlation id to identify the timer when it expires or
 	// for cancellation. This action is asynchronous and will race with the timer expiring.
 	//
 	// If the correlationId is for an existing scheduled timer then it will be rescheduled to the new deadline. However,
@@ -51,7 +51,7 @@ type Cluster interface {
 	// ScheduleTimer returns true if the event to schedule a timer request has been sent or false if back-pressure is applied.
 	ScheduleTimer(correlationId int64, deadline int64) bool
 
-	// Cancel a previously scheduled timer. This action is asynchronous and will race with the timer expiring.
+	// CancelTimer cancels a previously scheduled timer. This action is asynchronous and will race with the timer expiring.
 	//
 	// Timers should only be scheduled or cancelled in the context of processing a
 	// ClusteredService#onSessionMessage(ClientSession, long, DirectBuffer, int, int, Header)

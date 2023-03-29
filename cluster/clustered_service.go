@@ -8,7 +8,7 @@ import (
 )
 
 type ClusteredService interface {
-	// StartEvent is called to initialize the service and load snapshot state, where the snapshot image can be nil if no previous snapshot exists.
+	// OnStart is called to initialize the service and load snapshot state, where the snapshot image can be nil if no previous snapshot exists.
 	//
 	// Note: As this can potentially be a long-running operation, the implementation should use Cluster.IdleStrategy() and
 	// occasionally call IdleStrategy.Idle() or IdleStrategy.Idle(int), especially when polling the Image returns 0.
@@ -17,13 +17,13 @@ type ClusteredService interface {
 	// snapshotImage the Image from which the service can load its archived state, which can be nil when there is no snapshot.
 	OnStart(cluster Cluster, image aeron.Image)
 
-	// A session has been opened for a client to the cluster.
+	// OnSessionOpen notifies the clustered service that a session has been opened for a client to the cluster.
 	//
 	// session   for the client which have been opened.
 	// timestamp at which the session was opened.
 	OnSessionOpen(session ClientSession, timestamp int64)
 
-	// A session has been closed for a client to the cluster.
+	// OnSessionClose notifies the clustered service that a session has been closed for a client to the cluster.
 	//
 	// session     that has been closed.
 	// timestamp   at which the session was closed.
@@ -34,7 +34,7 @@ type ClusteredService interface {
 		closeReason codecs.CloseReasonEnum,
 	)
 
-	// A message has been received to be processed by a clustered service.
+	// OnSessionMessage notifies the clustered service that a message has been received to be processed by a clustered service.
 	//
 	// session   for the client which sent the message. This can be null if the client was a service.
 	// timestamp for when the message was received.
@@ -51,13 +51,13 @@ type ClusteredService interface {
 		header *logbuffer.Header,
 	)
 
-	// A scheduled timer has expired.
+	// OnTimerEvent notifies the clustered service that a scheduled timer has expired.
 	//
 	// correlationId for the expired timer.
 	// timestamp     at which the timer expired.
 	OnTimerEvent(correlationId, timestamp int64)
 
-	// The service should take a snapshot and store its state to the provided archive Publication.
+	// OnTakeSnapshot instructs the clustered service to take a snapshot and store its state to the provided aeron archive Publication.
 	//
 	// Note: As this is a potentially long-running operation the implementation should use
 	// Cluster#idleStrategy() and then occasionally call IdleStrategy#idle()
@@ -66,17 +66,17 @@ type ClusteredService interface {
 	// publication to which the state should be recorded.
 	OnTakeSnapshot(publication *aeron.Publication)
 
-	// Notify that the cluster node has changed role.
+	// OnRoleChange notifies the clustered service that the cluster node has changed role.
 	//
 	// role that the node has assumed.
 	OnRoleChange(role Role)
 
-	// Called when the container is going to terminate.
+	// OnTerminate notifies the clustered service that the container is going to terminate.
 	//
 	// cluster with which the service can interact.
 	OnTerminate(cluster Cluster)
 
-	// An election has been successful and a leader has entered a new term.
+	// OnNewLeadershipTermEvent notifies the clustered service that an election has been successful and a leader has entered a new term.
 	//
 	// leadershipTermId    identity for the new leadership term.
 	// logPosition         position the log has reached as the result of this message.
