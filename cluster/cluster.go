@@ -35,10 +35,10 @@ type Cluster interface {
 	// services in the same cluster. Service isolation can be achieved by using the upper bits for service id.
 	//
 	// Timers should only be scheduled or cancelled in the context of processing a
-	// ClusteredService#onSessionMessage(ClientSession, long, DirectBuffer, int, int, Header)
-	// ClusteredService#onTimerEvent(long, long)
-	// ClusteredService#onSessionOpen(ClientSession, long) or
-	// ClusteredService#onSessionClose(ClientSession, long, CloseReason)
+	// ClusteredService#onSessionMessage(ClientSession, int64, DirectBuffer, int, int, Header)
+	// ClusteredService#onTimerEvent(int64, int64)
+	// ClusteredService#onSessionOpen(ClientSession, int64) or
+	// ClusteredService#onSessionClose(ClientSession, int64, CloseReason)
 	// If applied to other events then they are not guaranteed to be reliable.
 	//
 	// Callers of this method should loop until the method succeeds.
@@ -54,22 +54,21 @@ type Cluster interface {
 	// CancelTimer cancels a previously scheduled timer. This action is asynchronous and will race with the timer expiring.
 	//
 	// Timers should only be scheduled or cancelled in the context of processing a
-	// ClusteredService#onSessionMessage(ClientSession, long, DirectBuffer, int, int, Header)
-	// ClusteredService#onTimerEvent(long, long)
-	// ClusteredService#onSessionOpen(ClientSession, long) or
-	// ClusteredService#onSessionClose(ClientSession, long, CloseReason)
+	// ClusteredService#onSessionMessage(ClientSession, int64, DirectBuffer, int, int, Header)
+	// ClusteredService#onTimerEvent(int64, int64)
+	// ClusteredService#onSessionOpen(ClientSession, int64) or
+	// ClusteredService#onSessionClose(ClientSession, int64, CloseReason)
 	// If applied to other events then they are not guaranteed to be reliable.
 	//
-	// Callers of this method should loop until the method succeeds, see {@link
-	// io.aeron.cluster.service.Cluster#scheduleTimer(long, long)} for an example.
+	// Callers of this method should loop until the method succeeds, see
+	// Cluster#scheduleTimer(int64, int64) for an example.
 	//
 	// correlationId for the timer provided when it was scheduled. Long#MAX_VALUE not supported.
 	// CancelTimer   returns true if the event to cancel request has been sent or false if back-pressure is applied.
 	CancelTimer(correlationId int64) bool
 
 	// Offer a message as ingress to the cluster for sequencing. This will happen efficiently over IPC to the
-	// consensus module and have the cluster session of as the negative value of the
-	// io.aeron.cluster.service.ClusteredServiceContainer.Configuration#SERVICE_ID_PROP_NAME
+	// consensus module and set the cluster session as the negative value of the cluster.Options#ServiceID
 	//
 	// Callers of this method should loop until the method succeeds.
 	//
