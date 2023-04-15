@@ -11,7 +11,7 @@ type ClusteredService interface {
 	// OnStart is called to initialize the service and load snapshot state, where the snapshot image can be nil if no previous snapshot exists.
 	//
 	// Note: As this can potentially be a long-running operation, the implementation should use Cluster.IdleStrategy() and
-	// occasionally call IdleStrategy.Idle() or IdleStrategy.Idle(int), especially when polling the Image returns 0
+	// occasionally call IdleStrategy.Idle(), especially when polling the Image returns 0
 	OnStart(cluster Cluster, image aeron.Image)
 
 	// OnSessionOpen notifies the clustered service that a session has been opened for a client to the cluster
@@ -40,8 +40,8 @@ type ClusteredService interface {
 	// OnTakeSnapshot instructs the clustered service to take a snapshot and store its state to the provided aeron archive Publication.
 	//
 	// Note: As this is a potentially long-running operation the implementation should use
-	// Cluster#idleStrategy() and then occasionally call IdleStrategy#idle()
-	// especially when the snapshot ExclusivePublication returns Publication#BACK_PRESSURED
+	// Cluster.idleStrategy() and then occasionally call IdleStrategy.idle()
+	// especially when the snapshot ExclusivePublication returns Publication.BACK_PRESSURED
 	OnTakeSnapshot(publication *aeron.Publication)
 
 	// OnRoleChange notifies the clustered service that the cluster node has changed role
