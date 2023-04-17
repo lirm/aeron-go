@@ -14,6 +14,7 @@ package cluster
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,7 +115,7 @@ func NewClusteredServiceAgent(
 		counterFile.MetaDataBuf.Get(),
 	)
 
-	cmf, err := NewClusterMarkFile(options.ClusterDir + "/cluster-mark-service-0.dat")
+	cmf, err := NewClusterMarkFile(options.ClusterDir + "/cluster-mark-service-" + strconv.Itoa(int(options.ServiceId)) + ".dat")
 	if err != nil {
 		return nil, err
 	}
