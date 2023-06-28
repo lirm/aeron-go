@@ -55,6 +55,7 @@ func GetFileSize(filename string) int64 {
 func MapExisting(filename string, offset int64, length int) (*File, error) {
 	logger.Debugf("Will try to map existing %s, %d, %d", filename, offset, length)
 
+	/* #nosec G304 -- Read counters/logbuffers */
 	f, err := os.OpenFile(filename, syscall.O_RDWR, 0)
 	if err != nil {
 		return nil, err
@@ -94,6 +95,7 @@ func MapExisting(filename string, offset int64, length int) (*File, error) {
 func NewFile(filename string, offset int64, length int) (*File, error) {
 	logger.Debugf("Will try to map new %s, %d, %d", filename, offset, length)
 
+	/* #nosec G304 -- Read cluster-mark-service-0.dat */
 	f, err := os.Create(filename)
 	if err != nil {
 		return nil, err
