@@ -55,7 +55,7 @@ func GetFileSize(filename string) int64 {
 func MapExisting(filename string, offset int64, length int) (*File, error) {
 	logger.Debugf("Will try to map existing %s, %d, %d", filename, offset, length)
 
-	f, err := os.OpenFile(filename, syscall.O_RDWR, 0644)
+	f, err := os.OpenFile(filename, syscall.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
