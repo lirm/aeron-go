@@ -41,16 +41,9 @@ var memories = sync.Map{}
 
 // GetFileSize is a helper function to retrieve file size
 func GetFileSize(filename string) int64 {
-	file, err := os.Open(filename)
+	fi, err := os.Stat(filename)
 	if err != nil {
 		logger.Error(err)
-		return -1
-	}
-	defer file.Close()
-
-	fi, err := file.Stat()
-	if err != nil {
-		logger.Fatal(err)
 		return -1
 	}
 
