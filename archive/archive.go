@@ -166,8 +166,8 @@ func nextCorrelationID() int64 {
 	return _correlationID.Inc()
 }
 
-// ReplaySessionIdToStreamId utility function to convert a ReplaySessionID into a streamID
-func ReplaySessionIdToStreamId(replaySessionID int64) int32 {
+// ReplaySessionIdToSessionId utility function to convert a ReplaySessionID into a session ID
+func ReplaySessionIdToSessionId(replaySessionID int64) int32 {
 	// It's actually just the least significant 32 bits
 	return int32(replaySessionID)
 }
@@ -755,7 +755,7 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 //
 // The lower 32-bits of the returned value contains the ImageSessionID() of the received replay. All
 // 64-bits are required to uniquely identify the replay when calling StopReplay(). The lower 32-bits
-// can be obtained by casting the int64 value to an int32. See ReplaySessionIdToStreamId() helper.
+// can be obtained by casting the int64 value to an int32. See ReplaySessionIdToSessionId() helper.
 //
 // Returns a ReplaySessionID - the id of the replay session which will be the same as the Image sessionId
 // of the received replay for correlation with the matching channel and stream id in the lower 32 bits
@@ -789,7 +789,7 @@ func (archive *Archive) StartReplay(recordingID int64, position int64, length in
 //
 // The lower 32-bits of the returned value contains the ImageSessionID() of the received replay. All
 // 64-bits are required to uniquely identify the replay when calling StopReplay(). The lower 32-bits
-// can be obtained by casting the int64 value to an int32. See ReplaySessionIdToStreamId() helper.
+// can be obtained by casting the int64 value to an int32. See ReplaySessionIdToSessionId() helper.
 //
 // Returns a ReplaySessionID - the id of the replay session which will be the same as the Image sessionId
 // of the received replay for correlation with the matching channel and stream id in the lower 32 bits

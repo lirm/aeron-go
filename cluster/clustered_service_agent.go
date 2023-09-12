@@ -253,7 +253,7 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	if err != nil {
 		return err
 	}
-	subChannel, err := archive.AddSessionIdToChannel(channel, archive.ReplaySessionIdToStreamId(replaySessionId))
+	subChannel, err := archive.AddSessionIdToChannel(channel, archive.ReplaySessionIdToSessionId(replaySessionId))
 	if err != nil {
 		return err
 	}
