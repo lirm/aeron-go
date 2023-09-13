@@ -241,7 +241,7 @@ func (ac *AeronCluster) updateMemberEndpoints(endpoints string) {
 	logger.Debugf("updateMemberEndpoints: %s", endpoints)
 	for idx, endpoint := range strings.Split(endpoints, ",") {
 		if delim := strings.IndexByte(endpoint, '='); delim > 0 {
-			memberId, err := strconv.Atoi(endpoint[:delim])
+			memberId, err := strconv.ParseInt(endpoint[:delim], 10, 32)
 			if err != nil {
 				logger.Warningf("invalid endpoint at idx=%d: %s", idx, endpoint)
 				continue
