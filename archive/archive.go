@@ -758,7 +758,7 @@ func (archive *Archive) ListRecording(recordingID int64) (*codecs.RecordingDescr
 // can be obtained by casting the int64 value to an int32. See ReplaySessionIdToSessionId() helper.
 //
 // Returns a ReplaySessionID - the id of the replay session which will be the same as the Image sessionId
-// of the received replay for correlation with the matching channel and stream id in the lower 32 bits
+// of the received replay for correlation with the matching session id in the lower 32 bits
 func (archive *Archive) StartReplay(recordingID int64, position int64, length int64, replayChannel string, replayStream int32) (int64, error) {
 
 	correlationID := nextCorrelationID()
@@ -792,7 +792,7 @@ func (archive *Archive) StartReplay(recordingID int64, position int64, length in
 // can be obtained by casting the int64 value to an int32. See ReplaySessionIdToSessionId() helper.
 //
 // Returns a ReplaySessionID - the id of the replay session which will be the same as the Image sessionId
-// of the received replay for correlation with the matching channel and stream id in the lower 32 bits
+// of the received replay for correlation with the matching session id in the lower 32 bits
 func (archive *Archive) BoundedReplay(recordingID int64, position int64, length int64, limitCounterID int32, replayStream int32, replayChannel string) (int64, error) {
 	correlationID := nextCorrelationID()
 	logger.Debugf("BoundedReplay(%d, %d, %d, %d, %d, %s), correlationID:%d", recordingID, position, length, limitCounterID, replayStream, correlationID)
