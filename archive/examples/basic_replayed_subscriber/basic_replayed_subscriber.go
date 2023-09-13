@@ -85,7 +85,7 @@ func main() {
 	}
 
 	// Make the channel based upon that recording and subscribe to it
-	subChannel, err := archive.AddSessionIdToChannel(sampleChannel, archive.ReplaySessionIdToStreamId(replaySessionID))
+	subChannel, err := archive.AddSessionIdToChannel(sampleChannel, archive.ReplaySessionIdToSessionId(replaySessionID))
 	if err != nil {
 		logger.Fatalf("AddReplaySessionIdToChannel() failed: %s", err.Error())
 	}
