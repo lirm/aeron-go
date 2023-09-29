@@ -43,6 +43,10 @@ func (hdr *Header) Position() int64 {
 	return computePosition(hdr.TermId(), resultingOffset, hdr.positionBitsToShift, hdr.InitialTermId())
 }
 
+func (hdr *Header) Buffer() *atomic.Buffer {
+	return &hdr.buffer
+}
+
 func (hdr *Header) Offset() int32 {
 	return hdr.offset
 }
