@@ -308,8 +308,9 @@ func (cc *ClientConductor) run(idleStrategy idlestrategy.Idler) {
 			errStr := fmt.Sprintf("Panic: %v", err)
 			logger.Error(errStr)
 			cc.onError(errors.New(errStr))
-			cc.running.Set(false)
 		}
+
+		cc.running.Set(false)
 		cc.forceCloseResources()
 		cc.conductorRunning.Set(false)
 
