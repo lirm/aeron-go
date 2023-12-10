@@ -749,7 +749,7 @@ func (agent *ClusteredServiceAgent) Offer(buffer *atomic.Buffer, offset, length 
 	}
 
 	hdrBuf := agent.sessionMsgHdrBuffer
-	hdrBuf.PutInt64(SBEHeaderLength+8, -int64(agent.opts.ServiceId))
+	hdrBuf.PutInt64(SBEHeaderLength+8, int64(agent.opts.ServiceId))
 	hdrBuf.PutInt64(SBEHeaderLength+16, agent.clusterTime)
 	return agent.proxy.Offer2(hdrBuf, 0, hdrBuf.Capacity(), buffer, offset, length)
 }
