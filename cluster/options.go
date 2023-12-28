@@ -30,15 +30,15 @@ type Options struct {
 
 func NewOptions() *Options {
 	archiveOpts := archive.DefaultOptions()
-	archiveOpts.RequestChannel = "aeron:ipc?alias=cluster-service-archive-ctrl-req|term-length=128k"
-	archiveOpts.ResponseChannel = "aeron:ipc?alias=cluster-service-archive-ctrl-resp|term-length=128k"
+	archiveOpts.RequestChannel = "aeron:ipc?alias=cluster-service-archive-ctrl-req|term-length=2097152"
+	archiveOpts.ResponseChannel = "aeron:ipc?alias=cluster-service-archive-ctrl-resp|term-length=2097152"
 	return &Options{
 		Timeout:                 time.Second * 5,
 		IdleStrategy:            idlestrategy.NewDefaultBackoffIdleStrategy(),
 		RangeChecking:           true,
 		Loglevel:                zapcore.WarnLevel,
 		ClusterDir:              "/tmp/aeron-cluster",
-		ControlChannel:          "aeron:ipc?term-length=128k|alias=service-control",
+		ControlChannel:          "aeron:ipc?term-length=2097152|alias=service-control",
 		ConsensusModuleStreamId: 105,
 		ServiceStreamId:         104,
 		SnapshotChannel:         "aeron:ipc?alias=snapshot",
