@@ -603,13 +603,13 @@ func (archive *Archive) StopRecordingByPublication(publication aeron.Publication
 func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*aeron.Publication, error) {
 
 	// This can fail in aeron via log.Fatalf(), not much we can do
-	publication, err := archive.AddPublication(channel, stream)
+	publication, err := archive.AddExclusivePublication(channel, stream)
 	if err != nil {
 		return nil, err
 	}
-	if !publication.IsOriginal() {
-		return nil, fmt.Errorf("publication already added for channel=%s stream=%d", channel, stream)
-	}
+	// if !publication.IsOriginal() {
+	// 	return nil, fmt.Errorf("publication already added for channel=%s stream=%d", channel, stream)
+	// }
 
 	correlationID := nextCorrelationID()
 	logger.Debugf("AddRecordedPublication(), correlationID:%d", correlationID)
@@ -625,7 +625,7 @@ func (archive *Archive) AddRecordedPublication(channel string, stream int32) (*a
 
 	archive.mtx.Lock()
 	defer archive.mtx.Unlock()
-	if err := archive.Proxy.StartRecordingRequest(correlationID, stream, true, false, sessionChannel); err != nil {
+	if err := archive.Proxy.StartRecordingRequest(correlationID, stream, true, true, sessionChannel); err != nil {
 		publication.Close()
 		return nil, err
 	}
