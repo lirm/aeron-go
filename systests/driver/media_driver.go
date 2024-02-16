@@ -19,14 +19,15 @@ package driver
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/logging"
 	"os"
 	"os/exec"
 	"reflect"
 	"syscall"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/logging"
 )
 
 // Must match Java's `AERON_DIR_PROP_NAME`
@@ -111,7 +112,6 @@ func setupCmd(tempDir string) *exec.Cmd {
 		fmt.Sprintf("-D%s=%d", aeronPublicationUnblockTimeoutNs, 15*time.Minute.Nanoseconds()),
 		"-XX:+UnlockDiagnosticVMOptions",
 		"-XX:GuaranteedSafepointInterval=300000",
-		"-XX:BiasedLockingStartupDelay=0",
 		"-cp",
 		jarName,
 		mediaDriverClassName,
