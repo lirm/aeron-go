@@ -44,7 +44,7 @@ const aeronClientLivenessTimeoutNs = "aeron.client.liveness.timeout"
 // Must match Java's `PUBLICATION_UNBLOCK_TIMEOUT_PROP_NAME`, measured in nanos
 const aeronPublicationUnblockTimeoutNs = "aeron.publication.unblock.timeout"
 
-const jarName = "driver/aeron-all-1.39.0.jar"
+const jarName = "driver/aeron-all-1.43.0.jar"
 
 const mediaDriverClassName = "io.aeron.driver.MediaDriver"
 
