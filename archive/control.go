@@ -349,6 +349,8 @@ func (control *Control) PollForErrorResponse() (int, error) {
 	context := PollContext{control, 0}
 	received := 0
 
+	control.Results.ErrorResponse = nil
+
 	// Poll for async events, errors etc until the queue is drained
 	for {
 		ret := control.poll(

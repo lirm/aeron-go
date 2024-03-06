@@ -127,7 +127,6 @@ func TestControl_PollForErrorResponse(t *testing.T) {
 		cnt, err := control.PollForErrorResponse()
 		assert.EqualValues(t, 1, cnt)
 		assert.Error(t, err)
-		control.Results.ErrorResponse = nil // TODO: Should this really be necessary?
 		cnt, err = control.PollForErrorResponse()
 		assert.EqualValues(t, 1, cnt)
 		assert.NoError(t, err)
