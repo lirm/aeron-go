@@ -354,8 +354,9 @@ func (control *Control) PollForErrorResponse() (int, error) {
 	// Poll for async events, errors etc until the queue is drained
 	for {
 		ret := control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
 				errorResponseFragmentHandler(&context, buf, offset, length, header)
+				return term.ControlledPollActionContinue
 			}, 1)
 		received += ret
 
@@ -506,7 +507,7 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 
 // poll provides the control response poller using local state to pass
 // back data from the underlying subscription
-func (control *Control) poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (control *Control) poll(handler term.ControlledFragmentHandler, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = control.archive.Options.RangeChecking
@@ -514,7 +515,7 @@ func (control *Control) poll(handler term.FragmentHandler, fragmentLimit int) in
 	control.Results.ControlResponse = nil  // Clear old results
 	control.Results.IsPollComplete = false // Clear completion flag
 
-	return control.Subscription.Poll(handler, fragmentLimit)
+	return control.Subscription.ControlledPoll(handler, fragmentLimit)
 }
 
 // Poll for control response events. Returns number of fragments read during the operation.
@@ -607,8 +608,9 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 	start := time.Now()
 	context := PollContext{control, correlationID}
 
-	handler := aeron.NewFragmentAssembler(func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+	handler := aeron.NewControlledFragmentAssembler(func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
 		controlFragmentHandler(&context, buf, offset, length, header)
+		return term.ControlledPollActionContinue
 	}, aeron.DefaultFragmentAssemblyBufferLength)
 	for {
 		ret := control.poll(handler.OnFragment, 1)
@@ -799,8 +801,9 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 	for !control.Results.IsPollComplete {
 		logger.Debugf("PollForDescriptors(%d:%d, %d)", correlationID, sessionID, int(fragmentsWanted)-descriptorCount)
 		fragments := control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
 				DescriptorFragmentHandler(&pollContext, buf, offset, length, header)
+				return term.ControlledPollActionContinue
 			}, int(fragmentsWanted)-descriptorCount)
 		logger.Debugf("Poll(%d:%d) returned %d fragments", correlationID, sessionID, fragments)
 		descriptorCount = len(control.Results.RecordingDescriptors) + len(control.Results.RecordingSubscriptionDescriptors)
