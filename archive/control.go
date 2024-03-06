@@ -611,7 +611,7 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 		controlFragmentHandler(&context, buf, offset, length, header)
 	}, aeron.DefaultFragmentAssemblyBufferLength)
 	for {
-		ret := control.poll(handler.OnFragment, 10)
+		ret := control.poll(handler.OnFragment, 1)
 
 		// Check result
 		if control.Results.IsPollComplete {

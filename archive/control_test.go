@@ -62,7 +62,7 @@ func TestControl_PollForResponse(t *testing.T) {
 		assert.EqualError(t, err, `Control Response failure: b0rk`)
 	})
 
-	t.Run("discards messages after error", func(t *testing.T) { // TODO: Why?
+	t.Run("does not process messages after result", func(t *testing.T) {
 		control, image := newTestControl(t)
 		mockPollResponses(t, image,
 			&codecs.ControlResponse{
@@ -78,7 +78,7 @@ func TestControl_PollForResponse(t *testing.T) {
 		assert.EqualValues(t, 3, id)
 		assert.EqualError(t, err, `Control Response failure: b0rk`)
 		fragments := image.Poll(func(buffer *atomic.Buffer, offset, length int32, header *logbuffer.Header) {}, 1)
-		assert.Zero(t, fragments)
+		assert.EqualValues(t, 1, fragments)
 	})
 }
 
