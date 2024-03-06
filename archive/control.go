@@ -113,11 +113,17 @@ func init() {
 	codecIds.recordingStopped = recordingStopped.SbeTemplateId()
 }
 
-func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) (action term.ControlledPollAction) {
+	action = term.ControlledPollActionContinue
+
 	pollContext, ok := context.(*PollContext)
 	if !ok {
 		logger.Errorf("context conversion failed")
 		return
+	}
+
+	if pollContext.control.Results.IsPollComplete {
+		return term.ControlledPollActionAbort
 	}
 
 	logger.Debugf("controlFragmentHandler: correlationID:%d offset:%d length:%d header:%#v", pollContext.correlationID, offset, length, header)
@@ -170,6 +176,8 @@ func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset i
 			logger.Debugf("controlFragmentHandler/controlResponse: received for sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
 			control.Results.ControlResponse = controlResponse
 			control.Results.IsPollComplete = true
+
+			return term.ControlledPollActionBreak
 		} else {
 			logger.Debugf("controlFragmentHandler/controlResponse ignoring sessionID:%d, correlationID:%d", controlResponse.ControlSessionId, controlResponse.CorrelationId)
 		}
@@ -198,6 +206,7 @@ func controlFragmentHandler(context interface{}, buffer *atomic.Buffer, offset i
 		// This can happen when testing/adding new functionality
 		fmt.Printf("controlFragmentHandler: Unexpected message type %d\n", hdr.TemplateId)
 	}
+	return
 }
 
 // ConnectionControlFragmentHandler is the connection handling specific fragment handler.
@@ -349,12 +358,14 @@ func (control *Control) PollForErrorResponse() (int, error) {
 	context := PollContext{control, 0}
 	received := 0
 
+	control.Results.ErrorResponse = nil
+
 	// Poll for async events, errors etc until the queue is drained
 	for {
 		ret := control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-				errorResponseFragmentHandler(&context, buf, offset, length, header)
-			}, 1)
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
+				return errorResponseFragmentHandler(&context, buf, offset, length, header)
+			}, 10)
 		received += ret
 
 		// If we received a response with an error then return it
@@ -377,11 +388,17 @@ func (control *Control) PollForErrorResponse() (int, error) {
 //	ignore messages not on our session ID
 //	process recordingSignalEvents
 //	Log a warning if we have interrupted a synchronous event
-func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) (action term.ControlledPollAction) {
+	action = term.ControlledPollActionContinue
+
 	pollContext, ok := context.(*PollContext)
 	if !ok {
 		logger.Errorf("context conversion failed")
 		return
+	}
+
+	if pollContext.control.Results.ErrorResponse != nil {
+		return term.ControlledPollActionAbort
 	}
 
 	logger.Debugf("errorResponseFragmentHandler: offset:%d length: %d", offset, length)
@@ -419,6 +436,7 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 		if controlResponse.ControlSessionId == pollContext.control.archive.SessionID {
 			if controlResponse.Code == codecs.ControlResponseCode.ERROR {
 				pollContext.control.Results.ErrorResponse = fmt.Errorf("PollForErrorResponse received a ControlResponse (correlationId:%d Code:ERROR error=\"%s\"", controlResponse.CorrelationId, controlResponse.ErrorMessage)
+				return term.ControlledPollActionBreak
 			}
 		}
 		return
@@ -500,11 +518,13 @@ func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, of
 	default:
 		fmt.Printf("errorResponseFragmentHandler: Insert decoder for type: %d", hdr.TemplateId)
 	}
+
+	return
 }
 
 // poll provides the control response poller using local state to pass
 // back data from the underlying subscription
-func (control *Control) poll(handler term.FragmentHandler, fragmentLimit int) int {
+func (control *Control) poll(handler term.ControlledFragmentHandler, fragmentLimit int) int {
 
 	// Update our globals in case they've changed so we use the current state in our callback
 	rangeChecking = control.archive.Options.RangeChecking
@@ -512,7 +532,7 @@ func (control *Control) poll(handler term.FragmentHandler, fragmentLimit int) in
 	control.Results.ControlResponse = nil  // Clear old results
 	control.Results.IsPollComplete = false // Clear completion flag
 
-	return control.Subscription.Poll(handler, fragmentLimit)
+	return control.Subscription.ControlledPoll(handler, fragmentLimit)
 }
 
 // Poll for control response events. Returns number of fragments read during the operation.
@@ -605,8 +625,8 @@ func (control *Control) PollForResponse(correlationID int64, sessionID int64) (i
 	start := time.Now()
 	context := PollContext{control, correlationID}
 
-	handler := aeron.NewFragmentAssembler(func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
-		controlFragmentHandler(&context, buf, offset, length, header)
+	handler := aeron.NewControlledFragmentAssembler(func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
+		return controlFragmentHandler(&context, buf, offset, length, header)
 	}, aeron.DefaultFragmentAssemblyBufferLength)
 	for {
 		ret := control.poll(handler.OnFragment, 10)
@@ -797,8 +817,9 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 	for !control.Results.IsPollComplete {
 		logger.Debugf("PollForDescriptors(%d:%d, %d)", correlationID, sessionID, int(fragmentsWanted)-descriptorCount)
 		fragments := control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
 				DescriptorFragmentHandler(&pollContext, buf, offset, length, header)
+				return term.ControlledPollActionContinue
 			}, int(fragmentsWanted)-descriptorCount)
 		logger.Debugf("Poll(%d:%d) returned %d fragments", correlationID, sessionID, fragments)
 		descriptorCount = len(control.Results.RecordingDescriptors) + len(control.Results.RecordingSubscriptionDescriptors)
