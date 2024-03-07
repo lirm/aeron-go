@@ -7,7 +7,6 @@ on:
     branches: [ master ]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -21,8 +20,8 @@ jobs:
     - name: Set up Java
       uses: actions/setup-java@v4
       with:
-	distribution: 'zulu'
-	java-version: '21'
+        distribution: 'zulu'
+        java-version: '21'
 
     - name: Build
       run: go build -v ./...
