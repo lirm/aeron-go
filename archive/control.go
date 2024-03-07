@@ -359,6 +359,9 @@ func (control *Control) PollForErrorResponse() (int, error) {
 	received := 0
 
 	control.Results.ErrorResponse = nil
+	if !control.Subscription.IsConnected() {
+		return received, fmt.Errorf("not connected")
+	}
 
 	// Poll for async events, errors etc until the queue is drained
 	for {
