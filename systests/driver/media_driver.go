@@ -61,6 +61,7 @@ func StartMediaDriver() (*MediaDriver, error) {
 	tempDir := aeronUniqueTempDir()
 	cmd := setupCmd(tempDir)
 	setupPdeathsig(cmd)
+	logger.Infof("Starting Media Driver with command line: %s", cmd)
 	if err := cmd.Start(); err != nil {
 		logger.Error("couldn't start Media Driver: ", err)
 		return nil, err
@@ -105,6 +106,7 @@ func aeronUniqueTempDir() string {
 func setupCmd(tempDir string) *exec.Cmd {
 	cmd := exec.Command(
 		"java",
+		"--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
 		fmt.Sprintf("-D%s=%s", aeronDirPropName, tempDir),
 		fmt.Sprintf("-D%s=true", aeronDirDeleteStartPropName),
 		fmt.Sprintf("-D%s=true", aeronDirDeleteShutdownPropName),
