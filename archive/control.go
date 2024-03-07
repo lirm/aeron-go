@@ -72,6 +72,8 @@ const (
 	ControlStateTimedOut           = iota
 )
 
+var ErrNotConnected = fmt.Errorf("not connected")
+
 // Used internally to handle connection state
 type controlState struct {
 	state int
@@ -360,7 +362,7 @@ func (control *Control) PollForErrorResponse() (int, error) {
 
 	control.Results.ErrorResponse = nil
 	if !control.Subscription.IsConnected() {
-		return received, fmt.Errorf("not connected")
+		return received, ErrNotConnected
 	}
 
 	// Poll for async events, errors etc until the queue is drained
