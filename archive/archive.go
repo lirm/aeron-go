@@ -225,6 +225,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.Control.archive = archive
 	archive.Control.fragmentAssembler = aeron.NewControlledFragmentAssembler(
 		archive.Control.onFragment, aeron.DefaultFragmentAssemblyBufferLength)
+	archive.Control.errorFragmentHandler = archive.Control.errorResponseFragmentHandler
 
 	// Setup the Proxy (publisher/request)
 	archive.Proxy = new(Proxy)

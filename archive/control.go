@@ -38,6 +38,8 @@ type Control struct {
 
 	archive           *Archive // link to parent
 	fragmentAssembler *aeron.ControlledFragmentAssembler
+
+	errorFragmentHandler term.ControlledFragmentHandler
 }
 
 // ControlResults for holding state over a Control request/response
@@ -355,9 +357,6 @@ func ConnectionControlFragmentHandler(context *PollContext, buffer *atomic.Buffe
 // Returns an error if we detect an archive operation in progress
 // and a count of how many messages were consumed
 func (control *Control) PollForErrorResponse() (int, error) {
-
-	logger.Debugf("PollForErrorResponse(%d)", control.archive.SessionID)
-	context := PollContext{control, 0}
 	received := 0
 
 	control.Results.ErrorResponse = nil
@@ -367,10 +366,7 @@ func (control *Control) PollForErrorResponse() (int, error) {
 
 	// Poll for async events, errors etc until the queue is drained
 	for {
-		ret := control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
-				return errorResponseFragmentHandler(&context, buf, offset, length, header)
-			}, 10)
+		ret := control.poll(control.errorFragmentHandler, 10)
 		received += ret
 
 		// If we received a response with an error then return it
@@ -393,16 +389,12 @@ func (control *Control) PollForErrorResponse() (int, error) {
 //	ignore messages not on our session ID
 //	process recordingSignalEvents
 //	Log a warning if we have interrupted a synchronous event
-func errorResponseFragmentHandler(context interface{}, buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) (action term.ControlledPollAction) {
+func (control *Control) errorResponseFragmentHandler(buffer *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) (action term.ControlledPollAction) {
 	action = term.ControlledPollActionContinue
 
-	pollContext, ok := context.(*PollContext)
-	if !ok {
-		logger.Errorf("context conversion failed")
-		return
-	}
+	pollContext := PollContext{control, 0}
 
-	if pollContext.control.Results.ErrorResponse != nil {
+	if control.Results.ErrorResponse != nil {
 		return term.ControlledPollActionAbort
 	}
 
