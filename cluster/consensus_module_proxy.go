@@ -39,7 +39,7 @@ func newConsensusModuleProxy(
 // publication. Responses will be processed on the control
 
 // ConnectRequest packet and send
-func (proxy *consensusModuleProxy) serviceAckRequest(
+func (proxy *consensusModuleProxy) ack(
 	logPosition int64,
 	timestamp int64,
 	ackID int64,
@@ -108,16 +108,15 @@ func (proxy *consensusModuleProxy) send(payload []byte) {
 }
 
 func (proxy *consensusModuleProxy) offer(buffer *atomic.Buffer, offset, length int32) int64 {
-	var result int64
-	for i := 0; i < 3; i++ {
-		result = proxy.publication.Offer(buffer, offset, length, nil)
-		if result >= 0 {
-			break
-		} else if result == aeron.NotConnected || result == aeron.PublicationClosed || result == aeron.MaxPositionExceeded {
-			panic(fmt.Sprintf("offer failed, result=%d", result))
-		}
-	}
+	result := proxy.publication.Offer(buffer, offset, length, nil)
+	checkResult(result)
 	return result
+}
+
+func checkResult(result int64) {
+	if result == aeron.NotConnected || result == aeron.PublicationClosed || result == aeron.MaxPositionExceeded {
+		panic(fmt.Sprintf("unexpected publication state, result=%d", result))
+	}
 }
 
 func (proxy *consensusModuleProxy) Offer2(

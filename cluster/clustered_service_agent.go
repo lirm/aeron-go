@@ -46,7 +46,7 @@ type ClusteredServiceAgent struct {
 	aeronClient              *aeron.Aeron
 	aeronCtx                 *aeron.Context
 	opts                     *Options
-	proxy                    *consensusModuleProxy
+	consensusModuleProxy     *consensusModuleProxy
 	counters                 *counters.Reader
 	serviceAdapter           *serviceAdapter
 	logAdapter               *boundedLogAdapter
@@ -121,20 +121,20 @@ func NewClusteredServiceAgent(
 	}
 
 	agent := &ClusteredServiceAgent{
-		aeronClient:         aeronClient,
-		opts:                options,
-		serviceAdapter:      serviceAdapter,
-		logAdapter:          logAdapter,
-		aeronCtx:            aeronCtx,
-		proxy:               proxy,
-		counters:            countersReader,
-		markFile:            cmf,
-		role:                Follower,
-		service:             service,
-		logPosition:         NullPosition,
-		terminationPosition: NullPosition,
-		sessions:            map[int64]ClientSession{},
-		sessionMsgHdrBuffer: codecs.MakeClusterMessageBuffer(SessionMessageHeaderTemplateId, SessionMessageHdrBlockLength),
+		aeronClient:          aeronClient,
+		opts:                 options,
+		serviceAdapter:       serviceAdapter,
+		logAdapter:           logAdapter,
+		aeronCtx:             aeronCtx,
+		consensusModuleProxy: proxy,
+		counters:             countersReader,
+		markFile:             cmf,
+		role:                 Follower,
+		service:              service,
+		logPosition:          NullPosition,
+		terminationPosition:  NullPosition,
+		sessions:             map[int64]ClientSession{},
+		sessionMsgHdrBuffer:  codecs.MakeClusterMessageBuffer(SessionMessageHeaderTemplateId, SessionMessageHdrBlockLength),
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
@@ -193,7 +193,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	agent.sessionMsgHdrBuffer.PutInt64(SBEHeaderLength, leadershipTermId)
 	agent.isServiceActive = true
 
-	if leadershipTermId == -1 {
+	if leadershipTermId == NullValue {
 		agent.service.OnStart(agent, nil)
 	} else {
 		serviceCount, err := agent.counters.GetKeyPartInt32(counterId, 28)
@@ -212,7 +212,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		}
 	}
 
-	agent.proxy.serviceAckRequest(
+	agent.consensusModuleProxy.ack(
 		agent.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
@@ -319,7 +319,7 @@ func (agent *ClusteredServiceAgent) pollServiceAdapter() {
 func (agent *ClusteredServiceAgent) terminate() {
 	agent.isServiceActive = false
 	agent.service.OnTerminate(agent)
-	agent.proxy.serviceAckRequest(
+	agent.consensusModuleProxy.ack(
 		agent.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
@@ -398,7 +398,7 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) error {
 	agent.logAdapter.image = img
 	agent.logAdapter.maxLogPosition = event.maxLogPosition
 
-	agent.proxy.serviceAckRequest(
+	agent.consensusModuleProxy.ack(
 		event.logPosition,
 		agent.clusterTime,
 		agent.getAndIncrementNextAckId(),
@@ -550,13 +550,20 @@ func (agent *ClusteredServiceAgent) onServiceAction(
 ) {
 	agent.logPosition = logPos
 	agent.clusterTime = timestamp
+	agent.executeAction(action, logPos, leadershipTermId)
+}
+
+func (agent *ClusteredServiceAgent) executeAction(
+	action codecs.ClusterActionEnum,
+	logPosition,
+	leadershipTermId int64,
+) {
 	if action == codecs.ClusterAction.SNAPSHOT {
-		recordingId, err := agent.takeSnapshot(logPos, leadershipTermId)
+		recordingId, err := agent.takeSnapshot(logPosition, leadershipTermId)
 		if err != nil {
 			logger.Errorf("take snapshot failed: ", err)
-		} else {
-			agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, agent.opts.ServiceId)
 		}
+		agent.consensusModuleProxy.ack(logPosition, agent.clusterTime, agent.getAndIncrementNextAckId(), recordingId, agent.opts.ServiceId)
 	}
 }
 
@@ -636,7 +643,6 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 		}
 		agent.Idle(0)
 	}
-	return NullValue, fmt.Errorf("timed out waiting for recordingId for sessionId=%d", sessionId)
 }
 
 func (agent *ClusteredServiceAgent) onServiceTerminationPosition(position int64) {
@@ -675,7 +681,7 @@ func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, b
 func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
 	if _, ok := agent.sessions[id]; ok {
 		// TODO: check if session already closed
-		agent.proxy.closeSessionRequest(id)
+		agent.consensusModuleProxy.closeSessionRequest(id)
 	} else {
 		logger.Errorf("closeClientSession: unknown session id=%d", id)
 	}
@@ -736,18 +742,18 @@ func (agent *ClusteredServiceAgent) IdleStrategy() idlestrategy.Idler {
 }
 
 func (agent *ClusteredServiceAgent) ScheduleTimer(correlationId int64, deadline int64) bool {
-	return agent.proxy.scheduleTimer(correlationId, deadline)
+	return agent.consensusModuleProxy.scheduleTimer(correlationId, deadline)
 }
 
 func (agent *ClusteredServiceAgent) CancelTimer(correlationId int64) bool {
-	return agent.proxy.cancelTimer(correlationId)
+	return agent.consensusModuleProxy.cancelTimer(correlationId)
 }
 
 func (agent *ClusteredServiceAgent) Offer(buffer *atomic.Buffer, offset, length int32) int64 {
 	hdrBuf := agent.sessionMsgHdrBuffer
 	hdrBuf.PutInt64(SBEHeaderLength+8, int64(agent.opts.ServiceId))
 	hdrBuf.PutInt64(SBEHeaderLength+16, agent.clusterTime)
-	return agent.proxy.Offer2(hdrBuf, 0, hdrBuf.Capacity(), buffer, offset, length)
+	return agent.consensusModuleProxy.Offer2(hdrBuf, 0, hdrBuf.Capacity(), buffer, offset, length)
 }
 
 // END CLUSTER IMPLEMENTATION
