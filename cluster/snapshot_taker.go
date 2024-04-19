@@ -100,7 +100,7 @@ func (st *snapshotTaker) offer(bytes []byte) int64 {
 			st.options.IdleStrategy.Idle(0)
 		// Fail on these
 		case aeron.NotConnected, aeron.PublicationClosed, aeron.MaxPositionExceeded:
-			logger.Warningf("unexpected publication state: %d", ret)
+			logger.Warningf("cluster exception - unexpected publication state: %d", ret)
 			return ret
 		}
 	}
