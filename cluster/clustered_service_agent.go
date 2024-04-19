@@ -652,6 +652,26 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	return recordingId, nil
 }
 
+func (agent *ClusteredServiceAgent) awaitRecordingComplete(sessionId int32, arch *archive.Archive) (int64, error) {
+	for {
+		recId := int64(NullValue)
+		counterId := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
+			if keyBuffer.GetInt32(8) == sessionId {
+				recId = keyBuffer.GetInt64(0)
+				return true
+			}
+			return false
+		})
+		if _, err := arch.PollForErrorResponse(); err != nil {
+			return NullValue, err
+		}
+		if counterId != NullValue {
+			return recId, nil
+		}
+		agent.Idle(0)
+	}
+}
+
 func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, error) {
 	start := time.Now()
 	for time.Since(start) < agent.opts.Timeout {
