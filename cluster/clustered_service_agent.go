@@ -652,7 +652,7 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	return recordingId, nil
 }
 
-func (agent *ClusteredServiceAgent) awaitRecordingComplete(sessionId int32, arch *archive.Archive) (int64, error) {
+func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32, arch *archive.Archive) (int64, error) {
 	for {
 		recId := int64(NullValue)
 		counterId := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
@@ -672,7 +672,7 @@ func (agent *ClusteredServiceAgent) awaitRecordingComplete(sessionId int32, arch
 	}
 }
 
-func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, error) {
+func (agent *ClusteredServiceAgent) awaitRecordingIdWithTimeout(sessionId int32) (int64, error) {
 	start := time.Now()
 	for time.Since(start) < agent.opts.Timeout {
 		recId := int64(NullValue)
