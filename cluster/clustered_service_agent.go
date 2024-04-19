@@ -648,6 +648,9 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	}
 	agent.checkForClockTick()
 	agent.service.OnTakeSnapshot(pub)
+	if err = agent.awaitRecordingComplete(recordingId, pub.Position(), counterId, arch); err != nil {
+		return 0, err
+	}
 
 	return recordingId, nil
 }
@@ -672,7 +675,16 @@ func (agent *ClusteredServiceAgent) awaitRecordingCounterAndId(sessionId int32, 
 	}
 }
 
+func (agent *ClusteredServiceAgent) awaitRecordingComplete(recordingId int64, position int64, counterId int32, arch *archive.Archive) error {
+	for agent.counters.GetCounterValue(counterId) < position {
 		agent.Idle(0)
+		if _, err := arch.PollForErrorResponse(); err != nil {
+			return err
+		}
+
+		if archive.IsRecordingActive(agent.counters, counterId, recordingId) {
+			return fmt.Errorf("cluster exception - recording stopped unexpectedly: %d", recordingId)
+		}
 	}
 	return nil
 }
