@@ -682,7 +682,7 @@ func (agent *ClusteredServiceAgent) awaitRecordingComplete(recordingId int64, po
 			return err
 		}
 
-		if archive.IsRecordingActive(agent.counters, counterId, recordingId) {
+		if !archive.IsRecordingActive(agent.counters, counterId, recordingId) {
 			return fmt.Errorf("cluster exception - recording stopped unexpectedly: %d", recordingId)
 		}
 	}
