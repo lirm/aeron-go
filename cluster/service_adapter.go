@@ -65,7 +65,13 @@ func (adapter *serviceAdapter) onFragment(
 	case serviceTerminationPosTemplateId:
 		logPos := buffer.GetInt64(offset)
 		adapter.agent.onServiceTerminationPosition(logPos)
+
+	case RequestServiceAckId:
+		logPos := buffer.GetInt64(offset)
+		adapter.agent.OnRequestServiceAck(logPos)
+
 	default:
 		logger.Debugf("serviceAdapter: unexpected templateId=%d at pos=%d", templateId, header.Position())
 	}
+
 }

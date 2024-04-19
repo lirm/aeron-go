@@ -9,8 +9,8 @@ type Role int32
 
 const (
 	Follower  Role = 0
-	Candidate      = 1
-	Leader         = 2
+	Candidate Role = 1
+	Leader    Role = 2
 )
 
 const (
@@ -34,6 +34,7 @@ const (
 	serviceTerminationPosTemplateId = 42
 	snapshotMarkerTemplateId        = 100
 	clientSessionTemplateId         = 102
+	RequestServiceAckId             = 108
 )
 
 const SessionMessageHdrBlockLength = 24
