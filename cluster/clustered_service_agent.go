@@ -510,6 +510,7 @@ func (agent *ClusteredServiceAgent) onSessionClose(
 
 	if session, ok := agent.sessions[clusterSessionId]; ok {
 		delete(agent.sessions, clusterSessionId)
+		session.Disconnect()
 		agent.service.OnSessionClose(session, timestamp, closeReason)
 	} else {
 		logger.Errorf("onSessionClose: unknown session - id=%d leaderTermId=%d logPos=%d reason=%v",

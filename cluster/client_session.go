@@ -34,6 +34,7 @@ type ClientSession interface {
 	// IsClosing() bool
 	Offer(*atomic.Buffer, int32, int32, term.ReservedValueSupplier) int64
 	// TryClaim(...)
+	Disconnect()
 }
 
 type containerClientSession struct {
@@ -86,6 +87,13 @@ func (s *containerClientSession) Close() {
 	if _, ok := s.agent.getClientSession(s.id); ok {
 		s.agent.closeClientSession(s.id)
 	}
+}
+
+func (s *containerClientSession) Disconnect() {
+	if err := s.response.Close(); err != nil {
+		logger.Warningf("Failed to disconnect publication: %v", err)
+	}
+	s.response = nil
 }
 
 func (s *containerClientSession) Offer(
