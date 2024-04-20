@@ -628,7 +628,7 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	}
 	defer closePublication(pub)
 
-	recordingId, counterId, err := agent.awaitRecordingCounterAndId(pub.SessionID(), arch)
+	recordingId, counterId, err := agent.awaitRecordingCounterAndId(pub.SessionID())
 	if err != nil {
 		return 0, err
 	}
@@ -647,6 +647,9 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 		return 0, err
 	}
 	agent.checkForClockTick()
+	if _, err := arch.PollForErrorResponse(); err != nil {
+		return 0, err
+	}
 	agent.service.OnTakeSnapshot(pub)
 	if err = agent.awaitRecordingComplete(recordingId, pub.Position(), counterId, arch); err != nil {
 		return 0, err
@@ -655,7 +658,7 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	return recordingId, nil
 }
 
-func (agent *ClusteredServiceAgent) awaitRecordingCounterAndId(sessionId int32, arch *archive.Archive) (int64, int32, error) {
+func (agent *ClusteredServiceAgent) awaitRecordingCounterAndId(sessionId int32) (int64, int32, error) {
 	for {
 		recId := int64(NullValue)
 		counterId := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
@@ -665,9 +668,6 @@ func (agent *ClusteredServiceAgent) awaitRecordingCounterAndId(sessionId int32, 
 			}
 			return false
 		})
-		if _, err := arch.PollForErrorResponse(); err != nil {
-			return NullValue, counterId, err
-		}
 		if counterId != NullValue {
 			return recId, counterId, nil
 		}
