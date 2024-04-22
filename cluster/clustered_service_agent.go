@@ -403,6 +403,10 @@ type activeLogEvent struct {
 }
 
 func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) error {
+	if event.role != Leader {
+		agent.disconnectEgress()
+	}
+
 	logSub, err := agent.aeronClient.AddSubscription(event.logChannel, event.logStreamId)
 	if err != nil {
 		return err
@@ -442,7 +446,14 @@ func (agent *ClusteredServiceAgent) closeLog() {
 	if err := agent.logAdapter.Close(); err != nil {
 		logger.Errorf("error closing log image: %v", err)
 	}
+	agent.disconnectEgress()
 	agent.setRole(Follower)
+}
+
+func (agent *ClusteredServiceAgent) disconnectEgress() {
+	for _, session := range agent.sessions {
+		session.Disconnect()
+	}
 }
 
 func (agent *ClusteredServiceAgent) setRole(newRole Role) {
