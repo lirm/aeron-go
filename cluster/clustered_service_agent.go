@@ -628,7 +628,7 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 	}
 	defer closePublication(pub)
 
-	recordingId, err := agent.awaitRecordingId(pub.SessionID())
+	recordingId, counterId, err := agent.awaitRecordingCounterAndId(pub.SessionID())
 	if err != nil {
 		return 0, err
 	}
@@ -647,14 +647,19 @@ func (agent *ClusteredServiceAgent) takeSnapshot(logPos int64, leadershipTermId 
 		return 0, err
 	}
 	agent.checkForClockTick()
+	if _, err := arch.PollForErrorResponse(); err != nil {
+		return 0, err
+	}
 	agent.service.OnTakeSnapshot(pub)
+	if err = agent.awaitRecordingComplete(recordingId, pub.Position(), counterId, arch); err != nil {
+		return 0, err
+	}
 
 	return recordingId, nil
 }
 
-func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, error) {
-	start := time.Now()
-	for time.Since(start) < agent.opts.Timeout {
+func (agent *ClusteredServiceAgent) awaitRecordingCounterAndId(sessionId int32) (int64, int32, error) {
+	for {
 		recId := int64(NullValue)
 		counterId := agent.counters.FindCounter(recordingPosCounterTypeId, func(keyBuffer *atomic.Buffer) bool {
 			if keyBuffer.GetInt32(8) == sessionId {
@@ -664,11 +669,24 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 			return false
 		})
 		if counterId != NullValue {
-			return recId, nil
+			return recId, counterId, nil
 		}
 		agent.Idle(0)
 	}
-	return NullValue, fmt.Errorf("timed out waiting for recordingId for sessionId=%d", sessionId)
+}
+
+func (agent *ClusteredServiceAgent) awaitRecordingComplete(recordingId int64, position int64, counterId int32, arch *archive.Archive) error {
+	for agent.counters.GetCounterValue(counterId) < position {
+		agent.Idle(0)
+		if _, err := arch.PollForErrorResponse(); err != nil {
+			return err
+		}
+
+		if !archive.IsRecordingActive(agent.counters, counterId, recordingId) {
+			return fmt.Errorf("cluster exception - recording stopped unexpectedly: %d", recordingId)
+		}
+	}
+	return nil
 }
 
 func (agent *ClusteredServiceAgent) onServiceTerminationPosition(position int64) {

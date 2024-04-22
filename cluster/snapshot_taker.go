@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
@@ -89,19 +88,20 @@ func (st *snapshotTaker) snapshotSession(session ClientSession) error {
 func (st *snapshotTaker) offer(bytes []byte) int64 {
 	buffer := atomic.MakeBuffer(bytes)
 	length := int32(len(bytes))
-	start := time.Now()
 	var ret int64
-	for time.Since(start) < st.options.Timeout {
+	for {
 		ret = st.publication.Offer(buffer, 0, length, nil)
+		if ret > 0 {
+			return ret
+		}
 		switch ret {
 		// Retry on these
-		case aeron.NotConnected, aeron.BackPressured, aeron.AdminAction:
+		case aeron.BackPressured, aeron.AdminAction:
 			st.options.IdleStrategy.Idle(0)
-		// Fail or succeed on other values
-		default:
+		// Fail on these
+		case aeron.NotConnected, aeron.PublicationClosed, aeron.MaxPositionExceeded:
+			logger.Warningf("cluster exception - unexpected publication state: %d", ret)
 			return ret
 		}
 	}
-	// Give up, returning the last failure
-	return ret
 }
