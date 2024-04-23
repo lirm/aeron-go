@@ -76,7 +76,10 @@ func (loader *snapshotLoader) onFragment(
 			loader.isDone = true
 		} else if marker.TypeId != snapshotTypeId {
 			loader.err = fmt.Errorf("unexpected snapshot type: %d", marker.TypeId)
-		} else if marker.Mark == codecs.SnapshotMark.BEGIN {
+			loader.isDone = true
+		}
+		switch marker.Mark {
+		case codecs.SnapshotMark.BEGIN:
 			if loader.inSnapshot {
 				loader.err = fmt.Errorf("already in snapshot, pos=%d", header.Position())
 				loader.isDone = true
@@ -85,7 +88,7 @@ func (loader *snapshotLoader) onFragment(
 				loader.appVersion = marker.AppVersion
 				loader.timeUnit = marker.TimeUnit
 			}
-		} else if marker.Mark == codecs.SnapshotMark.END {
+		case codecs.SnapshotMark.END:
 			if !loader.inSnapshot {
 				loader.err = fmt.Errorf("missing beging snapshot, pos=%d", header.Position())
 				loader.isDone = true
@@ -93,10 +96,12 @@ func (loader *snapshotLoader) onFragment(
 				loader.inSnapshot = false
 				loader.isDone = true
 			}
-		} else {
+
+		case codecs.SnapshotMark.SECTION, codecs.SnapshotMark.NullValue:
 			loader.err = fmt.Errorf("unexpected snapshot mark, pos=%d inSnapshot=%v mark=%v", header.Position(), loader.inSnapshot, marker.Mark)
 			loader.isDone = true
 		}
+
 	case clientSessionTemplateId:
 		s := codecs.ClientSession{}
 		if err := s.Decode(loader.marshaller, buf, version, blockLength, true); err != nil {

@@ -173,7 +173,11 @@ func (agent *ClusteredServiceAgent) OnStart() error {
 	if err := agent.awaitCommitPositionCounter(); err != nil {
 		return err
 	}
-	return agent.recoverState()
+	if err := agent.recoverState(); err != nil {
+		return err
+	}
+	agent.isServiceActive = true
+	return nil
 }
 
 func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
@@ -192,29 +196,21 @@ func (agent *ClusteredServiceAgent) awaitCommitPositionCounter() error {
 }
 
 func (agent *ClusteredServiceAgent) recoverState() error {
-	counterId, leadershipTermId := agent.awaitRecoveryCounter()
+	recoveryCounterId, leadershipTermId := agent.awaitRecoveryCounter()
 	logger.Debugf("found recovery counter - id=%d leadershipTermId=%d logPos=%d clusterTime=%d",
-		counterId, leadershipTermId, agent.logPosition, agent.clusterTime)
+		recoveryCounterId, leadershipTermId, agent.logPosition, agent.clusterTime)
 	agent.sessionMsgHdrBuffer.PutInt64(SBEHeaderLength, leadershipTermId)
-	agent.isServiceActive = true
 
-	if leadershipTermId == NullValue {
-		agent.service.OnStart(agent, nil)
-	} else {
-		serviceCount, err := agent.counters.GetKeyPartInt32(counterId, 28)
-		if err != nil {
-			return err
-		}
-		if serviceCount < 1 {
-			return fmt.Errorf("invalid service count: %d", serviceCount)
-		}
-		snapshotRecId, err := agent.counters.GetKeyPartInt64(counterId, 32+(agent.opts.ServiceId*util.SizeOfInt64))
+	if leadershipTermId != NullValue {
+		snapshotRecId, err := getSnapshotRecordingID(agent.counters, recoveryCounterId, agent.opts.ServiceId)
 		if err != nil {
 			return err
 		}
 		if err := agent.loadSnapshot(snapshotRecId); err != nil {
 			return err
 		}
+	} else {
+		agent.service.OnStart(agent, nil)
 	}
 
 	ackId := agent.getAndIncrementNextAckId()
@@ -228,6 +224,17 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		agent.Idle(0)
 	}
 	return nil
+}
+
+func getSnapshotRecordingID(counters *counters.Reader, recoveryCounterId, serviceId int32) (int64, error) {
+	serviceCount, err := counters.GetKeyPartInt32(recoveryCounterId, 28)
+	if err != nil {
+		return 0, err
+	}
+	if serviceId < 0 || serviceId >= serviceCount {
+		return 0, fmt.Errorf("invalid service id %d for count of: %d", serviceId, serviceCount)
+	}
+	return counters.GetKeyPartInt64(recoveryCounterId, 32+(serviceId*util.SizeOfInt64))
 }
 
 func (agent *ClusteredServiceAgent) awaitRecoveryCounter() (int32, int64) {
@@ -267,8 +274,7 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 		return err
 	}
 
-	logger.Debugf("replaying snapshot - recId=%d sessionId=%d streamId=%d",
-		recordingId, replaySessionId, streamId)
+	logger.Debugf("replaying snapshot - recId=%d sessionId=%d streamId=%d", recordingId, replaySessionId, streamId)
 	subscription, err := arch.AddSubscription(subChannel, streamId)
 	if err != nil {
 		return err
@@ -276,18 +282,39 @@ func (agent *ClusteredServiceAgent) loadSnapshot(recordingId int64) error {
 	defer closeSubscription(subscription)
 
 	img := agent.awaitImage(int32(replaySessionId), subscription)
-	loader := newSnapshotLoader(agent, img)
-	for !loader.isDone {
-		agent.opts.IdleStrategy.Idle(loader.poll())
+	if err = agent.loadState(img, arch); err != nil {
+		return err
 	}
-	if util.SemanticVersionMajor(uint32(agent.opts.AppVersion)) != util.SemanticVersionMajor(uint32(loader.appVersion)) {
-		panic(fmt.Errorf("incompatible app version: %v snapshot=%v",
-			util.SemanticVersionToString(uint32(agent.opts.AppVersion)),
-			util.SemanticVersionToString(uint32(loader.appVersion))))
-	}
-	agent.timeUnit = loader.timeUnit
 	agent.service.OnStart(agent, img)
 	return nil
+}
+
+func (agent *ClusteredServiceAgent) loadState(image aeron.Image, archive *archive.Archive) (err error) {
+	snapshotLoader := newSnapshotLoader(agent, image)
+	for !snapshotLoader.isDone {
+		fragments := snapshotLoader.poll()
+		if fragments == 0 {
+			if _, err = archive.PollForErrorResponse(); err != nil {
+				return err
+			}
+			if image.IsClosed() {
+				return fmt.Errorf("cluster exception - snapshot ended unexpectedly: %v", image)
+			}
+		}
+		agent.opts.IdleStrategy.Idle(fragments)
+	}
+
+	if snapshotLoader.err != nil {
+		return snapshotLoader.err
+	}
+
+	if util.SemanticVersionMajor(uint32(agent.opts.AppVersion)) != util.SemanticVersionMajor(uint32(snapshotLoader.appVersion)) {
+		panic(fmt.Errorf("incompatible app version: %v snapshot=%v",
+			util.SemanticVersionToString(uint32(agent.opts.AppVersion)),
+			util.SemanticVersionToString(uint32(snapshotLoader.appVersion))))
+	}
+	agent.timeUnit = snapshotLoader.timeUnit
+	return
 }
 
 func (agent *ClusteredServiceAgent) addSessionFromSnapshot(session *containerClientSession) {
