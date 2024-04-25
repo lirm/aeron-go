@@ -639,7 +639,6 @@ func (agent *ClusteredServiceAgent) executeAction(
 		recordingId, err := agent.takeSnapshot(logPosition, leadershipTermId)
 		if err != nil {
 			logger.Errorf("take snapshot failed: ", err)
-			return
 		}
 
 		ackId := agent.getAndIncrementNextAckId()
