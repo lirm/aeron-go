@@ -473,7 +473,7 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) error {
 
 	ackId := agent.getAndIncrementNextAckId()
 	logger.Infof("ack :: joinActiveLog :: start :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
-	for agent.consensusModuleProxy.ack(
+	for !agent.consensusModuleProxy.ack(
 		event.logPosition,
 		agent.clusterTime,
 		ackId,
@@ -651,7 +651,7 @@ func (agent *ClusteredServiceAgent) executeAction(
 
 		ackId := agent.getAndIncrementNextAckId()
 		logger.Infof("ack :: executeAction :: start :: ackId=%d, clusterTime=%d, recordingId=%d, serviceId=%d", ackId, agent.clusterTime, recordingId, agent.opts.ServiceId)
-		for agent.consensusModuleProxy.ack(logPosition, agent.clusterTime, ackId, recordingId, agent.opts.ServiceId) {
+		for !agent.consensusModuleProxy.ack(logPosition, agent.clusterTime, ackId, recordingId, agent.opts.ServiceId) {
 			agent.Idle(0)
 		}
 		logger.Infof("ack :: executeAction :: end :: ackId=%d, clusterTime=%d, recordingId=%d, serviceId=%d", ackId, agent.clusterTime, recordingId, agent.opts.ServiceId)
