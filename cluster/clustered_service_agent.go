@@ -214,6 +214,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	}
 
 	ackId := agent.getAndIncrementNextAckId()
+	logger.Infof("ack :: recoveryState :: start :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 	for !agent.consensusModuleProxy.ack(
 		agent.logPosition,
 		agent.clusterTime,
@@ -223,6 +224,7 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 	) {
 		agent.Idle(0)
 	}
+	logger.Infof("ack :: recoveryState :: end :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 	return nil
 }
 
@@ -367,9 +369,11 @@ func (agent *ClusteredServiceAgent) pollServiceAdapter() {
 			logger.Errorf("invalid ack request: logPos=%d > requestedAckPos=%d", agent.logPosition, agent.requestedAckPosition)
 		}
 		ackId := agent.getAndIncrementNextAckId()
+		logger.Infof("ack :: pollServiceAdapter :: start :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 		for !agent.consensusModuleProxy.ack(agent.logPosition, agent.clusterTime, ackId, NullValue, agent.opts.ServiceId) {
 			agent.Idle(0)
 		}
+		logger.Infof("ack :: pollServiceAdapter :: end :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 		agent.requestedAckPosition = NullPosition
 	}
 }
@@ -379,6 +383,7 @@ func (agent *ClusteredServiceAgent) terminate() {
 	agent.service.OnTerminate(agent)
 	attempts := 5
 	ackId := agent.getAndIncrementNextAckId()
+	logger.Infof("ack :: terminate :: start :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 	for attempts > 0 && !agent.consensusModuleProxy.ack(
 		agent.logPosition,
 		agent.clusterTime,
@@ -389,6 +394,7 @@ func (agent *ClusteredServiceAgent) terminate() {
 		attempts--
 		agent.Idle(0)
 	}
+	logger.Infof("ack :: terminate :: end :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 	agent.terminationPosition = NullPosition
 }
 
@@ -466,6 +472,7 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) error {
 	agent.logAdapter.maxLogPosition = event.maxLogPosition
 
 	ackId := agent.getAndIncrementNextAckId()
+	logger.Infof("ack :: joinActiveLog :: start :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 	for agent.consensusModuleProxy.ack(
 		event.logPosition,
 		agent.clusterTime,
@@ -475,6 +482,7 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) error {
 	) {
 		agent.Idle(0)
 	}
+	logger.Infof("ack :: joinActiveLog :: end :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
 	agent.memberId = event.memberId
 	agent.markFile.flyweight.MemberId.Set(agent.memberId)
 
@@ -642,9 +650,11 @@ func (agent *ClusteredServiceAgent) executeAction(
 		}
 
 		ackId := agent.getAndIncrementNextAckId()
+		logger.Infof("ack :: executeAction :: start :: ackId=%d, clusterTime=%d, recordingId=%d, serviceId=%d", ackId, agent.clusterTime, recordingId, agent.opts.ServiceId)
 		for agent.consensusModuleProxy.ack(logPosition, agent.clusterTime, ackId, recordingId, agent.opts.ServiceId) {
 			agent.Idle(0)
 		}
+		logger.Infof("ack :: executeAction :: end :: ackId=%d, clusterTime=%d, recordingId=%d, serviceId=%d", ackId, agent.clusterTime, recordingId, agent.opts.ServiceId)
 	}
 }
 
