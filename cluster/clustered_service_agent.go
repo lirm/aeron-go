@@ -137,6 +137,7 @@ func NewClusteredServiceAgent(
 		terminationPosition:  NullPosition,
 		sessions:             map[int64]ClientSession{},
 		sessionMsgHdrBuffer:  codecs.MakeClusterMessageBuffer(SessionMessageHeaderTemplateId, SessionMessageHdrBlockLength),
+		requestedAckPosition: NullPosition,
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
