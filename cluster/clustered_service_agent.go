@@ -40,6 +40,16 @@ const (
 	recoveryStateCounterTypeId = 204
 )
 
+type LifeCycleCallback int8
+
+const (
+	LIFECYCLE_CALLBACK_NONE = iota
+	LIFECYCLE_CALLBACK_ON_START
+	LIFECYCLE_CALLBACK_ON_TERMINATE
+	LIFECYCLE_CALLBACK_ON_ROLE_CHANGE
+	LIFECYCLE_CALLBACK_DO_BACKGROUND_WORK // noop in aeron-go ver
+)
+
 var logger = logging.MustGetLogger("cluster")
 
 type ClusteredServiceAgent struct {
@@ -68,6 +78,7 @@ type ClusteredServiceAgent struct {
 	commitPosition           *counters.ReadableCounter
 	sessionMsgHdrBuffer      *atomic.Buffer
 	requestedAckPosition     int64
+	activeLifecycleCallback  LifeCycleCallback
 }
 
 func NewClusteredServiceAgent(
@@ -138,6 +149,8 @@ func NewClusteredServiceAgent(
 		sessions:             map[int64]ClientSession{},
 		sessionMsgHdrBuffer:  codecs.MakeClusterMessageBuffer(SessionMessageHeaderTemplateId, SessionMessageHdrBlockLength),
 		requestedAckPosition: NullPosition,
+
+		activeLifecycleCallback: LIFECYCLE_CALLBACK_NONE,
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
@@ -202,17 +215,21 @@ func (agent *ClusteredServiceAgent) recoverState() error {
 		recoveryCounterId, leadershipTermId, agent.logPosition, agent.clusterTime)
 	agent.sessionMsgHdrBuffer.PutInt64(SBEHeaderLength, leadershipTermId)
 
+	agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_ON_START
 	if leadershipTermId != NullValue {
 		snapshotRecId, err := getSnapshotRecordingID(agent.counters, recoveryCounterId, agent.opts.ServiceId)
 		if err != nil {
+			agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_NONE
 			return err
 		}
 		if err := agent.loadSnapshot(snapshotRecId); err != nil {
+			agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_NONE
 			return err
 		}
 	} else {
 		agent.service.OnStart(agent, nil)
 	}
+	agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_NONE
 
 	ackId := agent.getAndIncrementNextAckId()
 	logger.Infof("ack :: recoveryState :: start :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
@@ -381,7 +398,9 @@ func (agent *ClusteredServiceAgent) pollServiceAdapter() {
 
 func (agent *ClusteredServiceAgent) terminate() {
 	agent.isServiceActive = false
+	agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_ON_TERMINATE
 	agent.service.OnTerminate(agent)
+	agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_NONE
 	attempts := 5
 	ackId := agent.getAndIncrementNextAckId()
 	logger.Infof("ack :: terminate :: start :: ackId=%d, clusterTime=%d, clientId=%d, serviceId=%d", ackId, agent.clusterTime, agent.aeronClient.ClientID(), agent.opts.ServiceId)
@@ -511,8 +530,10 @@ func (agent *ClusteredServiceAgent) disconnectEgress() {
 
 func (agent *ClusteredServiceAgent) setRole(newRole Role) {
 	if newRole != agent.role {
+		agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_ON_ROLE_CHANGE
 		agent.role = newRole
 		agent.service.OnRoleChange(newRole)
+		agent.activeLifecycleCallback = LIFECYCLE_CALLBACK_NONE
 	}
 }
 
@@ -774,8 +795,17 @@ func (agent *ClusteredServiceAgent) offerToSession(
 	length int32,
 	reservedValueSupplier term.ReservedValueSupplier,
 ) int64 {
+	if err := agent.checkForValidInvocation(); err != nil {
+		logger.Errorf("offerToSession: error in checkForValidInvocation clusterSessionId=%d publication.sessionID=%d offset=%d length=%d", clusterSessionId, publication.SessionID(), offset, length)
+		return NullValue
+	}
+
 	if agent.role != Leader {
 		return ClientSessionMockedOffer
+	}
+
+	if publication == nil || !publication.IsConnected() {
+		return aeron.NotConnected
 	}
 
 	hdrBuf := agent.sessionMsgHdrBuffer
@@ -790,6 +820,10 @@ func (agent *ClusteredServiceAgent) getClientSession(id int64) (ClientSession, b
 }
 
 func (agent *ClusteredServiceAgent) closeClientSession(id int64) {
+	if err := agent.checkForValidInvocation(); err != nil {
+		logger.Errorf("closeClientSession: error in checkForValidInvocation id=%d", id)
+		return
+	}
 	if _, ok := agent.sessions[id]; ok {
 		// TODO: check if session already closed
 		agent.consensusModuleProxy.closeSessionRequest(id)
@@ -853,14 +887,26 @@ func (agent *ClusteredServiceAgent) IdleStrategy() idlestrategy.Idler {
 }
 
 func (agent *ClusteredServiceAgent) ScheduleTimer(correlationId int64, deadline int64) bool {
+	if err := agent.checkForValidInvocation(); err != nil {
+		logger.Errorf("ScheduleTimer: error in checkForValidInvocation correlationId=%d", correlationId)
+		return false
+	}
 	return agent.consensusModuleProxy.scheduleTimer(correlationId, deadline)
 }
 
 func (agent *ClusteredServiceAgent) CancelTimer(correlationId int64) bool {
+	if err := agent.checkForValidInvocation(); err != nil {
+		logger.Errorf("CancelTimer: error in checkForValidInvocation correlationId=%d", correlationId)
+		return false
+	}
 	return agent.consensusModuleProxy.cancelTimer(correlationId)
 }
 
 func (agent *ClusteredServiceAgent) Offer(buffer *atomic.Buffer, offset, length int32) int64 {
+	if err := agent.checkForValidInvocation(); err != nil {
+		logger.Errorf("Offer: error in checkForValidInvocation offset=%d length=%d", offset, length)
+		return NullValue
+	}
 	hdrBuf := agent.sessionMsgHdrBuffer
 	hdrBuf.PutInt64(SBEHeaderLength+8, int64(agent.opts.ServiceId))
 	hdrBuf.PutInt64(SBEHeaderLength+16, agent.clusterTime)
@@ -869,6 +915,30 @@ func (agent *ClusteredServiceAgent) Offer(buffer *atomic.Buffer, offset, length 
 
 func (agent *ClusteredServiceAgent) OnRequestServiceAck(logPosition int64) {
 	agent.requestedAckPosition = logPosition
+}
+
+func (agent *ClusteredServiceAgent) checkForValidInvocation() error {
+	if agent.activeLifecycleCallback != LIFECYCLE_CALLBACK_NONE {
+		return fmt.Errorf("cluster exception - sending messages or scheduling timers is not allowed from %s", lifecycleName(agent.activeLifecycleCallback))
+	}
+	return nil
+}
+
+func lifecycleName(activeLifecycleCallback LifeCycleCallback) string {
+	switch activeLifecycleCallback {
+	case LIFECYCLE_CALLBACK_NONE:
+		return "none"
+	case LIFECYCLE_CALLBACK_ON_START:
+		return "onStart"
+	case LIFECYCLE_CALLBACK_ON_TERMINATE:
+		return "onTerminate"
+	case LIFECYCLE_CALLBACK_ON_ROLE_CHANGE:
+		return "onRoleChange"
+	case LIFECYCLE_CALLBACK_DO_BACKGROUND_WORK:
+		return "doBackgroundWork"
+	default:
+		return "unknown"
+	}
 }
 
 // END CLUSTER IMPLEMENTATION
