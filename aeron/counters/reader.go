@@ -123,17 +123,35 @@ func counterOffset(counterId int32) int32 {
 }
 
 func (reader *Reader) Scan(cb func(Counter)) {
+	bytesToString := func(labelBytes []byte) string {
+		return string(labelBytes)
+	}
+	reader.scan(cb, bytesToString)
+}
+
+// ScanUnsafe callbacks must only consume the label argument within  the callback or must deep copy it
+// because the underlying memory be reused for the next counter within scan.
+func (reader *Reader) ScanUnsafe(cb func(Counter)) {
+	bytesToString := func(labelBytes []byte) string {
+		return unsafe.String(&labelBytes[0], len(labelBytes))
+	}
+	reader.scan(cb, bytesToString)
+}
+
+func (reader *Reader) scan(cb func(Counter), bytesToString func(labelBytes []byte) string) {
 
 	var id int32 = 0
 	var i int32 = 0
 
+	label := make([]byte, 0, FullLabelLength)
 	for capacity := reader.metaData.Capacity(); i < capacity; i += MetadataLength {
 		recordStatus := reader.metaData.GetInt32Volatile(i)
 		if RecordUnused == recordStatus {
 			break
 		} else if RecordAllocated == recordStatus {
 			typeId := reader.metaData.GetInt32(i + TypeIdOffset)
-			label := reader.labelValue(i)
+			label = label[:0]
+			label = reader.labelValueUnsafe(i, label)
 
 			// TODO Get the key buffer
 
@@ -141,7 +159,7 @@ func (reader *Reader) Scan(cb func(Counter)) {
 
 			// fmt.Printf("Reading at offset %d; counterState=%d; typeId=%d\n", i, recordStatus, typeId)
 
-			cb(Counter{id, typeId, value, label})
+			cb(Counter{id, typeId, value, bytesToString(label)})
 		}
 		id++
 	}
@@ -284,4 +302,11 @@ func (reader *Reader) validateCounterIdAndOffset(counterId int32, offset int32) 
 func (reader *Reader) labelValue(metaDataOffset int32) string {
 	labelSize := reader.metaData.GetInt32(metaDataOffset + LabelOffset)
 	return string(reader.metaData.GetBytesArray(metaDataOffset+LabelOffset+4, labelSize))
+}
+
+func (reader *Reader) labelValueUnsafe(metaDataOffset int32, label []byte) []byte {
+	labelSize := reader.metaData.GetInt32(metaDataOffset + LabelOffset)
+	label = label[:labelSize]
+	reader.metaData.GetBytes(metaDataOffset+LabelOffset+4, label)
+	return label
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/lirm/aeron-go/aeron"
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/logbuffer"
+	"github.com/lirm/aeron-go/aeron/logbuffer/term"
 	"github.com/lirm/aeron-go/aeron/logging"
 	"github.com/lirm/aeron-go/archive/codecs"
 )
@@ -224,6 +225,7 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 	archive.Control.archive = archive
 	archive.Control.fragmentAssembler = aeron.NewControlledFragmentAssembler(
 		archive.Control.onFragment, aeron.DefaultFragmentAssemblyBufferLength)
+	archive.Control.errorFragmentHandler = archive.Control.errorResponseFragmentHandler
 
 	// Setup the Proxy (publisher/request)
 	archive.Proxy = new(Proxy)
@@ -318,8 +320,9 @@ func NewArchive(options *Options, context *aeron.Context) (*Archive, error) {
 
 	for archive.Control.State.state != ControlStateConnected && archive.Control.State.err == nil {
 		fragments := archive.Control.poll(
-			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) {
+			func(buf *atomic.Buffer, offset int32, length int32, header *logbuffer.Header) term.ControlledPollAction {
 				ConnectionControlFragmentHandler(&pollContext, buf, offset, length, header)
+				return term.ControlledPollActionContinue
 			}, 1)
 		if fragments > 0 {
 			logger.Debugf("Read %d fragment(s)", fragments)

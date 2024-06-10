@@ -19,14 +19,15 @@ package driver
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/lirm/aeron-go/aeron"
-	"github.com/lirm/aeron-go/aeron/logging"
 	"os"
 	"os/exec"
 	"reflect"
 	"syscall"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/lirm/aeron-go/aeron"
+	"github.com/lirm/aeron-go/aeron/logging"
 )
 
 // Must match Java's `AERON_DIR_PROP_NAME`
@@ -44,7 +45,7 @@ const aeronClientLivenessTimeoutNs = "aeron.client.liveness.timeout"
 // Must match Java's `PUBLICATION_UNBLOCK_TIMEOUT_PROP_NAME`, measured in nanos
 const aeronPublicationUnblockTimeoutNs = "aeron.publication.unblock.timeout"
 
-const jarName = "driver/aeron-all-1.39.0.jar"
+const jarName = "driver/aeron-all-1.43.0.jar"
 
 const mediaDriverClassName = "io.aeron.driver.MediaDriver"
 
@@ -60,6 +61,7 @@ func StartMediaDriver() (*MediaDriver, error) {
 	tempDir := aeronUniqueTempDir()
 	cmd := setupCmd(tempDir)
 	setupPdeathsig(cmd)
+	logger.Infof("Starting Media Driver with command line: %s", cmd)
 	if err := cmd.Start(); err != nil {
 		logger.Error("couldn't start Media Driver: ", err)
 		return nil, err
@@ -104,6 +106,7 @@ func aeronUniqueTempDir() string {
 func setupCmd(tempDir string) *exec.Cmd {
 	cmd := exec.Command(
 		"java",
+		"--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
 		fmt.Sprintf("-D%s=%s", aeronDirPropName, tempDir),
 		fmt.Sprintf("-D%s=true", aeronDirDeleteStartPropName),
 		fmt.Sprintf("-D%s=true", aeronDirDeleteShutdownPropName),
@@ -111,7 +114,6 @@ func setupCmd(tempDir string) *exec.Cmd {
 		fmt.Sprintf("-D%s=%d", aeronPublicationUnblockTimeoutNs, 15*time.Minute.Nanoseconds()),
 		"-XX:+UnlockDiagnosticVMOptions",
 		"-XX:GuaranteedSafepointInterval=300000",
-		"-XX:BiasedLockingStartupDelay=0",
 		"-cp",
 		jarName,
 		mediaDriverClassName,
