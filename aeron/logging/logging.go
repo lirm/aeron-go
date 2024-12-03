@@ -20,6 +20,7 @@
 package logging
 
 import (
+	"fmt"
 	"sync"
 
 	"go.uber.org/zap"
@@ -67,6 +68,14 @@ func MustGetLogger(name string) *ZapLogger {
 	namedLoggers.Store(name, z)
 
 	return z
+}
+
+func GetLogger(name string) (*ZapLogger, error) {
+	if z, ok := namedLoggers.Load(name); ok {
+		return z.(*ZapLogger), nil
+	} else {
+		return nil, fmt.Errorf("unknown logger %s", name)
+	}
 }
 
 // newAeronEncoderConfig returns a default opinionated EncoderConfig for aeron
