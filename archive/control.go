@@ -513,7 +513,7 @@ func (control *Control) errorResponseFragmentHandler(buffer *atomic.Buffer, offs
 		}
 
 	default:
-		fmt.Printf("errorResponseFragmentHandler: Insert decoder for type: %d", hdr.TemplateId)
+		// ignore any unknown messages to match other clients
 	}
 
 	return
