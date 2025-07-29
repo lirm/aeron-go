@@ -105,6 +105,17 @@ func (s *SubscriptionTestSuite) TestShouldReadDataFromMultipleSources() {
 	s.Assert().Equal(2, fragments)
 }
 
+func (s *SubscriptionTestSuite) TestShouldCloseImageOnRemoveImage() {
+	s.sub.addImage(s.imageOne)
+
+	s.imageOne.On("CorrelationID").Return(int64(1))
+	s.imageOne.On("Close").Return(nil)
+
+	s.sub.removeImage(1)
+
+	s.imageOne.AssertExpectations(s.T())
+}
+
 // TODO: Implement resolveChannel set of tests.
 
 func TestSubscription(t *testing.T) {

@@ -16,13 +16,14 @@ package aeron
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/lirm/aeron-go/aeron/atomic"
 	"github.com/lirm/aeron-go/aeron/counters"
 	"github.com/lirm/aeron-go/aeron/testdata"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"testing"
-	"time"
 )
 
 const (
@@ -168,6 +169,7 @@ func (c *ClientConductorTestSuite) TestClientNotifiedOfNewAndInactiveImagesWithD
 	c.Require().Nil(unavailableHandler.GetHandledImage())
 
 	image.On("CorrelationID").Return(CorrelationId1)
+	image.On("Close").Return(nil)
 	c.cc.OnUnavailableImage(CorrelationId1, sub.RegistrationID())
 	c.Require().Equal(sub.ImageCount(), 0)
 	c.Require().Equal(unavailableHandler.GetHandledImage(), &image)
@@ -210,6 +212,7 @@ func (c *ClientConductorTestSuite) TestClientNotifiedOfNewAndInactiveImagesWithS
 	c.Require().Nil(unavailableHandler.GetHandledImage())
 
 	image.On("CorrelationID").Return(CorrelationId1)
+	image.On("Close").Return(nil)
 	c.cc.OnUnavailableImage(CorrelationId1, sub.RegistrationID())
 	c.Require().Equal(sub.ImageCount(), 0)
 	c.Require().Equal(unavailableHandler.GetHandledImage(), &image)

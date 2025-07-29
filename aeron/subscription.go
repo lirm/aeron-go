@@ -260,6 +260,10 @@ func (sub *Subscription) removeImage(correlationID int64) Image {
 
 			sub.images.Set(img)
 
+			if err := image.Close(); err != nil {
+				logger.Infof("Error closing image %v for subscription %d: %v", image, sub.registrationID, err)
+			}
+
 			return image
 		}
 	}
