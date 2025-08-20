@@ -828,7 +828,7 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 			return nil
 		}
 
-		// Check wer're live
+		// Check we're live
 		if control.Subscription.IsClosed() {
 			return fmt.Errorf("response channel from archive is not connected")
 		}
@@ -847,9 +847,8 @@ func (control *Control) PollForDescriptors(correlationID int64, sessionID int64,
 		// If we are yet to receive anything then idle
 		if descriptorCount == 0 {
 			logger.Debugf("PollForDescriptors(%d:%d) idling with %d of %d", correlationID, sessionID, control.Results.FragmentsReceived, fragmentsWanted)
-			control.archive.Options.IdleStrategy.Idle(0)
 		}
-
+		control.archive.Options.IdleStrategy.Idle(0)
 	}
 	return nil
 }
