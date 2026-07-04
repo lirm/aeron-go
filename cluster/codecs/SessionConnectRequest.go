@@ -15,6 +15,7 @@ type SessionConnectRequest struct {
 	Version            int32
 	ResponseChannel    []uint8
 	EncodedCredentials []uint8
+	ClientInfo         []uint8
 }
 
 func (s *SessionConnectRequest) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bool) error {
@@ -42,6 +43,12 @@ func (s *SessionConnectRequest) Encode(_m *SbeGoMarshaller, _w io.Writer, doRang
 		return err
 	}
 	if err := _m.WriteBytes(_w, s.EncodedCredentials); err != nil {
+		return err
+	}
+	if err := _m.WriteUint32(_w, uint32(len(s.ClientInfo))); err != nil {
+		return err
+	}
+	if err := _m.WriteBytes(_w, s.ClientInfo); err != nil {
 		return err
 	}
 	return nil
@@ -100,6 +107,20 @@ func (s *SessionConnectRequest) Decode(_m *SbeGoMarshaller, _r io.Reader, acting
 			return err
 		}
 	}
+
+	if s.ClientInfoInActingVersion(actingVersion) {
+		var ClientInfoLength uint32
+		if err := _m.ReadUint32(_r, &ClientInfoLength); err != nil {
+			return err
+		}
+		if cap(s.ClientInfo) < int(ClientInfoLength) {
+			s.ClientInfo = make([]uint8, ClientInfoLength)
+		}
+		s.ClientInfo = s.ClientInfo[:ClientInfoLength]
+		if err := _m.ReadBytes(_r, s.ClientInfo); err != nil {
+			return err
+		}
+	}
 	if doRangeCheck {
 		if err := s.RangeCheck(actingVersion, s.SbeSchemaVersion()); err != nil {
 			return err
@@ -129,6 +150,11 @@ func (s *SessionConnectRequest) RangeCheck(actingVersion uint16, schemaVersion u
 			return fmt.Errorf("s.ResponseChannel[%d]=%d failed ASCII validation", idx, ch)
 		}
 	}
+	for idx, ch := range s.ClientInfo {
+		if ch > 127 {
+			return fmt.Errorf("s.ClientInfo[%d]=%d failed ASCII validation", idx, ch)
+		}
+	}
 	return nil
 }
 
@@ -150,11 +176,15 @@ func (*SessionConnectRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*SessionConnectRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*SessionConnectRequest) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*SessionConnectRequest) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*SessionConnectRequest) CorrelationIdId() uint16 {
@@ -348,5 +378,39 @@ func (SessionConnectRequest) EncodedCredentialsCharacterEncoding() string {
 }
 
 func (SessionConnectRequest) EncodedCredentialsHeaderLength() uint64 {
+	return 4
+}
+
+func (*SessionConnectRequest) ClientInfoMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "required"
+	}
+	return ""
+}
+
+func (*SessionConnectRequest) ClientInfoSinceVersion() uint16 {
+	return 14
+}
+
+func (s *SessionConnectRequest) ClientInfoInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= s.ClientInfoSinceVersion()
+}
+
+func (*SessionConnectRequest) ClientInfoDeprecated() uint16 {
+	return 0
+}
+
+func (SessionConnectRequest) ClientInfoCharacterEncoding() string {
+	return "US-ASCII"
+}
+
+func (SessionConnectRequest) ClientInfoHeaderLength() uint64 {
 	return 4
 }

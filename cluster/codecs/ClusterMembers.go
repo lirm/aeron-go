@@ -112,11 +112,15 @@ func (*ClusterMembers) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ClusterMembers) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*ClusterMembers) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*ClusterMembers) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*ClusterMembers) MemberIdId() uint16 {

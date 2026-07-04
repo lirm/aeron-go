@@ -23,6 +23,19 @@ jobs:
         distribution: 'zulu'
         java-version: '21'
 
+    - name: Cache aeron-all jar for cluster system tests
+      uses: actions/cache@v4
+      with:
+        path: systests/cluster/aeron-all-1.52.0.jar
+        key: aeron-all-1.52.0
+
+    - name: Fetch aeron-all jar for cluster system tests
+      run: |
+        if [ ! -f systests/cluster/aeron-all-1.52.0.jar ]; then
+          curl -fL -o systests/cluster/aeron-all-1.52.0.jar \
+            https://repo1.maven.org/maven2/io/aeron/aeron-all/1.52.0/aeron-all-1.52.0.jar
+        fi
+
     - name: Build
       run: go build -v ./...
 

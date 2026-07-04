@@ -58,6 +58,7 @@ func (adapter *serviceAdapter) onFragment(
 				joinLog.LogSessionId,
 				joinLog.LogStreamId,
 				joinLog.IsStartup == codecs.BooleanType.TRUE,
+				joinLog.IsStandby == codecs.BooleanType.TRUE,
 				Role(joinLog.Role),
 				string(joinLog.LogChannel),
 			)
@@ -65,6 +66,9 @@ func (adapter *serviceAdapter) onFragment(
 	case serviceTerminationPosTemplateId:
 		logPos := buffer.GetInt64(offset)
 		adapter.agent.onServiceTerminationPosition(logPos)
+	case requestServiceAckTemplateId:
+		logPos := buffer.GetInt64(offset)
+		adapter.agent.onRequestServiceAck(logPos)
 	default:
 		logger.Debugf("serviceAdapter: unexpected templateId=%d at pos=%d", templateId, header.Position())
 	}

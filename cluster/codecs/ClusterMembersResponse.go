@@ -138,11 +138,15 @@ func (*ClusterMembersResponse) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ClusterMembersResponse) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*ClusterMembersResponse) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*ClusterMembersResponse) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*ClusterMembersResponse) CorrelationIdId() uint16 {

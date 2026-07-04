@@ -175,7 +175,7 @@ func (ac *AeronCluster) Poll() int {
 		} else {
 			logger.Warningf("timed out waiting for session connect reply")
 			ac.state = clientDisconnected
-			ac.nextRetryConnectTime = now + (30 * time.Second).Milliseconds()
+			ac.nextRetryConnectTime = now + ac.opts.RetryBackoff.Milliseconds()
 		}
 	case clientConnected:
 		if ac.ingressPub.IsConnected() {
@@ -325,7 +325,7 @@ func (ac *AeronCluster) awaitPublicationConnected() (int, error) {
 	if now > ac.awaitTimeoutTime {
 		ac.state = clientDisconnected
 		// close publications? shouldn't be necessary unless we've hit some bug
-		ac.nextRetryConnectTime = now + (30 * time.Second).Milliseconds()
+		ac.nextRetryConnectTime = now + ac.opts.RetryBackoff.Milliseconds()
 		return 0, errors.New("timed out waiting for connected publication")
 	}
 	if len(ac.memberByIdMap) > 0 {

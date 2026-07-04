@@ -15,7 +15,7 @@ const (
 
 const (
 	ClusterSchemaId                 = 111
-	ClusterSchemaVersion            = 8
+	ClusterSchemaVersion            = 16
 	SessionMessageHeaderTemplateId  = 1
 	SessionEventTemplateId          = 2
 	SessionCloseRequestTemplateId   = 4
@@ -34,6 +34,13 @@ const (
 	serviceTerminationPosTemplateId = 42
 	snapshotMarkerTemplateId        = 100
 	clientSessionTemplateId         = 102
+	requestServiceAckTemplateId     = 108
+)
+
+// Flags for a cluster action request, mirroring io.aeron.cluster.ConsensusModule
+const (
+	clusterActionFlagsDefault         int32 = 0
+	clusterActionFlagsStandbySnapshot int32 = 1
 )
 
 const SessionMessageHdrBlockLength = 24

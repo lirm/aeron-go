@@ -14,6 +14,7 @@ type CanvassPosition struct {
 	LogPosition         int64
 	LeadershipTermId    int64
 	FollowerMemberId    int32
+	ProtocolVersion     int32
 }
 
 func (c *CanvassPosition) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bool) error {
@@ -32,6 +33,9 @@ func (c *CanvassPosition) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck
 		return err
 	}
 	if err := _m.WriteInt32(_w, c.FollowerMemberId); err != nil {
+		return err
+	}
+	if err := _m.WriteInt32(_w, c.ProtocolVersion); err != nil {
 		return err
 	}
 	return nil
@@ -63,6 +67,13 @@ func (c *CanvassPosition) Decode(_m *SbeGoMarshaller, _r io.Reader, actingVersio
 		c.FollowerMemberId = c.FollowerMemberIdNullValue()
 	} else {
 		if err := _m.ReadInt32(_r, &c.FollowerMemberId); err != nil {
+			return err
+		}
+	}
+	if !c.ProtocolVersionInActingVersion(actingVersion) {
+		c.ProtocolVersion = c.ProtocolVersionNullValue()
+	} else {
+		if err := _m.ReadInt32(_r, &c.ProtocolVersion); err != nil {
 			return err
 		}
 	}
@@ -98,15 +109,21 @@ func (c *CanvassPosition) RangeCheck(actingVersion uint16, schemaVersion uint16)
 			return fmt.Errorf("Range check failed on c.FollowerMemberId (%v < %v > %v)", c.FollowerMemberIdMinValue(), c.FollowerMemberId, c.FollowerMemberIdMaxValue())
 		}
 	}
+	if c.ProtocolVersionInActingVersion(actingVersion) {
+		if c.ProtocolVersion != c.ProtocolVersionNullValue() && (c.ProtocolVersion < c.ProtocolVersionMinValue() || c.ProtocolVersion > c.ProtocolVersionMaxValue()) {
+			return fmt.Errorf("Range check failed on c.ProtocolVersion (%v < %v > %v)", c.ProtocolVersionMinValue(), c.ProtocolVersion, c.ProtocolVersionMaxValue())
+		}
+	}
 	return nil
 }
 
 func CanvassPositionInit(c *CanvassPosition) {
+	c.ProtocolVersion = 0
 	return
 }
 
 func (*CanvassPosition) SbeBlockLength() (blockLength uint16) {
-	return 28
+	return 32
 }
 
 func (*CanvassPosition) SbeTemplateId() (templateId uint16) {
@@ -118,11 +135,15 @@ func (*CanvassPosition) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*CanvassPosition) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*CanvassPosition) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*CanvassPosition) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*CanvassPosition) LogLeadershipTermIdId() uint16 {
@@ -291,4 +312,46 @@ func (*CanvassPosition) FollowerMemberIdMaxValue() int32 {
 
 func (*CanvassPosition) FollowerMemberIdNullValue() int32 {
 	return math.MinInt32
+}
+
+func (*CanvassPosition) ProtocolVersionId() uint16 {
+	return 5
+}
+
+func (*CanvassPosition) ProtocolVersionSinceVersion() uint16 {
+	return 9
+}
+
+func (c *CanvassPosition) ProtocolVersionInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= c.ProtocolVersionSinceVersion()
+}
+
+func (*CanvassPosition) ProtocolVersionDeprecated() uint16 {
+	return 0
+}
+
+func (*CanvassPosition) ProtocolVersionMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "optional"
+	}
+	return ""
+}
+
+func (*CanvassPosition) ProtocolVersionMinValue() int32 {
+	return 1
+}
+
+func (*CanvassPosition) ProtocolVersionMaxValue() int32 {
+	return 16777215
+}
+
+func (*CanvassPosition) ProtocolVersionNullValue() int32 {
+	return 0
 }

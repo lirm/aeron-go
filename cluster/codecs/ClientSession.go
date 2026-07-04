@@ -133,11 +133,15 @@ func (*ClientSession) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ClientSession) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*ClientSession) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*ClientSession) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*ClientSession) ClusterSessionIdId() uint16 {

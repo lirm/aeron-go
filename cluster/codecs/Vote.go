@@ -146,11 +146,15 @@ func (*Vote) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*Vote) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*Vote) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*Vote) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*Vote) CandidateTermIdId() uint16 {

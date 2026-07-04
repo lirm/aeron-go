@@ -1,6 +1,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/lirm/aeron-go/aeron/idlestrategy"
 	"go.uber.org/zap/zapcore"
 )
@@ -15,6 +17,7 @@ type Options struct {
 	EgressStreamId     int32
 	IdleStrategy       idlestrategy.Idler
 	IsIngressExclusive bool
+	RetryBackoff       time.Duration // how long to wait before re-attempting to connect
 }
 
 func NewOptions() *Options {
@@ -25,5 +28,6 @@ func NewOptions() *Options {
 		EgressChannel:   "aeron:udp?alias=cluster-egress|endpoint=localhost:0",
 		EgressStreamId:  102,
 		IdleStrategy:    idlestrategy.NewDefaultBackoffIdleStrategy(),
+		RetryBackoff:    5 * time.Second,
 	}
 }

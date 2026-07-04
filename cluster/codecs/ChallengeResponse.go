@@ -107,11 +107,15 @@ func (*ChallengeResponse) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ChallengeResponse) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*ChallengeResponse) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*ChallengeResponse) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*ChallengeResponse) CorrelationIdId() uint16 {

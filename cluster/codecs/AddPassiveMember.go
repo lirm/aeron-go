@@ -96,11 +96,15 @@ func (*AddPassiveMember) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*AddPassiveMember) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*AddPassiveMember) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*AddPassiveMember) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*AddPassiveMember) CorrelationIdId() uint16 {

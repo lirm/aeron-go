@@ -114,11 +114,15 @@ func (*SessionCloseEvent) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*SessionCloseEvent) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*SessionCloseEvent) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*SessionCloseEvent) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*SessionCloseEvent) LeadershipTermIdId() uint16 {

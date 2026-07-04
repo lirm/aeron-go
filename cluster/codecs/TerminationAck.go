@@ -102,11 +102,15 @@ func (*TerminationAck) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*TerminationAck) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*TerminationAck) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*TerminationAck) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*TerminationAck) LeadershipTermIdId() uint16 {

@@ -60,6 +60,8 @@ type ClusteredServiceAgent struct {
 	memberId                 int32
 	nextAckId                int64
 	terminationPosition      int64
+	requestedAckPosition     int64
+	standbySnapshotFlags     int32
 	isServiceActive          bool
 	role                     Role
 	service                  ClusteredService
@@ -121,20 +123,22 @@ func NewClusteredServiceAgent(
 	}
 
 	agent := &ClusteredServiceAgent{
-		aeronClient:         aeronClient,
-		opts:                options,
-		serviceAdapter:      serviceAdapter,
-		logAdapter:          logAdapter,
-		aeronCtx:            aeronCtx,
-		proxy:               proxy,
-		counters:            countersReader,
-		markFile:            cmf,
-		role:                Follower,
-		service:             service,
-		logPosition:         NullPosition,
-		terminationPosition: NullPosition,
-		sessions:            map[int64]ClientSession{},
-		sessionMsgHdrBuffer: codecs.MakeClusterMessageBuffer(SessionMessageHeaderTemplateId, SessionMessageHdrBlockLength),
+		aeronClient:          aeronClient,
+		opts:                 options,
+		serviceAdapter:       serviceAdapter,
+		logAdapter:           logAdapter,
+		aeronCtx:             aeronCtx,
+		proxy:                proxy,
+		counters:             countersReader,
+		markFile:             cmf,
+		role:                 Follower,
+		service:              service,
+		logPosition:          NullPosition,
+		terminationPosition:  NullPosition,
+		requestedAckPosition: NullPosition,
+		standbySnapshotFlags: clusterActionFlagsDefault,
+		sessions:             map[int64]ClientSession{},
+		sessionMsgHdrBuffer:  codecs.MakeClusterMessageBuffer(SessionMessageHeaderTemplateId, SessionMessageHdrBlockLength),
 	}
 	serviceAdapter.agent = agent
 	logAdapter.agent = agent
@@ -314,6 +318,20 @@ func (agent *ClusteredServiceAgent) pollServiceAdapter() {
 		}
 		agent.terminate()
 	}
+
+	if agent.requestedAckPosition != NullPosition && agent.logPosition >= agent.requestedAckPosition {
+		if agent.logPosition > agent.requestedAckPosition {
+			logger.Errorf("invalid ack request: logPos=%d > requestedAckPos=%d", agent.logPosition, agent.requestedAckPosition)
+		}
+		agent.proxy.serviceAckRequest(
+			agent.logPosition,
+			agent.clusterTime,
+			agent.getAndIncrementNextAckId(),
+			NullValue,
+			agent.opts.ServiceId,
+		)
+		agent.requestedAckPosition = NullPosition
+	}
 }
 
 func (agent *ClusteredServiceAgent) terminate() {
@@ -354,10 +372,11 @@ func (agent *ClusteredServiceAgent) onJoinLog(
 	logSessionId int32,
 	logStreamId int32,
 	isStartup bool,
+	isStandby bool,
 	role Role,
 	logChannel string,
 ) {
-	logger.Debugf("onJoinLog - logPos=%d isStartup=%v role=%v logChannel=%s", logPosition, isStartup, role, logChannel)
+	logger.Debugf("onJoinLog - logPos=%d isStartup=%v isStandby=%v role=%v logChannel=%s", logPosition, isStartup, isStandby, role, logChannel)
 	agent.logAdapter.maxLogPosition = logPosition
 	event := &activeLogEvent{
 		logPosition:    logPosition,
@@ -366,6 +385,7 @@ func (agent *ClusteredServiceAgent) onJoinLog(
 		logSessionId:   logSessionId,
 		logStreamId:    logStreamId,
 		isStartup:      isStartup,
+		isStandby:      isStandby,
 		role:           role,
 		logChannel:     logChannel,
 	}
@@ -379,6 +399,7 @@ type activeLogEvent struct {
 	logSessionId   int32
 	logStreamId    int32
 	isStartup      bool
+	isStandby      bool
 	role           Role
 	logChannel     string
 }
@@ -397,6 +418,11 @@ func (agent *ClusteredServiceAgent) joinActiveLog(event *activeLogEvent) error {
 	}
 	agent.logAdapter.image = img
 	agent.logAdapter.maxLogPosition = event.maxLogPosition
+	if event.isStandby {
+		agent.standbySnapshotFlags = clusterActionFlagsStandbySnapshot
+	} else {
+		agent.standbySnapshotFlags = clusterActionFlagsDefault
+	}
 
 	agent.proxy.serviceAckRequest(
 		event.logPosition,
@@ -547,17 +573,22 @@ func (agent *ClusteredServiceAgent) onServiceAction(
 	logPos int64,
 	timestamp int64,
 	action codecs.ClusterActionEnum,
+	flags int32,
 ) {
 	agent.logPosition = logPos
 	agent.clusterTime = timestamp
-	if action == codecs.ClusterAction.SNAPSHOT {
+	if action == codecs.ClusterAction.SNAPSHOT && agent.shouldSnapshot(flags) {
 		recordingId, err := agent.takeSnapshot(logPos, leadershipTermId)
 		if err != nil {
 			logger.Errorf("take snapshot failed: ", err)
-		} else {
-			agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, agent.opts.ServiceId)
+			recordingId = NullValue
 		}
+		agent.proxy.serviceAckRequest(logPos, timestamp, agent.getAndIncrementNextAckId(), recordingId, agent.opts.ServiceId)
 	}
+}
+
+func (agent *ClusteredServiceAgent) shouldSnapshot(flags int32) bool {
+	return flags == clusterActionFlagsDefault || (flags&agent.standbySnapshotFlags) != 0
 }
 
 func (agent *ClusteredServiceAgent) onTimerEvent(
@@ -641,6 +672,27 @@ func (agent *ClusteredServiceAgent) awaitRecordingId(sessionId int32) (int64, er
 
 func (agent *ClusteredServiceAgent) onServiceTerminationPosition(position int64) {
 	agent.terminationPosition = position
+}
+
+func (agent *ClusteredServiceAgent) onRequestServiceAck(logPosition int64) {
+	agent.requestedAckPosition = logPosition
+}
+
+// Close terminates the service container and releases the aeron resources it
+// holds, so another agent can be started for the same cluster directory.
+func (agent *ClusteredServiceAgent) Close() {
+	agent.isServiceActive = false
+	if err := agent.logAdapter.Close(); err != nil {
+		logger.Errorf("error closing log adapter: %v", err)
+	}
+	closeSubscription(agent.serviceAdapter.subscription)
+	closePublication(agent.proxy.publication)
+	if err := agent.aeronClient.Close(); err != nil {
+		logger.Errorf("error closing aeron client: %v", err)
+	}
+	if err := agent.markFile.file.Close(); err != nil {
+		logger.Errorf("error closing mark file: %v", err)
+	}
 }
 
 func (agent *ClusteredServiceAgent) getAndIncrementNextAckId() int64 {

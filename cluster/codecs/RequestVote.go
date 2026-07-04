@@ -14,6 +14,7 @@ type RequestVote struct {
 	LogPosition         int64
 	CandidateTermId     int64
 	CandidateMemberId   int32
+	ProtocolVersion     int32
 }
 
 func (r *RequestVote) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bool) error {
@@ -32,6 +33,9 @@ func (r *RequestVote) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck boo
 		return err
 	}
 	if err := _m.WriteInt32(_w, r.CandidateMemberId); err != nil {
+		return err
+	}
+	if err := _m.WriteInt32(_w, r.ProtocolVersion); err != nil {
 		return err
 	}
 	return nil
@@ -63,6 +67,13 @@ func (r *RequestVote) Decode(_m *SbeGoMarshaller, _r io.Reader, actingVersion ui
 		r.CandidateMemberId = r.CandidateMemberIdNullValue()
 	} else {
 		if err := _m.ReadInt32(_r, &r.CandidateMemberId); err != nil {
+			return err
+		}
+	}
+	if !r.ProtocolVersionInActingVersion(actingVersion) {
+		r.ProtocolVersion = r.ProtocolVersionNullValue()
+	} else {
+		if err := _m.ReadInt32(_r, &r.ProtocolVersion); err != nil {
 			return err
 		}
 	}
@@ -98,15 +109,21 @@ func (r *RequestVote) RangeCheck(actingVersion uint16, schemaVersion uint16) err
 			return fmt.Errorf("Range check failed on r.CandidateMemberId (%v < %v > %v)", r.CandidateMemberIdMinValue(), r.CandidateMemberId, r.CandidateMemberIdMaxValue())
 		}
 	}
+	if r.ProtocolVersionInActingVersion(actingVersion) {
+		if r.ProtocolVersion != r.ProtocolVersionNullValue() && (r.ProtocolVersion < r.ProtocolVersionMinValue() || r.ProtocolVersion > r.ProtocolVersionMaxValue()) {
+			return fmt.Errorf("Range check failed on r.ProtocolVersion (%v < %v > %v)", r.ProtocolVersionMinValue(), r.ProtocolVersion, r.ProtocolVersionMaxValue())
+		}
+	}
 	return nil
 }
 
 func RequestVoteInit(r *RequestVote) {
+	r.ProtocolVersion = 0
 	return
 }
 
 func (*RequestVote) SbeBlockLength() (blockLength uint16) {
-	return 28
+	return 32
 }
 
 func (*RequestVote) SbeTemplateId() (templateId uint16) {
@@ -118,11 +135,15 @@ func (*RequestVote) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*RequestVote) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*RequestVote) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*RequestVote) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*RequestVote) LogLeadershipTermIdId() uint16 {
@@ -291,4 +312,46 @@ func (*RequestVote) CandidateMemberIdMaxValue() int32 {
 
 func (*RequestVote) CandidateMemberIdNullValue() int32 {
 	return math.MinInt32
+}
+
+func (*RequestVote) ProtocolVersionId() uint16 {
+	return 5
+}
+
+func (*RequestVote) ProtocolVersionSinceVersion() uint16 {
+	return 9
+}
+
+func (r *RequestVote) ProtocolVersionInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= r.ProtocolVersionSinceVersion()
+}
+
+func (*RequestVote) ProtocolVersionDeprecated() uint16 {
+	return 0
+}
+
+func (*RequestVote) ProtocolVersionMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "optional"
+	}
+	return ""
+}
+
+func (*RequestVote) ProtocolVersionMinValue() int32 {
+	return 1
+}
+
+func (*RequestVote) ProtocolVersionMaxValue() int32 {
+	return 16777215
+}
+
+func (*RequestVote) ProtocolVersionNullValue() int32 {
+	return 0
 }

@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -62,7 +63,22 @@ func StartMediaDriver() (*MediaDriver, error) {
 	cmd := setupCmd(tempDir)
 	setupPdeathsig(cmd)
 	logger.Infof("Starting Media Driver with command line: %s", cmd)
-	if err := cmd.Start(); err != nil {
+	// Pdeathsig is delivered when the forking OS thread dies, not when the
+	// parent process dies, and the Go runtime may retire that thread at any
+	// time - which would SIGTERM the driver mid-test. Keep the forking
+	// thread locked and alive for the driver's whole lifetime.
+	started := make(chan error, 1)
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		if err := cmd.Start(); err != nil {
+			started <- err
+			return
+		}
+		started <- nil
+		_ = cmd.Wait()
+	}()
+	if err := <-started; err != nil {
 		logger.Error("couldn't start Media Driver: ", err)
 		return nil, err
 	}

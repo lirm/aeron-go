@@ -17,6 +17,7 @@ type JoinLog struct {
 	LogStreamId    int32
 	IsStartup      BooleanTypeEnum
 	Role           int32
+	IsStandby      BooleanTypeEnum
 	LogChannel     []uint8
 }
 
@@ -45,6 +46,9 @@ func (j *JoinLog) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bool) e
 		return err
 	}
 	if err := _m.WriteInt32(_w, j.Role); err != nil {
+		return err
+	}
+	if err := j.IsStandby.Encode(_m, _w); err != nil {
 		return err
 	}
 	if err := _m.WriteUint32(_w, uint32(len(j.LogChannel))); err != nil {
@@ -101,6 +105,11 @@ func (j *JoinLog) Decode(_m *SbeGoMarshaller, _r io.Reader, actingVersion uint16
 		j.Role = j.RoleNullValue()
 	} else {
 		if err := _m.ReadInt32(_r, &j.Role); err != nil {
+			return err
+		}
+	}
+	if j.IsStandbyInActingVersion(actingVersion) {
+		if err := j.IsStandby.Decode(_m, _r, actingVersion); err != nil {
 			return err
 		}
 	}
@@ -163,6 +172,9 @@ func (j *JoinLog) RangeCheck(actingVersion uint16, schemaVersion uint16) error {
 			return fmt.Errorf("Range check failed on j.Role (%v < %v > %v)", j.RoleMinValue(), j.Role, j.RoleMaxValue())
 		}
 	}
+	if err := j.IsStandby.RangeCheck(actingVersion, schemaVersion); err != nil {
+		return err
+	}
 	for idx, ch := range j.LogChannel {
 		if ch > 127 {
 			return fmt.Errorf("j.LogChannel[%d]=%d failed ASCII validation", idx, ch)
@@ -176,7 +188,7 @@ func JoinLogInit(j *JoinLog) {
 }
 
 func (*JoinLog) SbeBlockLength() (blockLength uint16) {
-	return 36
+	return 40
 }
 
 func (*JoinLog) SbeTemplateId() (templateId uint16) {
@@ -188,11 +200,15 @@ func (*JoinLog) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*JoinLog) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*JoinLog) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*JoinLog) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*JoinLog) LogPositionId() uint16 {
@@ -475,6 +491,36 @@ func (*JoinLog) RoleMaxValue() int32 {
 
 func (*JoinLog) RoleNullValue() int32 {
 	return math.MinInt32
+}
+
+func (*JoinLog) IsStandbyId() uint16 {
+	return 9
+}
+
+func (*JoinLog) IsStandbySinceVersion() uint16 {
+	return 16
+}
+
+func (j *JoinLog) IsStandbyInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= j.IsStandbySinceVersion()
+}
+
+func (*JoinLog) IsStandbyDeprecated() uint16 {
+	return 0
+}
+
+func (*JoinLog) IsStandbyMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "optional"
+	}
+	return ""
 }
 
 func (*JoinLog) LogChannelMetaAttribute(meta int) string {

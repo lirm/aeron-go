@@ -159,11 +159,15 @@ func (*SnapshotMarker) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*SnapshotMarker) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*SnapshotMarker) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*SnapshotMarker) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*SnapshotMarker) TypeIdId() uint16 {

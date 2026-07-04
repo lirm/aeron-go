@@ -18,6 +18,7 @@ type BackupResponse struct {
 	LastTermBaseLogPosition int64
 	CommitPositionCounterId int32
 	LeaderMemberId          int32
+	MemberId                int32
 	Snapshots               []BackupResponseSnapshots
 	ClusterMembers          []uint8
 }
@@ -60,6 +61,9 @@ func (b *BackupResponse) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck 
 	if err := _m.WriteInt32(_w, b.LeaderMemberId); err != nil {
 		return err
 	}
+	if err := _m.WriteInt32(_w, b.MemberId); err != nil {
+		return err
+	}
 	var SnapshotsBlockLength uint16 = 44
 	if err := _m.WriteUint16(_w, SnapshotsBlockLength); err != nil {
 		return err
@@ -68,8 +72,8 @@ func (b *BackupResponse) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck 
 	if err := _m.WriteUint16(_w, SnapshotsNumInGroup); err != nil {
 		return err
 	}
-	for _, prop := range b.Snapshots {
-		if err := prop.Encode(_m, _w); err != nil {
+	for i := range b.Snapshots {
+		if err := b.Snapshots[i].Encode(_m, _w); err != nil {
 			return err
 		}
 	}
@@ -136,6 +140,13 @@ func (b *BackupResponse) Decode(_m *SbeGoMarshaller, _r io.Reader, actingVersion
 		b.LeaderMemberId = b.LeaderMemberIdNullValue()
 	} else {
 		if err := _m.ReadInt32(_r, &b.LeaderMemberId); err != nil {
+			return err
+		}
+	}
+	if !b.MemberIdInActingVersion(actingVersion) {
+		b.MemberId = b.MemberIdNullValue()
+	} else {
+		if err := _m.ReadInt32(_r, &b.MemberId); err != nil {
 			return err
 		}
 	}
@@ -225,8 +236,13 @@ func (b *BackupResponse) RangeCheck(actingVersion uint16, schemaVersion uint16) 
 			return fmt.Errorf("Range check failed on b.LeaderMemberId (%v < %v > %v)", b.LeaderMemberIdMinValue(), b.LeaderMemberId, b.LeaderMemberIdMaxValue())
 		}
 	}
-	for _, prop := range b.Snapshots {
-		if err := prop.RangeCheck(actingVersion, schemaVersion); err != nil {
+	if b.MemberIdInActingVersion(actingVersion) {
+		if b.MemberId < b.MemberIdMinValue() || b.MemberId > b.MemberIdMaxValue() {
+			return fmt.Errorf("Range check failed on b.MemberId (%v < %v > %v)", b.MemberIdMinValue(), b.MemberId, b.MemberIdMaxValue())
+		}
+	}
+	for i := range b.Snapshots {
+		if err := b.Snapshots[i].RangeCheck(actingVersion, schemaVersion); err != nil {
 			return err
 		}
 	}
@@ -352,7 +368,7 @@ func BackupResponseSnapshotsInit(b *BackupResponseSnapshots) {
 }
 
 func (*BackupResponse) SbeBlockLength() (blockLength uint16) {
-	return 56
+	return 60
 }
 
 func (*BackupResponse) SbeTemplateId() (templateId uint16) {
@@ -364,11 +380,15 @@ func (*BackupResponse) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*BackupResponse) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*BackupResponse) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*BackupResponse) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*BackupResponse) CorrelationIdId() uint16 {
@@ -707,6 +727,48 @@ func (*BackupResponse) LeaderMemberIdNullValue() int32 {
 	return math.MinInt32
 }
 
+func (*BackupResponse) MemberIdId() uint16 {
+	return 17
+}
+
+func (*BackupResponse) MemberIdSinceVersion() uint16 {
+	return 10
+}
+
+func (b *BackupResponse) MemberIdInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= b.MemberIdSinceVersion()
+}
+
+func (*BackupResponse) MemberIdDeprecated() uint16 {
+	return 0
+}
+
+func (*BackupResponse) MemberIdMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "required"
+	}
+	return ""
+}
+
+func (*BackupResponse) MemberIdMinValue() int32 {
+	return math.MinInt32 + 1
+}
+
+func (*BackupResponse) MemberIdMaxValue() int32 {
+	return math.MaxInt32
+}
+
+func (*BackupResponse) MemberIdNullValue() int32 {
+	return math.MinInt32
+}
+
 func (*BackupResponseSnapshots) RecordingIdId() uint16 {
 	return 10
 }
@@ -980,7 +1042,7 @@ func (*BackupResponseSnapshots) SbeBlockLength() (blockLength uint) {
 }
 
 func (*BackupResponseSnapshots) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*BackupResponse) ClusterMembersMetaAttribute(meta int) string {

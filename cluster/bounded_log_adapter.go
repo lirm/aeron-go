@@ -137,7 +137,11 @@ func (adapter *boundedLogAdapter) onMessage(
 		if err := e.Decode(adapter.marshaller, buf, version, blockLength, adapter.options.RangeChecking); err != nil {
 			logger.Errorf("boundedLogAdapter: cluster action request decode error: %v", err)
 		} else {
-			adapter.agent.onServiceAction(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.Action)
+			flags := e.Flags
+			if flags == e.FlagsNullValue() {
+				flags = clusterActionFlagsDefault
+			}
+			adapter.agent.onServiceAction(e.LeadershipTermId, e.LogPosition, e.Timestamp, e.Action, flags)
 		}
 	case newLeadershipTermTemplateId:
 		e := codecs.NewLeadershipTermEvent{}

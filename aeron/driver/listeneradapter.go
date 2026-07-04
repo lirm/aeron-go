@@ -224,8 +224,11 @@ func (adapter *ListenerAdapter) ReceiveMessages() int {
 
 			adapter.listener.OnClientTimeout(msg.clientID.Get())
 		default:
-			// Note: Java silently ignores unhandled events
-			logger.Fatalf("received unhandled %d", msgTypeID)
+			// Java silently ignores unhandled events. Newer drivers add event
+			// types (e.g. ON_NEXT_AVAILABLE_SESSION_ID), and responses meant
+			// for other clients arrive on the shared broadcast channel, so an
+			// unknown event must not be fatal.
+			logger.Debugf("ignoring unhandled driver event %d", msgTypeID)
 		}
 	}
 

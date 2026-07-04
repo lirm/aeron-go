@@ -86,11 +86,15 @@ func (*Timer) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*Timer) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*Timer) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*Timer) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*Timer) CorrelationIdId() uint16 {

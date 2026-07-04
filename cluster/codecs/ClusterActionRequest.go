@@ -14,6 +14,7 @@ type ClusterActionRequest struct {
 	LogPosition      int64
 	Timestamp        int64
 	Action           ClusterActionEnum
+	Flags            int32
 }
 
 func (c *ClusterActionRequest) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bool) error {
@@ -32,6 +33,9 @@ func (c *ClusterActionRequest) Encode(_m *SbeGoMarshaller, _w io.Writer, doRange
 		return err
 	}
 	if err := c.Action.Encode(_m, _w); err != nil {
+		return err
+	}
+	if err := _m.WriteInt32(_w, c.Flags); err != nil {
 		return err
 	}
 	return nil
@@ -61,6 +65,13 @@ func (c *ClusterActionRequest) Decode(_m *SbeGoMarshaller, _r io.Reader, actingV
 	}
 	if c.ActionInActingVersion(actingVersion) {
 		if err := c.Action.Decode(_m, _r, actingVersion); err != nil {
+			return err
+		}
+	}
+	if !c.FlagsInActingVersion(actingVersion) {
+		c.Flags = c.FlagsNullValue()
+	} else {
+		if err := _m.ReadInt32(_r, &c.Flags); err != nil {
 			return err
 		}
 	}
@@ -94,15 +105,21 @@ func (c *ClusterActionRequest) RangeCheck(actingVersion uint16, schemaVersion ui
 	if err := c.Action.RangeCheck(actingVersion, schemaVersion); err != nil {
 		return err
 	}
+	if c.FlagsInActingVersion(actingVersion) {
+		if c.Flags != c.FlagsNullValue() && (c.Flags < c.FlagsMinValue() || c.Flags > c.FlagsMaxValue()) {
+			return fmt.Errorf("Range check failed on c.Flags (%v < %v > %v)", c.FlagsMinValue(), c.Flags, c.FlagsMaxValue())
+		}
+	}
 	return nil
 }
 
 func ClusterActionRequestInit(c *ClusterActionRequest) {
+	c.Flags = math.MinInt32
 	return
 }
 
 func (*ClusterActionRequest) SbeBlockLength() (blockLength uint16) {
-	return 28
+	return 32
 }
 
 func (*ClusterActionRequest) SbeTemplateId() (templateId uint16) {
@@ -114,11 +131,15 @@ func (*ClusterActionRequest) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ClusterActionRequest) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*ClusterActionRequest) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*ClusterActionRequest) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*ClusterActionRequest) LeadershipTermIdId() uint16 {
@@ -275,4 +296,46 @@ func (*ClusterActionRequest) ActionMetaAttribute(meta int) string {
 		return "required"
 	}
 	return ""
+}
+
+func (*ClusterActionRequest) FlagsId() uint16 {
+	return 5
+}
+
+func (*ClusterActionRequest) FlagsSinceVersion() uint16 {
+	return 11
+}
+
+func (c *ClusterActionRequest) FlagsInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= c.FlagsSinceVersion()
+}
+
+func (*ClusterActionRequest) FlagsDeprecated() uint16 {
+	return 0
+}
+
+func (*ClusterActionRequest) FlagsMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "optional"
+	}
+	return ""
+}
+
+func (*ClusterActionRequest) FlagsMinValue() int32 {
+	return math.MinInt32 + 1
+}
+
+func (*ClusterActionRequest) FlagsMaxValue() int32 {
+	return math.MaxInt32
+}
+
+func (*ClusterActionRequest) FlagsNullValue() int32 {
+	return math.MinInt32
 }

@@ -13,6 +13,7 @@ type BackupQuery struct {
 	CorrelationId      int64
 	ResponseStreamId   int32
 	Version            int32
+	LogPosition        int64
 	ResponseChannel    []uint8
 	EncodedCredentials []uint8
 }
@@ -30,6 +31,9 @@ func (b *BackupQuery) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck boo
 		return err
 	}
 	if err := _m.WriteInt32(_w, b.Version); err != nil {
+		return err
+	}
+	if err := _m.WriteInt64(_w, b.LogPosition); err != nil {
 		return err
 	}
 	if err := _m.WriteUint32(_w, uint32(len(b.ResponseChannel))); err != nil {
@@ -66,6 +70,13 @@ func (b *BackupQuery) Decode(_m *SbeGoMarshaller, _r io.Reader, actingVersion ui
 		b.Version = b.VersionNullValue()
 	} else {
 		if err := _m.ReadInt32(_r, &b.Version); err != nil {
+			return err
+		}
+	}
+	if !b.LogPositionInActingVersion(actingVersion) {
+		b.LogPosition = b.LogPositionNullValue()
+	} else {
+		if err := _m.ReadInt64(_r, &b.LogPosition); err != nil {
 			return err
 		}
 	}
@@ -124,6 +135,11 @@ func (b *BackupQuery) RangeCheck(actingVersion uint16, schemaVersion uint16) err
 			return fmt.Errorf("Range check failed on b.Version (%v < %v > %v)", b.VersionMinValue(), b.Version, b.VersionMaxValue())
 		}
 	}
+	if b.LogPositionInActingVersion(actingVersion) {
+		if b.LogPosition != b.LogPositionNullValue() && (b.LogPosition < b.LogPositionMinValue() || b.LogPosition > b.LogPositionMaxValue()) {
+			return fmt.Errorf("Range check failed on b.LogPosition (%v < %v > %v)", b.LogPositionMinValue(), b.LogPosition, b.LogPositionMaxValue())
+		}
+	}
 	for idx, ch := range b.ResponseChannel {
 		if ch > 127 {
 			return fmt.Errorf("b.ResponseChannel[%d]=%d failed ASCII validation", idx, ch)
@@ -134,11 +150,12 @@ func (b *BackupQuery) RangeCheck(actingVersion uint16, schemaVersion uint16) err
 
 func BackupQueryInit(b *BackupQuery) {
 	b.Version = 0
+	b.LogPosition = math.MinInt64
 	return
 }
 
 func (*BackupQuery) SbeBlockLength() (blockLength uint16) {
-	return 16
+	return 24
 }
 
 func (*BackupQuery) SbeTemplateId() (templateId uint16) {
@@ -150,11 +167,15 @@ func (*BackupQuery) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*BackupQuery) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*BackupQuery) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*BackupQuery) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*BackupQuery) CorrelationIdId() uint16 {
@@ -281,6 +302,48 @@ func (*BackupQuery) VersionMaxValue() int32 {
 
 func (*BackupQuery) VersionNullValue() int32 {
 	return 0
+}
+
+func (*BackupQuery) LogPositionId() uint16 {
+	return 6
+}
+
+func (*BackupQuery) LogPositionSinceVersion() uint16 {
+	return 16
+}
+
+func (b *BackupQuery) LogPositionInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= b.LogPositionSinceVersion()
+}
+
+func (*BackupQuery) LogPositionDeprecated() uint16 {
+	return 0
+}
+
+func (*BackupQuery) LogPositionMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "optional"
+	}
+	return ""
+}
+
+func (*BackupQuery) LogPositionMinValue() int64 {
+	return math.MinInt64 + 1
+}
+
+func (*BackupQuery) LogPositionMaxValue() int64 {
+	return math.MaxInt64
+}
+
+func (*BackupQuery) LogPositionNullValue() int64 {
+	return math.MinInt64
 }
 
 func (*BackupQuery) ResponseChannelMetaAttribute(meta int) string {

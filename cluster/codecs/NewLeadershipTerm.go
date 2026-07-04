@@ -23,6 +23,7 @@ type NewLeadershipTerm struct {
 	LogSessionId            int32
 	AppVersion              int32
 	IsStartup               BooleanTypeEnum
+	CommitPosition          int64
 }
 
 func (n *NewLeadershipTerm) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bool) error {
@@ -68,6 +69,9 @@ func (n *NewLeadershipTerm) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeChe
 		return err
 	}
 	if err := n.IsStartup.Encode(_m, _w); err != nil {
+		return err
+	}
+	if err := _m.WriteInt64(_w, n.CommitPosition); err != nil {
 		return err
 	}
 	return nil
@@ -163,6 +167,13 @@ func (n *NewLeadershipTerm) Decode(_m *SbeGoMarshaller, _r io.Reader, actingVers
 			return err
 		}
 	}
+	if !n.CommitPositionInActingVersion(actingVersion) {
+		n.CommitPosition = n.CommitPositionNullValue()
+	} else {
+		if err := _m.ReadInt64(_r, &n.CommitPosition); err != nil {
+			return err
+		}
+	}
 	if actingVersion > n.SbeSchemaVersion() && blockLength > n.SbeBlockLength() {
 		io.CopyN(ioutil.Discard, _r, int64(blockLength-n.SbeBlockLength()))
 	}
@@ -238,6 +249,11 @@ func (n *NewLeadershipTerm) RangeCheck(actingVersion uint16, schemaVersion uint1
 	if err := n.IsStartup.RangeCheck(actingVersion, schemaVersion); err != nil {
 		return err
 	}
+	if n.CommitPositionInActingVersion(actingVersion) {
+		if n.CommitPosition < n.CommitPositionMinValue() || n.CommitPosition > n.CommitPositionMaxValue() {
+			return fmt.Errorf("Range check failed on n.CommitPosition (%v < %v > %v)", n.CommitPositionMinValue(), n.CommitPosition, n.CommitPositionMaxValue())
+		}
+	}
 	return nil
 }
 
@@ -247,7 +263,7 @@ func NewLeadershipTermInit(n *NewLeadershipTerm) {
 }
 
 func (*NewLeadershipTerm) SbeBlockLength() (blockLength uint16) {
-	return 88
+	return 96
 }
 
 func (*NewLeadershipTerm) SbeTemplateId() (templateId uint16) {
@@ -259,11 +275,15 @@ func (*NewLeadershipTerm) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*NewLeadershipTerm) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*NewLeadershipTerm) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*NewLeadershipTerm) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*NewLeadershipTerm) LogLeadershipTermIdId() uint16 {
@@ -798,4 +818,46 @@ func (*NewLeadershipTerm) IsStartupMetaAttribute(meta int) string {
 		return "required"
 	}
 	return ""
+}
+
+func (*NewLeadershipTerm) CommitPositionId() uint16 {
+	return 14
+}
+
+func (*NewLeadershipTerm) CommitPositionSinceVersion() uint16 {
+	return 15
+}
+
+func (n *NewLeadershipTerm) CommitPositionInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= n.CommitPositionSinceVersion()
+}
+
+func (*NewLeadershipTerm) CommitPositionDeprecated() uint16 {
+	return 0
+}
+
+func (*NewLeadershipTerm) CommitPositionMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "required"
+	}
+	return ""
+}
+
+func (*NewLeadershipTerm) CommitPositionMinValue() int64 {
+	return math.MinInt64 + 1
+}
+
+func (*NewLeadershipTerm) CommitPositionMaxValue() int64 {
+	return math.MaxInt64
+}
+
+func (*NewLeadershipTerm) CommitPositionNullValue() int64 {
+	return math.MinInt64
 }

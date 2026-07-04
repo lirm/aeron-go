@@ -171,6 +171,6 @@ func MakeClusterMessageBuffer(templateId, blockLength uint16) *atomic.Buffer {
 	buf.PutUInt16(0, blockLength)
 	buf.PutUInt16(2, templateId)
 	buf.PutUInt16(4, 111) // schemaId
-	buf.PutUInt16(6, 8)   // schemaVersion
+	buf.PutUInt16(6, 16)  // schemaVersion
 	return buf
 }

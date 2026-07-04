@@ -70,11 +70,15 @@ func (*ServiceTerminationPosition) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*ServiceTerminationPosition) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*ServiceTerminationPosition) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*ServiceTerminationPosition) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*ServiceTerminationPosition) LogPositionId() uint16 {

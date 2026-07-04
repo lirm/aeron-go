@@ -128,11 +128,15 @@ func (*CatchupPosition) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*CatchupPosition) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*CatchupPosition) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*CatchupPosition) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*CatchupPosition) LeadershipTermIdId() uint16 {

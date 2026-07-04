@@ -10,13 +10,14 @@ import (
 )
 
 type SessionEvent struct {
-	ClusterSessionId int64
-	CorrelationId    int64
-	LeadershipTermId int64
-	LeaderMemberId   int32
-	Code             EventCodeEnum
-	Version          int32
-	Detail           []uint8
+	ClusterSessionId         int64
+	CorrelationId            int64
+	LeadershipTermId         int64
+	LeaderMemberId           int32
+	Code                     EventCodeEnum
+	Version                  int32
+	LeaderHeartbeatTimeoutNs int64
+	Detail                   []uint8
 }
 
 func (s *SessionEvent) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bool) error {
@@ -41,6 +42,9 @@ func (s *SessionEvent) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCheck bo
 		return err
 	}
 	if err := _m.WriteInt32(_w, s.Version); err != nil {
+		return err
+	}
+	if err := _m.WriteInt64(_w, s.LeaderHeartbeatTimeoutNs); err != nil {
 		return err
 	}
 	if err := _m.WriteUint32(_w, uint32(len(s.Detail))); err != nil {
@@ -90,6 +94,13 @@ func (s *SessionEvent) Decode(_m *SbeGoMarshaller, _r io.Reader, actingVersion u
 		s.Version = s.VersionNullValue()
 	} else {
 		if err := _m.ReadInt32(_r, &s.Version); err != nil {
+			return err
+		}
+	}
+	if !s.LeaderHeartbeatTimeoutNsInActingVersion(actingVersion) {
+		s.LeaderHeartbeatTimeoutNs = s.LeaderHeartbeatTimeoutNsNullValue()
+	} else {
+		if err := _m.ReadInt64(_r, &s.LeaderHeartbeatTimeoutNs); err != nil {
 			return err
 		}
 	}
@@ -147,6 +158,11 @@ func (s *SessionEvent) RangeCheck(actingVersion uint16, schemaVersion uint16) er
 			return fmt.Errorf("Range check failed on s.Version (%v < %v > %v)", s.VersionMinValue(), s.Version, s.VersionMaxValue())
 		}
 	}
+	if s.LeaderHeartbeatTimeoutNsInActingVersion(actingVersion) {
+		if s.LeaderHeartbeatTimeoutNs != s.LeaderHeartbeatTimeoutNsNullValue() && (s.LeaderHeartbeatTimeoutNs < s.LeaderHeartbeatTimeoutNsMinValue() || s.LeaderHeartbeatTimeoutNs > s.LeaderHeartbeatTimeoutNsMaxValue()) {
+			return fmt.Errorf("Range check failed on s.LeaderHeartbeatTimeoutNs (%v < %v > %v)", s.LeaderHeartbeatTimeoutNsMinValue(), s.LeaderHeartbeatTimeoutNs, s.LeaderHeartbeatTimeoutNsMaxValue())
+		}
+	}
 	for idx, ch := range s.Detail {
 		if ch > 127 {
 			return fmt.Errorf("s.Detail[%d]=%d failed ASCII validation", idx, ch)
@@ -157,11 +173,12 @@ func (s *SessionEvent) RangeCheck(actingVersion uint16, schemaVersion uint16) er
 
 func SessionEventInit(s *SessionEvent) {
 	s.Version = 0
+	s.LeaderHeartbeatTimeoutNs = math.MinInt64
 	return
 }
 
 func (*SessionEvent) SbeBlockLength() (blockLength uint16) {
-	return 36
+	return 44
 }
 
 func (*SessionEvent) SbeTemplateId() (templateId uint16) {
@@ -173,11 +190,15 @@ func (*SessionEvent) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*SessionEvent) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*SessionEvent) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*SessionEvent) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*SessionEvent) ClusterSessionIdId() uint16 {
@@ -418,6 +439,48 @@ func (*SessionEvent) VersionMaxValue() int32 {
 
 func (*SessionEvent) VersionNullValue() int32 {
 	return 0
+}
+
+func (*SessionEvent) LeaderHeartbeatTimeoutNsId() uint16 {
+	return 8
+}
+
+func (*SessionEvent) LeaderHeartbeatTimeoutNsSinceVersion() uint16 {
+	return 13
+}
+
+func (s *SessionEvent) LeaderHeartbeatTimeoutNsInActingVersion(actingVersion uint16) bool {
+	return actingVersion >= s.LeaderHeartbeatTimeoutNsSinceVersion()
+}
+
+func (*SessionEvent) LeaderHeartbeatTimeoutNsDeprecated() uint16 {
+	return 0
+}
+
+func (*SessionEvent) LeaderHeartbeatTimeoutNsMetaAttribute(meta int) string {
+	switch meta {
+	case 1:
+		return ""
+	case 2:
+		return ""
+	case 3:
+		return ""
+	case 4:
+		return "optional"
+	}
+	return ""
+}
+
+func (*SessionEvent) LeaderHeartbeatTimeoutNsMinValue() int64 {
+	return math.MinInt64 + 1
+}
+
+func (*SessionEvent) LeaderHeartbeatTimeoutNsMaxValue() int64 {
+	return math.MaxInt64
+}
+
+func (*SessionEvent) LeaderHeartbeatTimeoutNsNullValue() int64 {
+	return math.MinInt64
 }
 
 func (*SessionEvent) DetailMetaAttribute(meta int) string {

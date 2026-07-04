@@ -128,11 +128,15 @@ func (*NewLeaderEvent) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*NewLeaderEvent) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*NewLeaderEvent) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*NewLeaderEvent) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*NewLeaderEvent) LeadershipTermIdId() uint16 {

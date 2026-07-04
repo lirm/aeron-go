@@ -86,11 +86,15 @@ func (*SnapshotRecordingQuery) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*SnapshotRecordingQuery) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*SnapshotRecordingQuery) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*SnapshotRecordingQuery) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*SnapshotRecordingQuery) CorrelationIdId() uint16 {

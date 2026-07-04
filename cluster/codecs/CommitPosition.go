@@ -102,11 +102,15 @@ func (*CommitPosition) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*CommitPosition) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*CommitPosition) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*CommitPosition) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*CommitPosition) LeadershipTermIdId() uint16 {

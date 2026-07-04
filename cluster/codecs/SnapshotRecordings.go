@@ -40,8 +40,8 @@ func (s *SnapshotRecordings) Encode(_m *SbeGoMarshaller, _w io.Writer, doRangeCh
 	if err := _m.WriteUint16(_w, SnapshotsNumInGroup); err != nil {
 		return err
 	}
-	for _, prop := range s.Snapshots {
-		if err := prop.Encode(_m, _w); err != nil {
+	for i := range s.Snapshots {
+		if err := s.Snapshots[i].Encode(_m, _w); err != nil {
 			return err
 		}
 	}
@@ -113,8 +113,8 @@ func (s *SnapshotRecordings) RangeCheck(actingVersion uint16, schemaVersion uint
 			return fmt.Errorf("Range check failed on s.CorrelationId (%v < %v > %v)", s.CorrelationIdMinValue(), s.CorrelationId, s.CorrelationIdMaxValue())
 		}
 	}
-	for _, prop := range s.Snapshots {
-		if err := prop.RangeCheck(actingVersion, schemaVersion); err != nil {
+	for i := range s.Snapshots {
+		if err := s.Snapshots[i].RangeCheck(actingVersion, schemaVersion); err != nil {
 			return err
 		}
 	}
@@ -252,11 +252,15 @@ func (*SnapshotRecordings) SbeSchemaId() (schemaId uint16) {
 }
 
 func (*SnapshotRecordings) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*SnapshotRecordings) SbeSemanticType() (semanticType []byte) {
 	return []byte("")
+}
+
+func (*SnapshotRecordings) SbeSemanticVersion() (semanticVersion string) {
+	return "5.4"
 }
 
 func (*SnapshotRecordings) CorrelationIdId() uint16 {
@@ -574,7 +578,7 @@ func (*SnapshotRecordingsSnapshots) SbeBlockLength() (blockLength uint) {
 }
 
 func (*SnapshotRecordingsSnapshots) SbeSchemaVersion() (schemaVersion uint16) {
-	return 8
+	return 16
 }
 
 func (*SnapshotRecordings) MemberEndpointsMetaAttribute(meta int) string {
