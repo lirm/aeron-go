@@ -54,8 +54,15 @@ func (header *headerWriter) fill(defaultHdr *atomic.Buffer) {
 	header.streamID = defaultHdr.GetInt32(logbuffer.DataFrameHeader.StreamIDFieldOffset)
 }
 
+// write writes the frame header with a negative length: the frame is claimed but not yet published.
+// The driver's term unblocker reads it when a publication stalls past the timeout, and it must not
+// see bytes of the frame before -length, otherwise it would take them for the next frame and pad
+// over a claimed one. So, as in the Java HeaderWriter, this is a store followed by a StoreStore
+// barrier rather than a full barrier: atomic.StoreInt32 is XCHG on amd64 and stalls on the cache
+// miss for a fresh term line instead of letting it overlap with the copy. The frame is published by
+// the release store of the length in SetFrameLength.
 func (header *headerWriter) write(termBuffer *atomic.Buffer, offset, length, termID int32) {
-	termBuffer.PutInt32Ordered(offset, -length)
+	termBuffer.PutInt32StoreFence(offset, -length)
 
 	termBuffer.PutInt8(offset+logbuffer.DataFrameHeader.VersionFieldOffset, logbuffer.DataFrameHeader.CurrentVersion)
 	termBuffer.PutUInt8(offset+logbuffer.DataFrameHeader.FlagsFieldOffset, unfragmented)

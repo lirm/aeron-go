@@ -80,7 +80,7 @@ func (claim *Claim) SetReservedValue(value int64) *Claim {
 func (claim *Claim) Commit() {
 	frameLength := claim.buffer.Capacity()
 
-	claim.buffer.PutInt32Ordered(DataFrameHeader.FrameLengthFieldOffset, frameLength)
+	claim.buffer.PutInt32Release(DataFrameHeader.FrameLengthFieldOffset, frameLength)
 }
 
 // Abort a claim of the message space to the log buffer so that the log can progress by ignoring this claim.
@@ -88,5 +88,5 @@ func (claim *Claim) Abort() {
 	frameLength := claim.buffer.Capacity()
 
 	claim.buffer.PutUInt16(DataFrameHeader.TypeFieldOffset, DataFrameHeader.TypePad)
-	claim.buffer.PutInt32Ordered(DataFrameHeader.FrameLengthFieldOffset, frameLength)
+	claim.buffer.PutInt32Release(DataFrameHeader.FrameLengthFieldOffset, frameLength)
 }

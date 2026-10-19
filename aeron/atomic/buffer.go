@@ -244,6 +244,30 @@ func (buf *Buffer) PutInt32Ordered(offset int32, value int32) {
 	atomic.StoreInt32((*int32)(uptr), value)
 }
 
+// PutInt32Release is a release store (putIntOrdered in Agrona): earlier stores become visible before
+// this one, but unlike PutInt32Ordered it does not issue a full barrier on amd64. Used to publish
+// the frame length.
+//
+//go:norace
+func (buf *Buffer) PutInt32Release(offset int32, value int32) {
+	BoundsCheck(offset, 4, buf.length)
+
+	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
+	storeInt32Release((*int32)(uptr), value)
+}
+
+// PutInt32StoreFence is a store that later stores cannot overtake (putLongOrdered followed by
+// storeFence in Agrona), also without a full barrier on amd64. Used for the negative length in the
+// frame header.
+//
+//go:norace
+func (buf *Buffer) PutInt32StoreFence(offset int32, value int32) {
+	BoundsCheck(offset, 4, buf.length)
+
+	uptr := unsafe.Pointer(uintptr(buf.bufferPtr) + uintptr(offset))
+	storeInt32StoreFence((*int32)(uptr), value)
+}
+
 //go:norace
 func (buf *Buffer) PutIntOrdered(offset int32, value int) {
 	BoundsCheck(offset, 4, buf.length)

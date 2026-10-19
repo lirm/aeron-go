@@ -87,8 +87,10 @@ func GetReservedValue(logBuffer *atomic.Buffer, frameOffset int32) int64 {
 	return logBuffer.GetInt64Volatile(offset)
 }
 
+// SetFrameLength publishes the frame: a reader that sees the positive length also sees every store
+// made to the frame before it. A release store is enough for that, as in frameLengthOrdered in Java.
 func SetFrameLength(logBuffer *atomic.Buffer, frameOffset int32, frameLength int32) {
-	logBuffer.PutInt32Ordered(lengthOffset(frameOffset), frameLength)
+	logBuffer.PutInt32Release(lengthOffset(frameOffset), frameLength)
 }
 
 func IsPaddingFrame(logBuffer *atomic.Buffer, frameOffset int32) bool {
